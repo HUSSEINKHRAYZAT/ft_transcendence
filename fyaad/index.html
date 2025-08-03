@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- Basic Meta Tags -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- SEO Meta Tags -->
+    <meta name="description" content="FT_PONG - A lime-themed Pong game built with TypeScript and Tailwind CSS">
+    <meta name="keywords" content="pong, game, typescript, lime theme, arcade">
+    <meta name="author" content="FT_PONG Team">
+
+    <!-- Open Graph Meta Tags for Social Sharing -->
+     <!-- its actually when the website is shared -->
+    <meta property="og:title" content="FT_PONG - Lime Themed Pong Game">
+    <meta property="og:description" content="Experience the classic Pong game with a fresh lime twist">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content="/images/pong-social-preview.jpg">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="https://img.icons8.com/color/48/ping-pong.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+
+    <!-- Title -->
+    <title>FT_PONG - Lime Themed Pong Game</title>
+
+    <!-- Tailwind CSS - Will be replaced with built CSS in production -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Custom Tailwind Configuration -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // Lime theme colors
+                        'lime': {
+                            50: '#f7ffe0',
+                            100: '#ecffc',
+                            200: '#d9ff99',
+                            300: '#bef264',
+                            400: '#a3e635',
+                            500: '#84cc16',  // Primary lime
+                            600: '#65a30d',
+                            700: '#4d7c0f',
+                            800: '#365314',
+                            900: '#1a2e05',
+                        },
+                        'dark-green': {
+                            50: '#f0fdf0',
+                            100: '#dcfce7',
+                            200: '#bbf7d0',
+                            300: '#86efac',
+                            400: '#4ade80',
+                            500: '#22c55e',
+                            600: '#16a34a',  // Secondary dark green
+                            700: '#15803d',
+                            800: '#166534',
+                            900: '#14532d',
+                        }
+                    },
+                    fontFamily: {
+                        'game': ['Orbitron', 'monospace'], // Game-style font
+                    },
+                    animation: {
+                        'pulse-lime': 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'bounce-slow': 'bounce 3s infinite',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts for game aesthetics -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+
+    <!-- Custom CSS for additional styling -->
+    <style>
+        /* Custom scrollbar with lime theme */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+
+            background: #14532d;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #84cc16;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #65a30d;
+        }
+
+        /* Smooth scrolling */
+        html {
+            scroll-behavior: smooth;
+        }
+
+        /* Game-style glow effects */
+        .glow-lime {
+            box-shadow: 0 0 20px rgba(132, 204, 22, 0.5);
+        }
+
+        .glow-dark-green {
+            box-shadow: 0 0 20px rgba(22, 163, 74, 0.5);
+        }
+
+
+        /* Modal backdrop blur */
+        .modal-backdrop {
+            backdrop-filter: blur(4px);
+        }
+
+        /* Custom button hover effects */
+        .btn-lime {
+            @apply bg-lime-500 hover:bg-lime-600 text-white font-bold py-2 px-4 rounded transition-all duration-300;
+        }
+
+        .btn-dark-green {
+            @apply bg-dark-green-600 hover:bg-dark-green-700 text-white font-bold py-2 px-4 rounded transition-all duration-300;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white font-game overflow-x-hidden">
+    <!-- Loading Screen - Will be hidden once app loads -->
+    <div id="loading-screen" class="fixed inset-0 bg-gray-900 flex items-center justify-center z-50">
+        <div class="text-center">
+            <div class="w-16 h-16 border-4 border-lime-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+            <h2 class="text-2xl font-bold text-lime-500">Loading FT_PONG...</h2>
+        </div>
+    </div>
+
+    <!-- Main App Container -->
+    <div id="app" class="min-h-screen">
+        <!-- Navigation Bar Container -->
+        <nav id="navbar" class="fixed top-0 left-0 right-0 z-40">
+            <!-- Navigation content will be dynamically inserted here by Navbar.ts -->
+        </nav>
+
+        <!-- Main Content Container -->
+        <main id="main-content" class="pt-16">
+            <!-- Jumbotron/Hero Section -->
+            <section id="jumbotron" class="min-h-screen">
+                <!-- Jumbotron content will be dynamically inserted here by Jumbotron.ts -->
+            </section>
+
+            <!-- Home Content Sections -->
+            <section id="home-content" class="py-16">
+                <div class="container mx-auto px-4">
+                    <!-- Content boxes row -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                        <!-- Notifications Box -->
+                        <div id="notifications-box" class="bg-gray-800 rounded-lg p-6">
+                            <!-- Content will be dynamically inserted by NotificationBox.ts -->
+                        </div>
+
+                        <!-- Friends Box -->
+                        <div id="friends-box" class="bg-gray-800 rounded-lg p-6">
+                            <!-- Content will be dynamically inserted by FriendsBox.ts -->
+                        </div>
+
+                        <!-- Settings Box -->
+                        <div id="settings-box" class="bg-gray-800 rounded-lg p-6">
+                            <!-- Content will be dynamically inserted by SettingsBox.ts -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Game Container (Hidden by default) -->
+            <section id="game-container" class="hidden min-h-screen">
+                <!-- Game canvas and controls will be inserted here by PongGame.ts -->
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer id="footer" class="bg-gray-800 py-8 mt-16">
+            <div class="container mx-auto px-4 text-center">
+                <p class="text-gray-400">&copy; 2024 FT_PONG. Built with TypeScript & Tailwind CSS.</p>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Modal Container - All modals will be rendered here -->
+    <div id="modal-container">
+        <!-- Modals will be dynamically inserted here by Modal classes -->
+    </div>
+
+    <!-- Toast/Notification Container -->
+    <div id="toast-container" class="fixed top-20 right-4 z-50 space-y-2">
+        <!-- Toast notifications will be dynamically inserted here -->
+    </div>
+
+    <!-- Debug Panel (Development only) -->
+    <div id="debug-panel" class="fixed bottom-4 left-4 bg-gray-800 p-4 rounded-lg text-xs hidden">
+        <h4 class="text-lime-500 font-bold mb-2">Debug Info</h4>
+        <div id="debug-auth-status">Auth: Not loaded</div>
+        <div id="debug-current-view">View: Home</div>
+        <div id="debug-modal-count">Modals: 0</div>
+    </div>
+
+    <!-- TypeScript Module Entry Point -->
+    <script type="module">
+        // Inline JavaScript to ensure loading works
+        console.log('🚀 Inline script executing...');
+
+        // Wait for DOM and hide loading screen
+        function hideLoadingScreen() {
+            console.log('🔍 Looking for loading screen...');
+            const loadingScreen = document.getElementById('loading-screen');
+            if (loadingScreen) {
+                console.log('✅ Found loading screen, hiding it...');
+                loadingScreen.style.display = 'none';
+                console.log('✅ Loading screen hidden!');
+                showBasicContent();
+            } else {
+                console.error('❌ Loading screen not found!');
+            }
+        }
+
+        // Show basic content
+        function showBasicContent() {
+            console.log('🏗️ Adding basic content...');
+
+            // Add navbar
+            const navbar = document.getElementById('navbar');
+            if (navbar) {
+                navbar.innerHTML = `
+                    <div class="bg-gray-800 border-b border-gray-700">
+                        <div class="container mx-auto px-4">
+                            <div class="flex items-center justify-between h-16">
+                                <div class="flex items-center">
+                                    <img src="https://img.icons8.com/color/48/ping-pong.png" alt="Pong Icon" class="w-6 h-6 mr-2">
+                                    <span class="text-2xl font-bold text-lime-500">FT_PONG</span>
+                                </div>
+
+                                <div class="flex space-x-4">
+                                    <button class="px-3 py-2 rounded-md text-sm font-medium text-lime-500 bg-gray-700">HOME</button>
+                                    <button onclick="window.showInfoModal('about')" class="px-3 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-lime-500 transition-colors duration-300">ABOUT US</button>
+                                    <button onclick="window.showInfoModal('project')" class="px-3 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-lime-500 transition-colors duration-300">PROJECT</button>
+                                </div>
+                                <div>
+                                    <button onclick="window.showLoginModal()" class="bg-lime-500 hover:bg-lime-600 text-white font-bold py-2 px-4 rounded transition-all duration-300">Login</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Add jumbotron
+            const jumbotron = document.getElementById('jumbotron');
+            if (jumbotron) {
+                jumbotron.innerHTML = `
+                    <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 to-gray-800">
+                        <div class="text-center max-w-600 p-8">
+                            <h1 class="text-6xl font-bold mb-6 bg-gradient-to-r from-lime-500 to-green-600 bg-clip-text text-transparent">FT_PONG</h1>
+                            <p class="text-xl text-gray-300 mb-8">Experience the classic Pong game with a fresh lime twist!</p>
+                            <button onclick="window.handleGetStarted()" class="bg-lime-500 hover:bg-lime-600 text-white font-bold py-4 px-8 text-xl rounded transition-all duration-300 transform hover:scale-105">Get Started</button>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Add content boxes
+            const notificationsBox = document.getElementById('notifications-box');
+            if (notificationsBox) {
+                notificationsBox.innerHTML = `
+                    <h3 class="text-xl font-bold mb-4 text-lime-500">📢 Notifications</h3>
+                    <p class="text-gray-400">Please log in to view notifications</p>
+                    <button onclick="window.showLoginModal()" class="mt-4 bg-lime-500 hover:bg-lime-600 text-white font-bold py-2 px-4 rounded transition-all duration-300">Sign In</button>
+                `;
+            }
+
+            const friendsBox = document.getElementById('friends-box');
+            if (friendsBox) {
+                friendsBox.innerHTML = `
+                    <h3 class="text-xl font-bold mb-4 text-lime-500">👥 Friends</h3>
+                    <p class="text-gray-400">Please log in to view friends</p>
+                    <button onclick="showLoginModal()" class="mt-4 bg-lime-500 hover:bg-lime-600 text-white font-bold py-2 px-4 rounded transition-all duration-300">Sign In</button>
+                `;
+            }
+
+            const settingsBox = document.getElementById('settings-box');
+            if (settingsBox) {
+                settingsBox.innerHTML = `
+                    <h3 class="text-xl font-bold mb-4 text-lime-500">⚙️ Settings</h3>
+                    <p class="text-gray-400">Please log in to access settings</p>
+                    <button onclick="showLoginModal()" class="mt-4 bg-lime-500 hover:bg-lime-600 text-white font-bold py-2 px-4 rounded transition-all duration-300">Sign In</button>
+                `;
+            }
+
+            console.log('✅ Basic content added successfully!');
+        }
+
+        // Modal functions
+        window.showLoginModal = function() {
+            console.log('🔑 Login button clicked! Opening login modal...');
+            const modalContainer = document.getElementById('modal-container');
+            console.log('📍 Modal container found:', !!modalContainer);
+
+            if (modalContainer) {
+                console.log('✅ Adding modal HTML...');
+                modalContainer.innerHTML = `
+                    <div class="fixed inset-0 z-50 flex items-center justify-center modal-backdrop" onclick="window.closeModal(event)">
+                        <div class="bg-gray-800 rounded-lg shadow-2xl max-w-md w-full mx-4 p-6" onclick="event.stopPropagation()">
+                            <div class="flex justify-between items-center mb-6">
+                                <h2 class="text-2xl font-bold text-lime-500">Login</h2>
+                                <button onclick="window.closeModal()" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+                            </div>
+                            <form onsubmit="window.handleLogin(event)">
+                                <div class="mb-4">
+                                    <label class="block text-sm font-medium text-gray-300 mb-2">Email</label>
+                                    <input type="email" id="login-email" required class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:border-lime-500 focus:ring-1 focus:ring-lime-500" placeholder="Enter your email">
+                                </div>
+                                <div class="mb-6">
+                                    <label class="block text-sm font-medium text-gray-300 mb-2">Password</label>
+                                    <input type="password" id="login-password" required class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:border-lime-500 focus:ring-1 focus:ring-lime-500" placeholder="Enter your password">
+                                </div>
+                                <button type="submit" class="w-full bg-lime-500 hover:bg-lime-600 text-white font-bold py-2 px-4 rounded transition-all duration-300 mb-4">Login</button>
+                            </form>
+                              <div class="text-center">
+                                  <p class="text-gray-400">Are you new here? <button onclick="window.showSignupModal()" class="text-lime-500 hover:text-lime-400">Sign up</button></p>
+                                  <button onclick="window.handleGoogleSignup()" class="mt-4 w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded transition-all duration-300 flex items-center justify-center">
+                                      <img src="/public/images/Google_white.png" alt="Google" class="w-5 h-5 mr-2">
+                                      Sign up with Google
+                                  </button>
+                              </div>
+                        </div>
+                    </div>
+                `;
+                console.log('✅ Modal HTML added successfully!');
+            } else {
+                console.error('❌ Modal container not found!');
+            }
+        }
+
+        window.showSignupModal = function() {
+            console.log('📝 Opening signup modal...');
+            const modalContainer = document.getElementById('modal-container');
+            if (modalContainer) {
+                modalContainer.innerHTML = `
+                    <div class="fixed inset-0 z-50 flex items-center justify-center modal-backdrop" onclick="window.closeModal(event)">
+                        <div class="bg-gray-800 rounded-lg shadow-2xl max-w-md w-full mx-4 p-6" onclick="event.stopPropagation()">
+                            <div class="flex justify-between items-center mb-6">
+                                <h2 class="text-2xl font-bold text-lime-500">Sign Up</h2>
+                                <button onclick="window.closeModal()" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+                            </div>
+                            <form onsubmit="window.handleSignup(event)">
+                                <div class="mb-4">
+                                    <label class="block text-sm font-medium text-gray-300 mb-2">First Name</label>
+                                    <input type="text" id="signup-firstname" required class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:border-lime-500 focus:ring-1 focus:ring-lime-500" placeholder="Enter your first name">
+                                </div>
+                                <div class="mb-4">
+                                    <label class="block text-sm font-medium text-gray-300 mb-2">Last Name</label>
+                                    <input type="text" id="signup-lastname" required class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:border-lime-500 focus:ring-1 focus:ring-lime-500" placeholder="Enter your last name">
+                                </div>
+                                <div class="mb-4">
+                                    <label class="block text-sm font-medium text-gray-300 mb-2">Email</label>
+                                    <input type="email" id="signup-email" required class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:border-lime-500 focus:ring-1 focus:ring-lime-500" placeholder="Enter your email">
+                                </div>
+                                <div class="mb-6">
+                                    <label class="block text-sm font-medium text-gray-300 mb-2">Password</label>
+                                    <input type="password" id="signup-password" required class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:border-lime-500 focus:ring-1 focus:ring-lime-500" placeholder="Enter your password">
+                                </div>
+                                <button type="submit" class="w-full bg-lime-500 hover:bg-lime-600 text-white font-bold py-2 px-4 rounded transition-all duration-300 mb-4">Sign Up</button>
+                            </form>
+                            <div class="text-center">
+                                <p class="text-gray-400">Already have an account? <button onclick="window.showLoginModal()" class="text-lime-500 hover:text-lime-400">Login</button></p>
+                                <button onclick="window.handleGoogleSignup()" class="mt-4 w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded transition-all duration-300">Sign up with Google</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        window.showInfoModal = function(type) {
+            console.log('ℹ️ Opening info modal:', type);
+            const titles = {
+                home: 'Welcome to FT_PONG',
+                about: 'About FT_PONG',
+                project: 'Project Information'
+            };
+            const contents = {
+                home: 'This is the home page where you can start playing our lime-themed Pong game. Get ready for some retro gaming fun!',
+                about: 'FT_PONG is a modern take on the classic Pong game, featuring a fresh lime theme and built with cutting-edge web technologies including TypeScript and Tailwind CSS.',
+                project: 'This project showcases modern web development practices with a focus on clean architecture, responsive design, and engaging user experience.'
+            };
+
+            const modalContainer = document.getElementById('modal-container');
+            if (modalContainer) {
+                modalContainer.innerHTML = `
+                    <div class="fixed inset-0 z-50 flex items-center justify-center modal-backdrop" onclick="window.closeModal(event)">
+                        <div class="bg-gray-800 rounded-lg shadow-2xl max-w-md w-full mx-4 p-6" onclick="event.stopPropagation()">
+                            <div class="flex justify-between items-center mb-6">
+                                <h2 class="text-2xl font-bold text-lime-500">${titles[type]}</h2>
+                                <button onclick="window.closeModal()" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+                            </div>
+                            <p class="text-gray-300 mb-6">${contents[type]}</p>
+                            <button onclick="window.closeModal()" class="w-full bg-lime-500 hover:bg-lime-600 text-white font-bold py-2 px-4 rounded transition-all duration-300">Close</button>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        window.closeModal = function(event) {
+            if (event && event.target !== event.currentTarget) return;
+            console.log('❌ Closing modal...');
+            const modalContainer = document.getElementById('modal-container');
+            if (modalContainer) {
+                modalContainer.innerHTML = '';
+            }
+        }
+
+        // Handle functions
+        window.handleLogin = function(event) {
+            event.preventDefault();
+            console.log('🔑 Handling login...');
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+
+            // Demo login - use demo@ftpong.com / demo123
+            if (email === 'demo@ftpong.com' && password === 'demo123') {
+                alert('Login successful! Welcome back!');
+                window.closeModal();
+            } else {
+                alert('Invalid credentials. Try: demo@ftpong.com / demo123');
+            }
+        }
+
+        window.handleSignup = function(event) {
+            event.preventDefault();
+            console.log('📝 Handling signup...');
+            const firstName = document.getElementById('signup-firstname').value;
+            const lastName = document.getElementById('signup-lastname').value;
+            const email = document.getElementById('signup-email').value;
+            const password = document.getElementById('signup-password').value;
+
+            alert(`Account created for ${firstName} ${lastName}! You can now login.`);
+            window.showLoginModal();
+        }
+
+        window.handleGetStarted = function() {
+            console.log('🚀 Get Started clicked...');
+            alert('Please login first to start playing!');
+            window.showLoginModal();
+        }
+
+        window.handleGoogleSignup = function() {
+            console.log('🌐 Google signup clicked...');
+            alert('Google signup will be implemented later!');
+        }
+
+        // Initialize when DOM is ready
+        if (document.readyState === 'loading') {
+            console.log('⏳ Waiting for DOM...');
+            document.addEventListener('DOMContentLoaded', hideLoadingScreen);
+        } else {
+            console.log('✅ DOM ready, initializing...');
+            hideLoadingScreen();
+        }
+
+        // Fallback - force hide loading screen after 2 seconds
+        setTimeout(() => {
+            console.log('⚠️ Fallback: Forcing loading screen to hide...');
+            hideLoadingScreen();
+        }, 2000);
+    </script>
+
+    <!-- Load TypeScript modules after basic content is shown -->
+    <!-- <script type="module" src="/src/main.ts"></script> -->
+
+    <!-- Development Console Commands -->
+    <script>
+        // Development helper functions available in console
+        if (process.env.NODE_ENV === 'development') {
+            window.ftPongDebug = {
+                showDebugPanel: () => {
+                    document.getElementById('debug-panel').classList.remove('hidden');
+                },
+                hideDebugPanel: () => {
+                    document.getElementById('debug-panel').classList.add('hidden');
+                },
+                toggleDebugPanel: () => {
+                    const panel = document.getElementById('debug-panel');
+                    panel.classList.toggle('hidden');
+                },
+                // Will be extended by App.ts with more debug functions
+            };
+
+            console.log('%cFT_PONG Debug Mode Enabled', 'color: #84cc16; font-size: 16px; font-weight: bold;');
+            console.log('Available debug commands:');
+            console.log('- ftPongDebug.showDebugPanel()');
+            console.log('- ftPongDebug.hideDebugPanel()');
+            console.log('- ftPongDebug.toggleDebugPanel()');
+        }
+    </script>
+</body>
+</html>
