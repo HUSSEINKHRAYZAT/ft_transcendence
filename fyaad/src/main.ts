@@ -2,154 +2,286 @@
 import { waitForDOM } from './utils/DOMHelpers';
 import './styles/main.css';
 
+// Try to import components with error handling
+let Navbar: any, NotificationBox: any, FriendsBox: any, SettingsBox: any, ModalService: any;
+
+try {
+  console.log('📦 Importing components...');
+
+  // Dynamic imports with better error handling
+  Promise.all([
+    import('./components/navbar/Navbar').then(m => Navbar = m.Navbar),
+    import('./components/home/NotificationBox').then(m => NotificationBox = m.NotificationBox),
+    import('./components/home/FriendsBox').then(m => FriendsBox = m.FriendsBox),
+    import('./components/home/SettingsBox').then(m => SettingsBox = m.SettingsBox),
+    import('./components/modals/ModalService').then(m => ModalService = m.ModalService)
+  ]).then(() => {
+    console.log('✅ All components imported successfully');
+    initializeWithComponents();
+  }).catch(error => {
+    console.error('❌ Failed to import components:', error);
+    console.log('🔄 Falling back to basic content...');
+    initializeBasicContent();
+  });
+
+} catch (error) {
+  console.error('❌ Import error:', error);
+  initializeBasicContent();
+}
+
 /**
- * Initialize the application
+ * Initialize with TypeScript components
  */
-async function initializeApp(): Promise<void> {
-  console.log('🔄 Starting application initialization...');
+async function initializeWithComponents(): Promise<void> {
+  console.log('🚀 Starting TypeScript application initialization...');
 
   try {
-    console.log('⏳ Waiting for DOM to be ready...');
     // Wait for DOM to be ready
     await waitForDOM();
     console.log('✅ DOM is ready!');
 
-    console.log('🔍 Looking for loading screen element...');
-    // Hide loading screen first
-    const loadingScreen = document.getElementById('loading-screen');
-    if (loadingScreen) {
-      console.log('✅ Loading screen found, hiding it...');
-      loadingScreen.style.display = 'none';
-      console.log('✅ Loading screen hidden successfully');
-    } else {
-      console.warn('⚠️ Loading screen element not found!');
-    }
+    // Hide loading screen
+    hideLoadingScreen();
 
-    // For now, just show a basic working state
-    // We'll add the App class once all components are created
-    console.log('🎮 FT_PONG Application initialized successfully!');
+    // Initialize modal service and make it globally available
+    const modalService = new ModalService();
+    (window as any).modalService = modalService;
+    console.log('🔑 Modal service initialized');
 
-    console.log('🖼️ Showing basic content...');
-    // Show basic content
-    showBasicContent();
-    console.log('✅ Basic content displayed');
+    // Add basic jumbotron content
+    addBasicJumbotron();
 
-    // Show debug info in development
-    if (import.meta.env.DEV) {
-      console.log('🟢 Development mode active');
-      console.log('🌍 Environment variables:', {
-        DEV: import.meta.env.DEV,
-        PROD: import.meta.env.PROD,
-        MODE: import.meta.env.MODE
-      });
-    }
+    // Initialize components
+    console.log('🧩 Initializing components...');
+
+    const navbar = new Navbar();
+    const notificationBox = new NotificationBox();
+    const friendsBox = new FriendsBox();
+    const settingsBox = new SettingsBox();
+
+    // Render all components
+    await Promise.all([
+      navbar.render(),
+      notificationBox.render(),
+      friendsBox.render(),
+      settingsBox.render()
+    ]);
+
+    console.log('✅ All components rendered successfully!');
+
+    // Setup authentication state listening
+    setupAuthListeners([navbar, notificationBox, friendsBox, settingsBox]);
+
+    // Check initial auth state
+    updateAuthState([navbar, notificationBox, friendsBox, settingsBox]);
+
+    console.log('🎮 FT_PONG Application initialized successfully with TypeScript components!');
 
   } catch (error) {
-    console.error('❌ Failed to initialize FT_PONG application:', error);
-    console.error('📍 Error details:', {
-      message: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : 'No stack trace'
-    });
+    console.error('❌ Failed to initialize with components:', error);
+    console.log('🔄 Falling back to basic content...');
+    initializeBasicContent();
+  }
+}
 
-    // Show error message to user
+/**
+ * Fallback to basic content if TypeScript components fail
+ */
+async function initializeBasicContent(): Promise<void> {
+  console.log('🔄 Initializing with basic content fallback...');
+
+  try {
+    await waitForDOM();
+    hideLoadingScreen();
+
+    // Create basic modal service
+    createBasicModalService();
+
+    // Add basic content
+    addBasicNavbar();
+    addBasicContentBoxes();
+
+    console.log('✅ Basic content initialized successfully!');
+
+  } catch (error) {
+    console.error('❌ Failed to initialize basic content:', error);
     showInitializationError(error);
   }
 }
 
 /**
- * Show basic content until components are ready
+ * Hide loading screen
  */
-function showBasicContent(): void {
-  console.log('🏗️ Building basic content...');
+function hideLoadingScreen(): void {
+  const loadingScreen = document.getElementById('loading-screen');
+  if (loadingScreen) {
+    console.log('✅ Loading screen found, hiding it...');
+    loadingScreen.style.display = 'none';
+    console.log('✅ Loading screen hidden successfully');
+  }
+}
 
-  // Add basic navbar
-  console.log('📍 Setting up navbar...');
+/**
+ * Create basic modal service as fallback
+ */
+function createBasicModalService(): void {
+  (window as any).modalService = {
+    showLoginModal: () => alert('Login modal - TypeScript components not loaded'),
+    showSignupModal: () => alert('Signup modal - TypeScript components not loaded'),
+    showInfoModal: (type: string) => alert(`${type} info - TypeScript components not loaded`),
+    closeModal: () => console.log('Close modal - using fallback')
+  };
+  console.log('🔑 Basic modal service created');
+}
+
+/**
+ * Add basic navbar
+ */
+function addBasicNavbar(): void {
   const navbar = document.getElementById('navbar');
   if (navbar) {
-    console.log('✅ Navbar element found, adding content...');
     navbar.innerHTML = `
       <div class="bg-gray-800 border-b border-gray-700">
         <div class="container mx-auto px-4">
           <div class="flex items-center justify-between h-16">
             <div class="flex items-center">
-              <span class="text-2xl font-bold text-lime-500">🏓 FT_PONG</span>
+              <img src="https://img.icons8.com/color/48/ping-pong.png" alt="Pong Icon" class="w-6 h-6 mr-2">
+              <span class="text-2xl font-bold text-lime-500">FT_PONG</span>
             </div>
             <div class="flex space-x-4">
-              <button class="nav-link">HOME</button>
-              <button class="nav-link">ABOUT US</button>
-              <button class="nav-link">PROJECT</button>
+              <button class="px-3 py-2 rounded-md text-sm font-medium text-lime-500 bg-gray-700">HOME</button>
+              <button onclick="alert('About Us - TypeScript components not loaded')" class="px-3 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-lime-500 transition-colors duration-300">ABOUT US</button>
+              <button onclick="alert('Project Info - TypeScript components not loaded')" class="px-3 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-lime-500 transition-colors duration-300">PROJECT</button>
             </div>
             <div>
-              <button class="btn-lime">Login</button>
+              <button onclick="alert('Login - TypeScript components not loaded')" class="bg-lime-500 hover:bg-lime-600 text-white font-bold py-2 px-4 rounded transition-all duration-300">Login</button>
             </div>
           </div>
         </div>
       </div>
     `;
-    console.log('✅ Navbar content added');
-  } else {
-    console.error('❌ Navbar element not found!');
+    console.log('✅ Basic navbar added');
   }
+}
 
-  // Add basic jumbotron
-  console.log('📍 Setting up jumbotron...');
+/**
+ * Add basic jumbotron content
+ */
+function addBasicJumbotron(): void {
   const jumbotron = document.getElementById('jumbotron');
   if (jumbotron) {
-    console.log('✅ Jumbotron element found, adding content...');
-    jumbotron.innerHTML = `
-      <div class="jumbotron">
-        <div class="jumbotron-content">
-          <h1>FT_PONG</h1>
-          <p>Experience the classic Pong game with a fresh lime twist!</p>
-          <button class="btn-lime text-xl px-8 py-4">Get Started</button>
-        </div>
-      </div>
-    `;
-    console.log('✅ Jumbotron content added');
-  } else {
-    console.error('❌ Jumbotron element not found!');
+jumbotron.innerHTML = `
+  <div class="min-h-screen flex items-center justify-center animated-gradient">
+    <div class="text-center max-w-600 p-8">
+      <h1 class="text-6xl font-bold mb-6 bg-gradient-to-r from-lime-500 to-green-600 bg-clip-text text-transparent">FT_PONG</h1>
+      <p class="text-xl text-gray-100 mb-8">Experience the classic Pong game with a fresh lime twist!</p>
+      <button onclick="handleGetStarted()" class="bg-lime-500 hover:bg-lime-600 text-white font-bold py-4 px-8 text-xl rounded transition-all duration-300 transform hover:scale-105">Get Started</button>
+    </div>
+  </div>
+`;
+
+    console.log('✅ Basic jumbotron added');
   }
+}
 
-  // Add basic content boxes
-  console.log('📍 Setting up content boxes...');
+/**
+ * Handle Get Started button (global function)
+ */
+(window as any).handleGetStarted = function() {
+  console.log('🚀 Get Started clicked...');
+  if ((window as any).modalService) {
+    const authToken = localStorage.getItem('ft_pong_auth_token');
+    if (authToken) {
+      alert('Game starting! (Game component will be added later)');
+    } else {
+      (window as any).modalService.showLoginModal();
+    }
+  } else {
+    alert('Please login first to start playing!');
+  }
+};
 
+/**
+ * Add basic content boxes
+ */
+function addBasicContentBoxes(): void {
+  // Notifications box
   const notificationsBox = document.getElementById('notifications-box');
   if (notificationsBox) {
-    console.log('✅ Notifications box found, adding content...');
     notificationsBox.innerHTML = `
       <h3 class="text-xl font-bold mb-4 text-lime-500">📢 Notifications</h3>
-      <p class="text-gray-400">Please log in to view notifications</p>
+      <p class="text-gray-400">TypeScript components not loaded. Using fallback content.</p>
     `;
-    console.log('✅ Notifications box content added');
-  } else {
-    console.error('❌ Notifications box element not found!');
   }
 
+  // Friends box
   const friendsBox = document.getElementById('friends-box');
   if (friendsBox) {
-    console.log('✅ Friends box found, adding content...');
     friendsBox.innerHTML = `
       <h3 class="text-xl font-bold mb-4 text-lime-500">👥 Friends</h3>
-      <p class="text-gray-400">Please log in to view friends</p>
+      <p class="text-gray-400">TypeScript components not loaded. Using fallback content.</p>
     `;
-    console.log('✅ Friends box content added');
-  } else {
-    console.error('❌ Friends box element not found!');
   }
 
+  // Settings box
   const settingsBox = document.getElementById('settings-box');
   if (settingsBox) {
-    console.log('✅ Settings box found, adding content...');
     settingsBox.innerHTML = `
       <h3 class="text-xl font-bold mb-4 text-lime-500">⚙️ Settings</h3>
-      <p class="text-gray-400">Please log in to access settings</p>
+      <p class="text-gray-400">TypeScript components not loaded. Using fallback content.</p>
     `;
-    console.log('✅ Settings box content added');
-  } else {
-    console.error('❌ Settings box element not found!');
   }
 
-  console.log('🎉 All basic content setup complete!');
+  console.log('✅ Basic content boxes added');
+}
+
+/**
+ * Setup authentication state listeners
+ */
+function setupAuthListeners(components: any[]): void {
+  // Listen for auth state changes
+  window.addEventListener('auth-state-changed', ((e: CustomEvent) => {
+    console.log('🔄 Auth state changed:', e.detail);
+    components.forEach(component => {
+      if (component.updateAuthState) {
+        component.updateAuthState(e.detail.isAuthenticated, e.detail.user);
+      }
+    });
+  }) as EventListener);
+
+  // Listen for storage changes (login/logout from other tabs)
+  window.addEventListener('storage', (e) => {
+    if (e.key === 'ft_pong_auth_token' || e.key === 'ft_pong_user_data') {
+      updateAuthState(components);
+    }
+  });
+}
+
+/**
+ * Update authentication state
+ */
+function updateAuthState(components: any[]): void {
+  const authToken = localStorage.getItem('ft_pong_auth_token');
+  const userData = localStorage.getItem('ft_pong_user_data');
+
+  const isAuthenticated = !!(authToken && userData);
+  let user = null;
+
+  if (userData) {
+    try {
+      user = JSON.parse(userData);
+    } catch (error) {
+      console.error('Error parsing user data:', error);
+    }
+  }
+
+  console.log('🔄 Updating auth state:', { isAuthenticated, user });
+
+  components.forEach(component => {
+    if (component.updateAuthState) {
+      component.updateAuthState(isAuthenticated, user);
+    }
+  });
 }
 
 /**
@@ -180,78 +312,8 @@ function showInitializationError(error: unknown): void {
   `;
 
   // Hide loading screen and show error
-  const loadingScreen = document.getElementById('loading-screen');
-  if (loadingScreen) {
-    loadingScreen.style.display = 'none';
-  }
-
+  hideLoadingScreen();
   document.body.appendChild(errorContainer);
-}
-
-/**
- * Handle unhandled errors
- */
-window.addEventListener('error', (event) => {
-  console.error('Unhandled error:', event.error);
-
-  if (import.meta.env.DEV) {
-    // In development, show more detailed error info
-    const errorInfo = {
-      message: event.error?.message || event.message,
-      filename: event.filename,
-      lineno: event.lineno,
-      colno: event.colno,
-      stack: event.error?.stack,
-    };
-    console.table(errorInfo);
-  }
-});
-
-/**
- * Handle unhandled promise rejections
- */
-window.addEventListener('unhandledrejection', (event) => {
-  console.error('Unhandled promise rejection:', event.reason);
-
-  if (import.meta.env.DEV) {
-    console.log('Promise rejection details:', {
-      reason: event.reason,
-      promise: event.promise,
-    });
-  }
-});
-
-/**
- * Performance monitoring in development
- */
-if (import.meta.env.DEV) {
-  // Log performance metrics
-  window.addEventListener('load', () => {
-    setTimeout(() => {
-      const perfData = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming;
-      const loadTime = perfData.loadEventEnd - perfData.loadEventStart;
-      const domContentLoadedTime = perfData.domContentLoadedEventEnd - perfData.domContentLoadedEventStart;
-
-      console.log('📊 Performance Metrics:');
-      console.log(`⏱️ Page Load Time: ${loadTime}ms`);
-      console.log(`🏗️ DOM Content Loaded: ${domContentLoadedTime}ms`);
-      console.log(`🎯 DOM Interactive: ${perfData.domInteractive - perfData.navigationStart}ms`);
-    }, 0);
-  });
-}
-
-/**
- * Service worker registration (for future PWA features)
- */
-if ('serviceWorker' in navigator && import.meta.env.PROD) {
-  window.addEventListener('load', async () => {
-    try {
-      const registration = await navigator.serviceWorker.register('/sw.js');
-      console.log('🔧 Service Worker registered successfully:', registration);
-    } catch (error) {
-      console.log('❌ Service Worker registration failed:', error);
-    }
-  });
 }
 
 /**
@@ -260,15 +322,3 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
 console.log('🚀 main.ts script loaded and executing...');
 console.log('📅 Current time:', new Date().toISOString());
 console.log('🌐 Document ready state:', document.readyState);
-
-// Check if DOM is already loaded
-if (document.readyState === 'loading') {
-  console.log('⏳ DOM is still loading, waiting for DOMContentLoaded...');
-  document.addEventListener('DOMContentLoaded', () => {
-    console.log('✅ DOMContentLoaded event fired!');
-    initializeApp();
-  });
-} else {
-  console.log('✅ DOM already loaded, initializing immediately...');
-  initializeApp();
-}
