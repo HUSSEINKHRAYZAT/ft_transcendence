@@ -7,11 +7,9 @@ export class SettingsBox {
 
   constructor() {
     this.container = document.getElementById('settings-box');
+    this.applySavedLanguage();
   }
 
-  /**
-   * Render the settings box
-   */
   async render(): Promise<void> {
     if (!this.container) {
       console.error('❌ Settings box container not found');
@@ -30,9 +28,6 @@ export class SettingsBox {
     }
   }
 
-  /**
-   * Update content based on authentication state
-   */
   private updateContent(): void {
     if (!this.container) return;
 
@@ -40,17 +35,12 @@ export class SettingsBox {
     const userData = localStorage.getItem('ft_pong_user_data');
 
     if (authToken && userData) {
-      // User is logged in - show settings
       this.container.innerHTML = this.getAuthenticatedContent();
     } else {
-      // User is not logged in - show login prompt
       this.container.innerHTML = this.getUnauthenticatedContent();
     }
   }
 
-  /**
-   * Get content for authenticated users
-   */
   private getAuthenticatedContent(): string {
     const settings = this.loadSettings();
 
@@ -81,13 +71,19 @@ export class SettingsBox {
           </select>
         </div>
         <div class="bg-gray-700 p-3 rounded">
-          <label class="text-sm font-medium text-gray-300 block mb-2">Theme</label>
-          <select id="theme-select" class="w-full bg-gray-600 border border-gray-500 rounded text-white p-2 focus:border-lime-500 focus:ring-1 focus:ring-lime-500">
-            <option value="lime" ${settings.theme === 'lime' ? 'selected' : ''}>Lime (Default)</option>
-            <option value="classic" ${settings.theme === 'classic' ? 'selected' : ''}>Classic</option>
-            <option value="neon" ${settings.theme === 'neon' ? 'selected' : ''}>Neon</option>
-            <option value="retro" ${settings.theme === 'retro' ? 'selected' : ''}>Retro</option>
+          <label class="text-sm font-medium text-gray-300 block mb-2">Language</label>
+          <select id="language-select" class="w-full bg-gray-600 border border-gray-500 rounded text-white p-2 focus:border-lime-500 focus:ring-1 focus:ring-lime-500">
+            <option value="eng" ${settings.language === 'eng' ? 'selected' : ''}>English</option>
+            <option value="fr" ${settings.language === 'fr' ? 'selected' : ''}>Français</option>
+            <option value="span" ${settings.language === 'span' ? 'selected' : ''}>Español</option>
           </select>
+        </div>
+        <div class="bg-gray-700 p-3 rounded">
+          <div class="flex items-center justify-between">
+            <label class="text-sm font-medium text-gray-300">Animations</label>
+            <input type="checkbox" id="animations-toggle" ${settings.animationsEnabled !== false ? 'checked' : ''}
+                   class="toggle-checkbox bg-gray-600 border-gray-500 rounded focus:ring-lime-500">
+          </div>
         </div>
       </div>
       <div class="mt-4 flex gap-2">
@@ -101,9 +97,6 @@ export class SettingsBox {
     `;
   }
 
-  /**
-   * Get content for unauthenticated users
-   */
   private getUnauthenticatedContent(): string {
     return `
       <h3 class="text-xl font-bold mb-4 text-lime-500">⚙️ Settings</h3>
@@ -114,15 +107,13 @@ export class SettingsBox {
     `;
   }
 
-  /**
-   * Setup event listeners
-   */
   private setupEventListeners(): void {
     const signinBtn = document.getElementById('settings-signin');
     const soundToggle = document.getElementById('sound-toggle') as HTMLInputElement;
     const musicToggle = document.getElementById('music-toggle') as HTMLInputElement;
+    const animationsToggle = document.getElementById('animations-toggle') as HTMLInputElement;
     const difficultySelect = document.getElementById('difficulty-select') as HTMLSelectElement;
-    const themeSelect = document.getElementById('theme-select') as HTMLSelectElement;
+    const languageSelect = document.getElementById('language-select') as HTMLSelectElement;
     const saveBtn = document.getElementById('save-settings');
     const resetBtn = document.getElementById('reset-settings');
 
@@ -138,12 +129,24 @@ export class SettingsBox {
       musicToggle.addEventListener('change', () => this.updateSetting('musicEnabled', musicToggle.checked));
     }
 
+    if (animationsToggle) {
+      animationsToggle.addEventListener('change', (e) => {
+        const enabled = (e.target as HTMLInputElement).checked;
+        this.updateSetting('animationsEnabled', enabled);
+        this.toggleAnimations(enabled);
+      });
+    }
+
     if (difficultySelect) {
       difficultySelect.addEventListener('change', () => this.updateSetting('difficulty', difficultySelect.value));
     }
 
-    if (themeSelect) {
-      themeSelect.addEventListener('change', () => this.updateSetting('theme', themeSelect.value));
+    if (languageSelect) {
+      languageSelect.addEventListener('change', (e) => {
+        const language = (e.target as HTMLSelectElement).value;
+        this.updateSetting('language', language);
+        console.log(`🌍 Language changed to: ${language}`);
+      });
     }
 
     if (saveBtn) {
@@ -155,61 +158,75 @@ export class SettingsBox {
     }
   }
 
-  /**
-   * Load settings from localStorage
-   */
   private loadSettings(): any {
     const defaultSettings = {
       soundEnabled: true,
       musicEnabled: true,
+      animationsEnabled: true,
       difficulty: 'medium',
-      theme: 'lime'
+      language: 'eng'
     };
 
     try {
       const saved = localStorage.getItem('ft_pong_game_settings');
-      return saved ? { ...defaultSettings, ...JSON.parse(saved) } : defaultSettings;
+      if (saved) {
+        const parsedSettings = JSON.parse(saved);
+        return { ...defaultSettings, ...parsedSettings };
+      }
+      return defaultSettings;
     } catch (error) {
       console.error('Error loading settings:', error);
       return defaultSettings;
     }
   }
 
-  /**
-   * Update a specific setting
-   */
   private updateSetting(key: string, value: any): void {
     const settings = this.loadSettings();
     settings[key] = value;
     localStorage.setItem('ft_pong_game_settings', JSON.stringify(settings));
+    console.log(`⚙️ Setting updated: ${key} = ${value}`);
   }
 
-  /**
-   * Save all settings
-   */
-  private saveSettings(): void {
-    // Settings are already saved on change, this is just for user feedback
-    alert('Settings saved successfully!');
+  private applySavedLanguage(): void {
+    const settings = this.loadSettings();
+    // You can use settings.language later to apply UI translations
+    console.log(`🌍 Loaded language: ${settings.language}`);
   }
 
-  /**
-   * Reset settings to default
-   */
-  private resetSettings(): void {
-    if (confirm('Are you sure you want to reset all settings to default?')) {
-      localStorage.removeItem('ft_pong_game_settings');
-      this.updateContent();
-      this.setupEventListeners();
-      alert('Settings reset to default!');
+  private toggleAnimations(enabled: boolean): void {
+    if (enabled) {
+      document.body.classList.remove('no-animations');
+    } else {
+      document.body.classList.add('no-animations');
     }
   }
 
-  /**
-   * Show login modal
-   */
+  private saveSettings(): void {
+    if ((window as any).modalService?.showToast) {
+      (window as any).modalService.showToast('success', 'Settings Saved', 'All settings have been saved successfully!');
+    } else {
+      alert('Settings saved successfully!');
+    }
+  }
+
+  private resetSettings(): void {
+    if (confirm('Are you sure you want to reset all settings to default?')) {
+      localStorage.removeItem('ft_pong_game_settings');
+      this.toggleAnimations(true);
+      this.updateContent();
+      this.setupEventListeners();
+
+      if ((window as any).modalService?.showToast) {
+        (window as any).modalService.showToast('info', 'Settings Reset', 'All settings have been reset to default values.');
+      } else {
+        alert('Settings reset to default!');
+      }
+    }
+  }
+
   private showLoginModal(): void {
     console.log('🔍 SettingsBox: Trying to show login modal');
-    if ((window as any).modalService && (window as any).modalService.showLoginModal) {
+    if ((window as any).modalService?.showLoginModal) {
       (window as any).modalService.showLoginModal();
     } else {
       console.error('❌ Modal service not available');
@@ -217,33 +234,21 @@ export class SettingsBox {
     }
   }
 
-  /**
-   * Update based on authentication state
-   */
   updateAuthState(isAuthenticated: boolean): void {
     if (!this.isRendered) return;
     this.updateContent();
     this.setupEventListeners();
   }
 
-  /**
-   * Get current settings
-   */
   getSettings(): any {
     return this.loadSettings();
   }
 
-  /**
-   * Apply theme changes
-   */
-  private applyTheme(theme: string): void {
-    document.body.className = document.body.className.replace(/theme-\w+/g, '');
-    document.body.classList.add(`theme-${theme}`);
+  getCurrentLanguage(): string {
+    const settings = this.loadSettings();
+    return settings.language;
   }
 
-  /**
-   * Cleanup component resources
-   */
   destroy(): void {
     if (this.container) {
       this.container.innerHTML = '';
