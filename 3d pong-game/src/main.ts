@@ -347,8 +347,8 @@ class Pong3D {
   private touchedOnce = false;
 
   // dimensions / physics
-  private ballRadius = 0.3;
-  private speedIncrement = 1.0005;
+  private ballRadius = 0.2;
+  private speedIncrement = 1.0001;
   private wallThickness = 0.1;
   private cornerSize = this.wallThickness * 5;
 
@@ -605,7 +605,7 @@ class Pong3D {
 
     // Ball
     const ballMat = new StandardMaterial("ballMat", this.scene);
-    ballMat.diffuseTexture = new Texture("textures/ball.jpg", this.scene);
+    ballMat.diffuseTexture = new Texture("textures/ball.png", this.scene);
     this.ball = MeshBuilder.CreateSphere(
       "ball",
       { diameter: this.ballRadius * 2, segments: 16 },
