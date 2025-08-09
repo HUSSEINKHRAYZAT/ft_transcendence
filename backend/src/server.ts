@@ -33,7 +33,7 @@ const start = async () => {
 app.get("/users", (request, reply) => {
   const q = `
     SELECT
-      id, FirstName, lastName, username, email,password,
+      id, FirstName, lastName, username, email,
       profilepath, status, isVerified, isLoggedIn,
       enable2fa, createdAt, updatedAt
     FROM User
@@ -363,43 +363,33 @@ app.get("/users", (request, reply) => {
     });
   });
 
-  // ===== FRIENDS / FRIENDSHIP =====
-
-// tiny helper: check if any friendship row exists in either direction
-function getFriendship(a: number, b: number, cb: (err: Error|null, row?: any) => void) {
-  const q = `
-    SELECT * FROM friendship
-    WHERE (requesterId = ? AND addresseeId = ?)
-       OR (requesterId = ? AND addresseeId = ?)
-    LIMIT 1
-  `;
-  db.get(q, [a, b, b, a], cb);
-}
-
-// Send friend request
 app.post("/friends/request", (req, reply) => {
   const { fromUserId, toUserId } = req.body as { fromUserId: number; toUserId: number };
   if (!fromUserId || !toUserId) return reply.code(400).send({ error: "fromUserId and toUserId required" });
   if (fromUserId === toUserId) return reply.code(400).send({ error: "Cannot friend yourself" });
 
-  getFriendship(fromUserId, toUserId, (err, row) => {
-    if (err) return reply.code(500).send({ error: "Database error" });
-    if (row) {
-      // if already pending but opposite direction, user can accept instead
-      return reply.code(409).send({ error: "Friendship already exists", status: row.status, row });
-    }
+  const existQ = `SELECT id FROM User WHERE id IN (?, ?)`;
+  db.all(existQ, [fromUserId, toUserId], (exErr, rows) => {
+    if (exErr) return reply.code(500).send({ error: exErr.message });
+    if (!rows || rows.length !== 2) return reply.code(404).send({ error: "User not found" });
 
-    const now = new Date().toISOString();
-    const q = `
-      INSERT INTO friendship (requesterId, addresseeId, status, createdAt, updatedAt)
-      VALUES (?, ?, 'pending', ?, ?)
-    `;
-    db.run(q, [fromUserId, toUserId, now, now], function (e) {
-      if (e) return reply.code(500).send({ error: e.message });
-      return reply.code(201).send({ id: this.lastID, requesterId: fromUserId, addresseeId: toUserId, status: "pending" });
+    getFriendship(fromUserId, toUserId, (err, row) => {
+      if (err) return reply.code(500).send({ error: "Database error" });
+      if (row) return reply.code(409).send({ error: "Friendship already exists", status: row.status, row });
+
+      const now = new Date().toISOString();
+      const q = `
+        INSERT INTO friendship (requesterId, addresseeId, status, createdAt, updatedAt)
+        VALUES (?, ?, 'pending', ?, ?)
+      `;
+      db.run(q, [fromUserId, toUserId, now, now], function (e) {
+        if (e) return reply.code(500).send({ error: e.message });
+        return reply.code(201).send({ id: this.lastID, requesterId: fromUserId, addresseeId: toUserId, status: "pending" });
+      });
     });
   });
 });
+
 
 // Accept a friend request (only addressee can accept)
 app.post("/friends/accept", (req, reply) => {
@@ -492,7 +482,7 @@ app.post("/friends/block", (req, reply) => {
 });
 
 // List accepted friends for a user (returns basic user info)
-app.get("/friends/:userId", (req, reply) => {
+app.get("/friends/list/:userId", (req, reply) => {
   const userId = Number((req.params as any).userId);
   const q = `
     SELECT u.id, u.username, u.FirstName, u.lastName, u.profilepath, u.status
@@ -512,7 +502,6 @@ app.get("/friends/:userId", (req, reply) => {
   });
 });
 
-// List pending requests (incoming/outgoing) for a user
 app.get("/friends/pending/:userId", (req, reply) => {
   const userId = Number((req.params as any).userId);
   const q = `
@@ -520,15 +509,16 @@ app.get("/friends/pending/:userId", (req, reply) => {
     FROM friendship f
     JOIN User r ON r.id = f.requesterId
     JOIN User a ON a.id = f.addresseeId
-    WHERE (f.requesterId = ? OR f.addresseeId = ?)
+    WHERE f.addresseeId = ?      -- INCOMING ONLY
       AND f.status = 'pending'
     ORDER BY f.createdAt DESC
   `;
-  db.all(q, [userId, userId], (e, rows) => {
+  db.all(q, [userId], (e, rows) => {
     if (e) return reply.code(500).send({ error: e.message });
     return reply.send(rows);
-    });
   });
+});
+
 
   // START SERVER
   app.listen({ port: 3000 }, () => {

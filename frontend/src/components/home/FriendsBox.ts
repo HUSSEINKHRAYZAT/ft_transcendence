@@ -7,6 +7,8 @@ export class FriendsBox {
 
   // ---- backend + storage helpers ----
   private BASE_URL = "http://localhost:3000";
+  // adjust if your backend uses another route
+  private FRIENDS_LIST_PATH = (userId: number) => `/friends/list/${userId}`;
 
   private getCurrentUser() {
     try {
@@ -65,6 +67,8 @@ export class FriendsBox {
     try {
       this.updateContent();
       this.setupEventListeners();
+      await this.refreshRequestsUI();
+      await this.loadAndRenderFriends(); // <-- load from DB
       this.isRendered = true;
       console.log("✅ FriendsBox component rendered successfully");
     } catch (error) {
@@ -82,48 +86,22 @@ export class FriendsBox {
     const userData = localStorage.getItem("ft_pong_user_data");
 
     if (authToken && userData) {
-      // User is logged in - show friends
       this.container.innerHTML = this.getAuthenticatedContent();
     } else {
-      // User is not logged in - show login prompt
       this.container.innerHTML = this.getUnauthenticatedContent();
     }
   }
 
   /**
-   * Get content for authenticated users
+   * Get content for authenticated users (no hardcoded users!)
    */
   private getAuthenticatedContent(): string {
     return `
       <h3 class="text-xl font-bold mb-4 text-lime-500">👥 Friends</h3>
-      <div class="space-y-3">
-        <div class="flex items-center justify-between bg-gray-700 p-3 rounded">
-          <div class="flex items-center">
-            <div class="w-8 h-8 bg-lime-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
-              JD
-            </div>
-            <div class="ml-3">
-              <p class="text-sm font-medium text-white">John Doe</p>
-              <p class="text-xs text-green-400">● Online</p>
-            </div>
-          </div>
-          <button class="bg-lime-500 hover:bg-lime-600 text-white text-xs px-3 py-1 rounded transition-all duration-300">
-            Invite
-          </button>
-        </div>
-        <div class="flex items-center justify-between bg-gray-700 p-3 rounded">
-          <div class="flex items-center">
-            <div class="w-8 h-8 bg-purple-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
-              AS
-            </div>
-            <div class="ml-3">
-              <p class="text-sm font-medium text-white">Alice Smith</p>
-              <p class="text-xs text-gray-400">● Offline</p>
-            </div>
-          </div>
-          <button class="bg-gray-600 text-white text-xs px-3 py-1 rounded cursor-not-allowed">
-            Offline
-          </button>
+
+      <div id="friends-list" class="space-y-3">
+        <div id="friends-empty" class="text-sm text-gray-400">
+          No friends yet.
         </div>
       </div>
 
@@ -132,7 +110,7 @@ export class FriendsBox {
           Add Friend
         </button>
         <button id="friend-requests" class="flex-1 bg-gray-600 hover:bg-gray-700 text-white text-sm font-bold py-2 px-3 rounded transition-all duration-300">
-          Requests (2)
+          Requests <span id="req-count-badge" class="inline-block ml-1 px-2 py-0.5 rounded bg-gray-800 text-white text-xs align-middle">0</span>
         </button>
       </div>
 
@@ -147,6 +125,9 @@ export class FriendsBox {
           Block User
         </button>
       </div>
+
+      <!-- requests modal host -->
+      <div id="friend-req-modal-root"></div>
     `;
   }
 
@@ -182,7 +163,7 @@ export class FriendsBox {
     }
 
     if (requestsBtn) {
-      requestsBtn.addEventListener("click", () => this.showFriendRequests());
+      requestsBtn.addEventListener("click", () => this.openRequestsModal());
     }
 
     if (removeBtn) {
@@ -196,6 +177,7 @@ export class FriendsBox {
           if (!otherId) return alert("No user found with that email.");
           await this.removeFriend(otherId);
           alert("🗑️ Friend removed");
+          await this.loadAndRenderFriends(); // refresh list
         } catch (e: any) {
           alert("Failed to remove: " + (e?.message || "unknown error"));
         }
@@ -213,6 +195,7 @@ export class FriendsBox {
           if (!otherId) return alert("No user found with that email.");
           await this.blockUser(otherId);
           alert("⛔ User blocked");
+          await this.loadAndRenderFriends(); // refresh list
         } catch (e: any) {
           alert("Failed to block: " + (e?.message || "unknown error"));
         }
@@ -234,7 +217,7 @@ export class FriendsBox {
   }
 
   /**
-   * Show add friend modal (checks email exists before sending)
+   * Add friend (email must exist)
    */
   private async showAddFriendModal(): Promise<void> {
     const me = this.getCurrentUser();
@@ -258,9 +241,9 @@ export class FriendsBox {
       }
 
       const body = JSON.stringify({ fromUserId: me.id, toUserId });
-      const data = await this.apiFetch("/friends/request", { method: "POST", body });
-      console.log("Friend request sent:", data);
+      await this.apiFetch("/friends/request", { method: "POST", body });
       alert("✅ Friend request sent!");
+      await this.refreshRequestsUI();
     } catch (err: any) {
       console.error(err);
       alert("❌ Could not send request: " + err.message);
@@ -268,44 +251,102 @@ export class FriendsBox {
   }
 
   /**
-   * Show friend requests (loads pending + accept one)
+   * Requests modal (Accept works; refreshes badge and list)
    */
-  private async showFriendRequests(): Promise<void> {
+  private async openRequestsModal(): Promise<void> {
     const me = this.getCurrentUser();
     if (!me?.id) {
       alert("Please sign in first.");
       return;
     }
 
+    let pending: any[] = [];
     try {
-      const pending = await this.apiFetch(`/friends/pending/${me.id}`);
-      if (!Array.isArray(pending) || pending.length === 0) {
-        alert("No pending requests.");
-        return;
-      }
-
-      const list = pending
-        .map((r: any) => `• from #${r.requesterId} → you (#${r.addresseeId}) [${r.status}]`)
-        .join("\n");
-
-      const chosen = prompt(
-        `Pending requests:\n${list}\n\nType the requesterId to accept (or Cancel):`
-      );
-      if (!chosen) return;
-
-      const requesterId = Number(chosen);
-      if (!requesterId) return;
-
-      await this.apiFetch("/friends/accept", {
-        method: "POST",
-        body: JSON.stringify({ requesterId, addresseeId: me.id }),
-      });
-
-      alert("✅ Request accepted!");
-    } catch (err: any) {
-      console.error(err);
-      alert("❌ Could not load/accept requests: " + err.message);
+      pending = await this.apiFetch(`/friends/pending/${me.id}`);
+    } catch (e: any) {
+      alert("Failed to load requests: " + (e?.message || "unknown error"));
+      return;
     }
+
+    const root = document.getElementById("friend-req-modal-root");
+    if (!root) return;
+
+    const listItems =
+      pending.length === 0
+        ? `<p class="text-sm text-gray-300">No pending requests.</p>`
+        : pending
+            .map(
+              (r) => `
+          <div class="flex items-center justify-between bg-gray-700 rounded p-3">
+            <div class="text-sm text-white">
+              <span class="font-semibold">Request from:</span>
+              <span>#${r.requesterId}</span>
+              <span class="ml-2 text-xs text-gray-300">[${r.status}]</span>
+            </div>
+            <div class="flex gap-2">
+              <button data-requester="${r.requesterId}"
+                class="req-accept bg-lime-600 hover:bg-lime-700 text-white text-xs font-bold px-3 py-1 rounded">
+                Accept
+              </button>
+            </div>
+          </div>`
+            )
+            .join("");
+
+    root.innerHTML = `
+      <div id="friend-req-overlay"
+           class="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+        <div class="w-11/12 max-w-md bg-gray-800 rounded-2xl p-5 shadow-xl">
+          <div class="flex items-center justify-between mb-3">
+            <h4 class="text-lg font-bold text-white">Friend Requests</h4>
+            <button id="req-close"
+              class="text-white bg-gray-700 hover:bg-gray-600 rounded px-3 py-1 text-sm">
+              Close
+            </button>
+          </div>
+          <div class="space-y-3 max-h-80 overflow-auto">
+            ${listItems}
+          </div>
+        </div>
+      </div>
+    `;
+
+    const closeBtn = document.getElementById("req-close");
+    const overlay = document.getElementById("friend-req-overlay");
+    const close = () => this.closeRequestsModal();
+    if (closeBtn) closeBtn.addEventListener("click", close);
+    if (overlay) {
+      overlay.addEventListener("click", (e) => {
+        if (e.target === overlay) close();
+      });
+    }
+
+    overlay?.addEventListener("click", async (e) => {
+      const target = e.target as HTMLElement;
+      if (target && target.classList.contains("req-accept")) {
+        const requesterId = Number(target.getAttribute("data-requester"));
+        if (!requesterId) return;
+
+        try {
+          await this.apiFetch("/friends/accept", {
+            method: "POST",
+            body: JSON.stringify({ requesterId, addresseeId: me.id }),
+          });
+          await this.refreshRequestsUI();
+          await this.loadAndRenderFriends(); // accepted -> becomes friend
+          this.closeRequestsModal();
+          alert("✅ Request accepted!");
+        } catch (err: any) {
+          console.error(err);
+          alert("❌ Could not accept: " + err.message);
+        }
+      }
+    });
+  }
+
+  private closeRequestsModal(): void {
+    const root = document.getElementById("friend-req-modal-root");
+    if (root) root.innerHTML = "";
   }
 
   /**
@@ -315,45 +356,113 @@ export class FriendsBox {
     if (!this.isRendered) return;
     this.updateContent();
     this.setupEventListeners();
+    this.refreshRequestsUI().catch(() => {});
+    this.loadAndRenderFriends().catch(() => {});
   }
 
   /**
-   * Add a friend to the list (UI only)
+   * Load & render friends from backend
+   * Expected server shape (example):
+   * [
+   *   { id: 12, username: "alice", FirstName: "Alice", lastName: "Smith", status: "online" }
+   * ]
    */
-  addFriend(name: string, isOnline: boolean = false): void {
-    if (!this.container || !this.isRendered) return;
+  private async loadAndRenderFriends(): Promise<void> {
+    const me = this.getCurrentUser();
+    if (!me?.id || !this.container) return;
 
-    const initials = name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase();
-    const colors = ["bg-lime-500", "bg-purple-500", "bg-blue-500", "bg-red-500", "bg-yellow-500"];
-    const randomColor = colors[Math.floor(Math.random() * colors.length)];
+    const listEl = this.container.querySelector("#friends-list");
+    const emptyEl = this.container.querySelector("#friends-empty") as HTMLElement | null;
+    if (!listEl) return;
 
-    const friendHTML = `
-      <div class="flex items-center justify-between bg-gray-700 p-3 rounded">
+    // clear all friend cards (but keep empty label for now)
+    listEl.querySelectorAll(".friend-card").forEach((n) => n.remove());
+
+    try {
+      const friends = await this.apiFetch(this.FRIENDS_LIST_PATH(me.id));
+      const arr: any[] = Array.isArray(friends) ? friends : [];
+
+      if (arr.length === 0) {
+        if (emptyEl) emptyEl.style.display = "block";
+        return;
+      }
+      if (emptyEl) emptyEl.style.display = "none";
+
+      for (const f of arr) {
+        const card = this.renderFriendCard(f);
+        listEl.insertAdjacentHTML("beforeend", card);
+      }
+    } catch (e) {
+      console.error("Failed to load friends:", e);
+      if (emptyEl) {
+        emptyEl.style.display = "block";
+        emptyEl.textContent = "Could not load friends.";
+      }
+    }
+  }
+
+  private renderFriendCard(friend: any): string {
+    const id = Number(friend.friendId ?? friend.id ?? 0);
+    const first = (friend.FirstName || "").toString();
+    const last = (friend.lastName || "").toString();
+    const username = (friend.username || "").toString();
+    const displayName =
+      [first, last].filter(Boolean).join(" ").trim() || username || `#${id}`;
+    const initials = this.initialsFrom(displayName);
+    const isOnline = String(friend.status || "").toLowerCase() === "online";
+
+    const color = this.colorFor(id);
+
+    return `
+      <div class="friend-card flex items-center justify-between bg-gray-700 p-3 rounded">
         <div class="flex items-center">
-          <div class="w-8 h-8 ${randomColor} rounded-full flex items-center justify-center text-white font-bold text-sm">
+          <div class="w-8 h-8 ${color} rounded-full flex items-center justify-center text-white font-bold text-sm">
             ${initials}
           </div>
           <div class="ml-3">
-            <p class="text-sm font-medium text-white">${name}</p>
+            <p class="text-sm font-medium text-white">${this.escape(displayName)}</p>
             <p class="text-xs ${isOnline ? "text-green-400" : "text-gray-400"}">
               ● ${isOnline ? "Online" : "Offline"}
             </p>
           </div>
         </div>
-        <button class="${isOnline ? "bg-lime-500 hover:bg-lime-600" : "bg-gray-600 cursor-not-allowed"} text-white text-xs px-3 py-1 rounded transition-all duration-300">
+        <button
+          class="${isOnline ? "bg-lime-500 hover:bg-lime-600" : "bg-gray-600 cursor-not-allowed"} text-white text-xs px-3 py-1 rounded transition-all duration-300"
+          ${isOnline ? "" : "disabled"}
+          title="${isOnline ? "Invite to play" : "User is offline"}"
+        >
           ${isOnline ? "Invite" : "Offline"}
         </button>
       </div>
     `;
+  }
 
-    const friendsContainer = this.container.querySelector(".space-y-3");
-    if (friendsContainer) {
-      friendsContainer.insertAdjacentHTML("beforeend", friendHTML);
-    }
+  private initialsFrom(name: string): string {
+    return name
+      .trim()
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((n) => n[0]?.toUpperCase() || "")
+      .join("");
+  }
+
+  private colorFor(id: number): string {
+    const colors = ["bg-lime-500", "bg-purple-500", "bg-blue-500", "bg-red-500", "bg-yellow-500"];
+    if (!id) return colors[0];
+    return colors[id % colors.length];
+  }
+
+  private escape(s: string): string {
+    return s.replace(/[&<>"']/g, (c) => {
+      switch (c) {
+        case "&": return "&amp;";
+        case "<": return "&lt;";
+        case ">": return "&gt;";
+        case '"': return "&quot;";
+        case "'": return "&#39;";
+        default: return c;
+      }
+    });
   }
 
   /**
@@ -378,7 +487,6 @@ export class FriendsBox {
       method: "POST",
       body: JSON.stringify({ userId: me.id, otherUserId }),
     });
-    alert("🗑️ Friend removed");
   }
 
   private async blockUser(otherUserId: number) {
@@ -388,6 +496,24 @@ export class FriendsBox {
       method: "POST",
       body: JSON.stringify({ userId: me.id, otherUserId }),
     });
-    alert("⛔ User blocked");
+  }
+
+  // ------------------------------
+  // Requests badge / visibility
+  // ------------------------------
+
+  private async refreshRequestsUI(): Promise<void> {
+    const me = this.getCurrentUser();
+    const badge = document.getElementById("req-count-badge");
+    if (!me?.id || !badge) return;
+
+    try {
+      const pending = await this.apiFetch(`/friends/pending/${me.id}`);
+      const count = Array.isArray(pending) ? pending.length : 0;
+      badge.textContent = String(count);
+      (badge as HTMLElement).style.display = count > 0 ? "inline-block" : "none";
+    } catch {
+      (badge as HTMLElement).style.display = "none";
+    }
   }
 }
