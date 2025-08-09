@@ -85,5 +85,19 @@ db.serialize(() => {
     FOREIGN KEY(addresseeId) REFERENCES User(id)
   )`);
 
+  db.run(`CREATE TABLE IF NOT EXISTS Relation_types (
+  Id INTEGER PRIMARY KEY AUTOINCREMENT,
+  type TEXT NOT NULL UNIQUE
+)`);
+
+// User-to-user relations
+  db.run(`CREATE TABLE IF NOT EXISTS Realtions (
+  UId1 INTEGER NOT NULL,
+  UId2 INTEGER NOT NULL,
+  TypeID INTEGER NOT NULL,
+  FOREIGN KEY(UId1) REFERENCES User(id),
+  FOREIGN KEY(UId2) REFERENCES User(id),
+  FOREIGN KEY(TypeID) REFERENCES Relation_types(Id)
+)`);
   console.log("✅ All tables created.");
 });

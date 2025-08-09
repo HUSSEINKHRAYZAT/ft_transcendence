@@ -10,6 +10,16 @@ function hashPassword(password: string): string {
   return crypto.createHash("sha256").update(password + PEPPER).digest("hex");
 }
 
+function getFriendship(a: number, b: number, cb: (err: Error|null, row?: any) => void) {
+  const q = `
+    SELECT * FROM friendship
+    WHERE (requesterId = ? AND addresseeId = ?)
+       OR (requesterId = ? AND addresseeId = ?)
+    LIMIT 1
+  `;
+  db.get(q, [a, b, b, a], cb);
+}
+
 const start = async () => {
   const app = Fastify({ logger: true });
 
@@ -350,6 +360,173 @@ app.get("/users", (request, reply) => {
     db.run(q, v, function (err) {
       if (err) return reply.code(500).send({ error: err.message });
       reply.send({ id: this.lastID });
+    });
+  });
+
+  // ===== FRIENDS / FRIENDSHIP =====
+
+// tiny helper: check if any friendship row exists in either direction
+function getFriendship(a: number, b: number, cb: (err: Error|null, row?: any) => void) {
+  const q = `
+    SELECT * FROM friendship
+    WHERE (requesterId = ? AND addresseeId = ?)
+       OR (requesterId = ? AND addresseeId = ?)
+    LIMIT 1
+  `;
+  db.get(q, [a, b, b, a], cb);
+}
+
+// Send friend request
+app.post("/friends/request", (req, reply) => {
+  const { fromUserId, toUserId } = req.body as { fromUserId: number; toUserId: number };
+  if (!fromUserId || !toUserId) return reply.code(400).send({ error: "fromUserId and toUserId required" });
+  if (fromUserId === toUserId) return reply.code(400).send({ error: "Cannot friend yourself" });
+
+  getFriendship(fromUserId, toUserId, (err, row) => {
+    if (err) return reply.code(500).send({ error: "Database error" });
+    if (row) {
+      // if already pending but opposite direction, user can accept instead
+      return reply.code(409).send({ error: "Friendship already exists", status: row.status, row });
+    }
+
+    const now = new Date().toISOString();
+    const q = `
+      INSERT INTO friendship (requesterId, addresseeId, status, createdAt, updatedAt)
+      VALUES (?, ?, 'pending', ?, ?)
+    `;
+    db.run(q, [fromUserId, toUserId, now, now], function (e) {
+      if (e) return reply.code(500).send({ error: e.message });
+      return reply.code(201).send({ id: this.lastID, requesterId: fromUserId, addresseeId: toUserId, status: "pending" });
+    });
+  });
+});
+
+// Accept a friend request (only addressee can accept)
+app.post("/friends/accept", (req, reply) => {
+  const { requesterId, addresseeId } = req.body as { requesterId: number; addresseeId: number };
+  if (!requesterId || !addresseeId) return reply.code(400).send({ error: "requesterId and addresseeId required" });
+
+  const q = `
+    UPDATE friendship
+    SET status = 'accepted', updatedAt = ?
+    WHERE requesterId = ? AND addresseeId = ? AND status = 'pending'
+  `;
+  db.run(q, [new Date().toISOString(), requesterId, addresseeId], function (e) {
+    if (e) return reply.code(500).send({ error: e.message });
+    if (this.changes === 0) return reply.code(404).send({ error: "Pending request not found" });
+    return reply.send({ ok: true, status: "accepted" });
+  });
+});
+
+// Decline a friend request (delete pending row)
+app.post("/friends/decline", (req, reply) => {
+  const { requesterId, addresseeId } = req.body as { requesterId: number; addresseeId: number };
+  if (!requesterId || !addresseeId) return reply.code(400).send({ error: "requesterId and addresseeId required" });
+
+  const q = `DELETE FROM friendship WHERE requesterId = ? AND addresseeId = ? AND status = 'pending'`;
+  db.run(q, [requesterId, addresseeId], function (e) {
+    if (e) return reply.code(500).send({ error: e.message });
+    if (this.changes === 0) return reply.code(404).send({ error: "Pending request not found" });
+    return reply.send({ ok: true, deleted: true });
+  });
+});
+
+// Cancel a request you sent
+app.post("/friends/cancel", (req, reply) => {
+  const { requesterId, addresseeId } = req.body as { requesterId: number; addresseeId: number };
+  if (!requesterId || !addresseeId) return reply.code(400).send({ error: "requesterId and addresseeId required" });
+
+  const q = `DELETE FROM friendship WHERE requesterId = ? AND addresseeId = ? AND status = 'pending'`;
+  db.run(q, [requesterId, addresseeId], function (e) {
+    if (e) return reply.code(500).send({ error: e.message });
+    if (this.changes === 0) return reply.code(404).send({ error: "Pending request not found" });
+    return reply.send({ ok: true, canceled: true });
+  });
+});
+
+// Unfriend (either side)
+app.post("/friends/remove", (req, reply) => {
+  const { userId, otherUserId } = req.body as { userId: number; otherUserId: number };
+  if (!userId || !otherUserId) return reply.code(400).send({ error: "userId and otherUserId required" });
+
+  const q = `
+    DELETE FROM friendship
+    WHERE status = 'accepted' AND (
+      (requesterId = ? AND addresseeId = ?) OR
+      (requesterId = ? AND addresseeId = ?)
+    )
+  `;
+  db.run(q, [userId, otherUserId, otherUserId, userId], function (e) {
+    if (e) return reply.code(500).send({ error: e.message });
+    if (this.changes === 0) return reply.code(404).send({ error: "Friendship not found" });
+    return reply.send({ ok: true, removed: true });
+  });
+});
+
+// Block (creates or updates a row to 'blocked' from blocker -> other)
+app.post("/friends/block", (req, reply) => {
+  const { userId, otherUserId } = req.body as { userId: number; otherUserId: number };
+  if (!userId || !otherUserId) return reply.code(400).send({ error: "userId and otherUserId required" });
+  if (userId === otherUserId) return reply.code(400).send({ error: "Cannot block yourself" });
+
+  // try update an existing directed row first
+  const now = new Date().toISOString();
+  const updateQ = `
+    UPDATE friendship SET status='blocked', updatedAt=?
+    WHERE requesterId = ? AND addresseeId = ?
+  `;
+  db.run(updateQ, [now, userId, otherUserId], function (e) {
+    if (e) return reply.code(500).send({ error: e.message });
+    if (this.changes > 0) return reply.send({ ok: true, status: "blocked" });
+
+    // if no directed row existed, insert one
+    const insertQ = `
+      INSERT INTO friendship (requesterId, addresseeId, status, createdAt, updatedAt)
+      VALUES (?, ?, 'blocked', ?, ?)
+    `;
+    db.run(insertQ, [userId, otherUserId, now, now], function (e2) {
+      if (e2) return reply.code(500).send({ error: e2.message });
+      return reply.code(201).send({ ok: true, status: "blocked", id: this.lastID });
+    });
+  });
+});
+
+// List accepted friends for a user (returns basic user info)
+app.get("/friends/:userId", (req, reply) => {
+  const userId = Number((req.params as any).userId);
+  const q = `
+    SELECT u.id, u.username, u.FirstName, u.lastName, u.profilepath, u.status
+    FROM friendship f
+    JOIN User u
+      ON u.id = CASE
+        WHEN f.requesterId = ? THEN f.addresseeId
+        ELSE f.requesterId
+      END
+    WHERE (f.requesterId = ? OR f.addresseeId = ?)
+      AND f.status = 'accepted'
+    ORDER BY u.username ASC
+  `;
+  db.all(q, [userId, userId, userId], (e, rows) => {
+    if (e) return reply.code(500).send({ error: e.message });
+    return reply.send(rows);
+  });
+});
+
+// List pending requests (incoming/outgoing) for a user
+app.get("/friends/pending/:userId", (req, reply) => {
+  const userId = Number((req.params as any).userId);
+  const q = `
+    SELECT f.*, r.username AS requesterUsername, a.username AS addresseeUsername
+    FROM friendship f
+    JOIN User r ON r.id = f.requesterId
+    JOIN User a ON a.id = f.addresseeId
+    WHERE (f.requesterId = ? OR f.addresseeId = ?)
+      AND f.status = 'pending'
+    ORDER BY f.createdAt DESC
+  `;
+  db.all(q, [userId, userId], (e, rows) => {
+    if (e) return reply.code(500).send({ error: e.message });
+    return reply.send(rows);
     });
   });
 
