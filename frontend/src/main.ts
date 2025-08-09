@@ -712,40 +712,154 @@ function addBasicNavbar(): void {
 		}
 
 		const authSection = isAuthenticated && user ?
-			`<div class="flex items-center space-x-4">
-				 <button onclick="handleProfile()" class="flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium text-lime-500 bg-gray-700 hover:bg-gray-600 transition-colors duration-300">
+			`<div class="relative">
+				 <button id="profile-dropdown-btn" class="flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium text-lime-500 bg-gray-700 hover:bg-gray-600 transition-colors duration-300">
 					 ${user.avatar ? `<img src="${user.avatar}" alt="Profile" class="w-6 h-6 rounded-full">` : '<div class="w-6 h-6 rounded-full bg-lime-500 flex items-center justify-center text-xs font-bold text-gray-900">' + (user.firstName ? user.firstName.charAt(0).toUpperCase() : (user.username ? user.username.charAt(0).toUpperCase() : 'U')) + '</div>'}
 					 <span>${user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : (user.username || user.email || 'User')}</span>
+					 <svg class="w-4 h-4 transition-transform duration-200" id="dropdown-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+					 </svg>
 				 </button>
-				 <button onclick="handleLogout()" class="px-3 py-2 rounded-md text-sm font-medium text-red-400 hover:bg-red-600 hover:text-white transition-colors duration-300">
-					 Logout
-				 </button>
+
+				 <!-- Dropdown Menu -->
+				 <div id="profile-dropdown-menu" class="absolute right-0 mt-2 w-48 bg-gray-800 rounded-md shadow-lg py-1 z-50 border border-gray-700 hidden opacity-0 transform scale-95 transition-all duration-200">
+					 <button onclick="handleProfile()" class="flex items-center w-full px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition-colors duration-300">
+						 <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+						 </svg>
+						 Profile
+					 </button>
+					 <button onclick="handleLogout()" class="flex items-center w-full px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-red-400 transition-colors duration-300">
+						 <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+						 </svg>
+						 Logout
+					 </button>
+				 </div>
 			 </div>` :
 			`<button onclick="handleLogin()" class="bg-lime-500 hover:bg-lime-600 text-white font-bold py-2 px-4 rounded transition-all duration-300">Login</button>`;
 
 		navbar.innerHTML = `
 			<div class="bg-gray-800 border-b border-gray-700">
 				<div class="container mx-auto px-4">
-					<div class="flex items-center justify-between h-16">
-						<div class="flex items-center">
+					<div class="grid grid-cols-3 items-center h-16">
+						<!-- Left Section: Logo -->
+						<div class="flex items-center justify-start">
 							<img src="https://img.icons8.com/color/48/ping-pong.png" alt="Pong Icon" class="w-6 h-6 mr-2">
 							<span class="text-2xl font-bold text-lime-500">FT_PONG</span>
 						</div>
-						<div class="flex space-x-4">
+
+						<!-- Center Section: Navigation -->
+						<div class="flex items-center justify-center space-x-4">
 							<button class="px-3 py-2 rounded-md text-sm font-medium text-lime-500 bg-gray-700">HOME</button>
 							<button onclick="handleAbout()" class="px-3 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-lime-500 transition-colors duration-300">ABOUT US</button>
 							<button onclick="handleProject()" class="px-3 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-lime-500 transition-colors duration-300">PROJECT</button>
 						</div>
-						<div>
+
+						<!-- Right Section: Auth -->
+						<div class="flex items-center justify-end">
 							${authSection}
 						</div>
 					</div>
 				</div>
 			</div>
 		`;
-		console.log('✅ Basic navbar added with profile functionality');
+
+		// Setup dropdown functionality if user is authenticated
+		if (isAuthenticated && user) {
+			setupProfileDropdown();
+		}
+
+		console.log('✅ Basic navbar added with profile dropdown functionality');
 	}
 }
+
+/**
+ * Setup profile dropdown functionality
+ */
+function setupProfileDropdown(): void {
+	const dropdownBtn = document.getElementById('profile-dropdown-btn');
+	const dropdownMenu = document.getElementById('profile-dropdown-menu');
+	const dropdownArrow = document.getElementById('dropdown-arrow');
+
+	if (!dropdownBtn || !dropdownMenu || !dropdownArrow) return;
+
+	let isDropdownOpen = false;
+
+	// Toggle dropdown
+	const toggleDropdown = () => {
+		isDropdownOpen = !isDropdownOpen;
+
+		if (isDropdownOpen) {
+			// Show dropdown
+			dropdownMenu.classList.remove('hidden');
+			setTimeout(() => {
+				dropdownMenu.classList.remove('opacity-0', 'scale-95');
+				dropdownMenu.classList.add('opacity-100', 'scale-100');
+			}, 10);
+
+			// Rotate arrow
+			dropdownArrow.style.transform = 'rotate(180deg)';
+		} else {
+			// Hide dropdown
+			dropdownMenu.classList.remove('opacity-100', 'scale-100');
+			dropdownMenu.classList.add('opacity-0', 'scale-95');
+			setTimeout(() => {
+				dropdownMenu.classList.add('hidden');
+			}, 200);
+
+			// Reset arrow
+			dropdownArrow.style.transform = 'rotate(0deg)';
+		}
+	};
+
+	// Close dropdown
+	const closeDropdown = () => {
+		if (isDropdownOpen) {
+			isDropdownOpen = false;
+			dropdownMenu.classList.remove('opacity-100', 'scale-100');
+			dropdownMenu.classList.add('opacity-0', 'scale-95');
+			setTimeout(() => {
+				dropdownMenu.classList.add('hidden');
+			}, 200);
+			dropdownArrow.style.transform = 'rotate(0deg)';
+		}
+	};
+
+	// Dropdown button click
+	dropdownBtn.addEventListener('click', (e) => {
+		e.stopPropagation();
+		toggleDropdown();
+	});
+
+	// Close dropdown when clicking outside
+	document.addEventListener('click', (e) => {
+		const target = e.target as HTMLElement;
+		if (!dropdownBtn.contains(target) && !dropdownMenu.contains(target)) {
+			closeDropdown();
+		}
+	});
+
+	// Close dropdown on escape key
+	document.addEventListener('keydown', (e) => {
+		if (e.key === 'Escape') {
+			closeDropdown();
+		}
+	});
+
+	// Close dropdown when clicking on menu items
+	const menuItems = dropdownMenu.querySelectorAll('button');
+	menuItems.forEach(item => {
+		item.addEventListener('click', () => {
+			closeDropdown();
+		});
+	});
+
+	console.log('✅ Profile dropdown functionality setup complete');
+}
+
+// Make the function globally available
+(window as any).addBasicNavbar = addBasicNavbar;
 
 // Global functions for navbar functionality
 (window as any).handleProfile = function() {
@@ -820,36 +934,183 @@ function addBasicNavbar(): void {
 	}
 };
 
+(window as any).testLogoutModal = function() {
+  console.log('🧪 Testing logout modal...');
+
+  // Create a mini modal directly for testing
+  const testConfig = {
+    type: 'logout' as const,
+    title: 'Confirm Logout',
+    message: 'Are you sure you want to logout? You will need to login again to access your account.',
+    confirmText: 'Yes, Logout',
+    cancelText: 'Cancel',
+    onConfirm: () => {
+      console.log('✅ Logout confirmed in test');
+      alert('Logout confirmed! (This is just a test)');
+    },
+    onCancel: () => {
+      console.log('❌ Logout cancelled in test');
+    }
+  };
+
+  console.log('🔍 Test config:', testConfig);
+
+  // Try using modal service
+  if ((window as any).modalService && (window as any).modalService.showMiniModal) {
+    console.log('✅ Using modal service');
+    (window as any).modalService.showMiniModal(testConfig);
+  } else {
+    console.log('❌ Modal service not available, creating direct instance');
+    // Import and create MiniModal directly
+    // Note: This might not work if MiniModal is not globally available
+    // In that case, check your import structure
+    console.error('Modal service not found. Make sure ModalService is properly initialized.');
+  }
+};
+
+// Alternative direct test
+(window as any).testLogoutModalDirect = function() {
+  console.log('🧪 Testing logout modal DIRECTLY...');
+
+  // Create modal HTML directly for testing
+  const backdrop = document.createElement('div');
+  backdrop.className = 'fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm transition-all duration-300';
+  backdrop.id = 'test-logout-modal';
+
+  backdrop.innerHTML = `
+    <div class="bg-gray-800 rounded-lg shadow-2xl max-w-sm w-full mx-4 p-6 border border-gray-700">
+      <div class="flex justify-between items-center mb-6">
+        <h2 class="text-2xl font-bold text-lime-500">Confirm Logout</h2>
+        <button id="test-close" class="text-gray-400 hover:text-white text-2xl transition-colors duration-300">&times;</button>
+      </div>
+
+      <div class="text-center">
+        <div class="w-12 h-12 mx-auto mb-4 bg-red-100 rounded-full flex items-center justify-center">
+          <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+          </svg>
+        </div>
+        <p class="text-gray-300 mb-6">Are you sure you want to logout? You will need to login again to access your account.</p>
+        <div class="flex space-x-3">
+          <button id="test-cancel" class="flex-1 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors duration-300">
+            Cancel
+          </button>
+          <button id="test-confirm" class="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors duration-300">
+            Yes, Logout
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(backdrop);
+
+  // Add event listeners
+  const closeBtn = backdrop.querySelector('#test-close');
+  const cancelBtn = backdrop.querySelector('#test-cancel');
+  const confirmBtn = backdrop.querySelector('#test-confirm');
+
+  const closeModal = () => {
+    backdrop.remove();
+  };
+
+  closeBtn?.addEventListener('click', closeModal);
+  cancelBtn?.addEventListener('click', () => {
+    console.log('❌ Test logout cancelled');
+    closeModal();
+  });
+  confirmBtn?.addEventListener('click', () => {
+    console.log('✅ Test logout confirmed');
+    alert('Logout confirmed! (This is just a test)');
+    closeModal();
+  });
+
+  // Close on backdrop click
+  backdrop.addEventListener('click', (e) => {
+    if (e.target === backdrop) closeModal();
+  });
+};
+
+
+// Updated handleLogout function using the new MiniModal class
 (window as any).handleLogout = function() {
-	console.log('👋 Logout clicked...');
+  console.log('👋 Logout clicked...');
+  console.log('🔍 Modal service available:', !!(window as any).modalService);
+  console.log('🔍 showMiniModal method available:', !!((window as any).modalService && (window as any).modalService.showMiniModal));
 
-	// Show confirmation dialog
-	const confirmed = confirm('Are you sure you want to logout?');
+  // Use the modal service to show mini modal
+  if ((window as any).modalService && (window as any).modalService.showMiniModal) {
+    console.log('✅ Using modal service for logout');
 
-	if (confirmed) {
-		// Clear authentication data
-		localStorage.removeItem('ft_pong_auth_token');
-		localStorage.removeItem('ft_pong_user_data');
+    const config = {
+      type: 'logout' as const,
+      title: 'Confirm Logout',
+      message: 'Are you sure you want to logout? You will need to login again to access your account.',
+      confirmText: 'Yes, Logout',
+      cancelText: 'Cancel',
+      onConfirm: () => {
+        console.log('✅ Logout confirmed');
 
-		// Refresh navbar to show login button
-		addBasicNavbar();
+        // Clear authentication data
+        localStorage.removeItem('ft_pong_auth_token');
+        localStorage.removeItem('ft_pong_user_data');
 
-		// Refresh the Jumbotron
-		updateJumbotronButton();
+        // Refresh navbar to show login button
+        if (typeof (window as any).addBasicNavbar === 'function') {
+          (window as any).addBasicNavbar();
+        }
 
-		// Dispatch auth state change event
-		window.dispatchEvent(new CustomEvent('auth-state-changed', {
-			detail: { isAuthenticated: false, user: null }
-		}));
+        // Refresh the Jumbotron
+        if (typeof (window as any).updateJumbotronButton === 'function') {
+          (window as any).updateJumbotronButton();
+        }
 
-		console.log('✅ User logged out successfully');
-		if (isComponentsLoaded) {
-			// Update components if loaded
-			updateAuthState(componentInstances);
-		} else {
-			showBasicToast('success', 'You have been logged out successfully!');
-		}
-	}
+        // Dispatch auth state change event
+        window.dispatchEvent(new CustomEvent('auth-state-changed', {
+          detail: { isAuthenticated: false, user: null }
+        }));
+
+        console.log('✅ User logged out successfully');
+
+        // Show success message
+        if (typeof (window as any).showBasicToast === 'function') {
+          (window as any).showBasicToast('success', 'You have been logged out successfully!');
+        }
+      },
+      onCancel: () => {
+        console.log('📝 Logout cancelled');
+      }
+    };
+
+    console.log('🔍 Logout config:', config);
+    (window as any).modalService.showMiniModal(config);
+  } else {
+    console.log('❌ Modal service not available, using fallback');
+    // Fallback to basic confirm if modal service not available
+    const confirmed = confirm('Are you sure you want to logout?');
+    if (confirmed) {
+      // Same logout logic as above
+      localStorage.removeItem('ft_pong_auth_token');
+      localStorage.removeItem('ft_pong_user_data');
+
+      if (typeof (window as any).addBasicNavbar === 'function') {
+        (window as any).addBasicNavbar();
+      }
+      if (typeof (window as any).updateJumbotronButton === 'function') {
+        (window as any).updateJumbotronButton();
+      }
+
+      window.dispatchEvent(new CustomEvent('auth-state-changed', {
+        detail: { isAuthenticated: false, user: null }
+      }));
+
+      console.log('✅ User logged out successfully');
+
+      if (typeof (window as any).showBasicToast === 'function') {
+        (window as any).showBasicToast('success', 'You have been logged out successfully!');
+      }
+    }
+  }
 };
 
 /**

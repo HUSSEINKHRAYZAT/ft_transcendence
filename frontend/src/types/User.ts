@@ -12,6 +12,7 @@ export interface User {
   email: string;
   firstName: string;
   lastName: string;
+  userName : string;
   avatar?: string;
   createdAt: Date;
   updatedAt: Date;
