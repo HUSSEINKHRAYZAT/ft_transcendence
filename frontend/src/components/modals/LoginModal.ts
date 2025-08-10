@@ -15,14 +15,15 @@ export class LoginModal extends BaseModal {
     return 'Login';
   }
 
-  protected getModalContent(): string {
+  protected getModalContent(): string
+  {
     return `
       <form id="login-form">
         <div class="mb-4">
-          <label class="block text-sm font-medium text-gray-300 mb-2">Email</label>
+          <label class="block text-sm font-medium text-gray-300 mb-2">Email / Username (it will be handlet later)</label>
           <input type="email" id="login-email" required
                  class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:border-lime-500 focus:ring-1 focus:ring-lime-500 transition-colors duration-300"
-                 placeholder="Enter your email">
+                 placeholder="Enter your email or username">
         </div>
         <div class="mb-6">
           <label class="block text-sm font-medium text-gray-300 mb-2">Password</label>
@@ -50,9 +51,6 @@ export class LoginModal extends BaseModal {
             </svg>
             <span>Sign in with Google</span>
           </button>
-          <p class="text-xs text-gray-500 mb-2">Demo Account:</p>
-          <p class="text-xs text-gray-400">Email: demo@ftpong.com</p>
-          <p class="text-xs text-gray-400">Password: demo123</p>
         </div>
       </div>
     `;

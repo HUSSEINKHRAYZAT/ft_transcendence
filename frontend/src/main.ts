@@ -1,58 +1,47 @@
-// Main entry point for FT_PONG application
 import { waitForDOM } from './utils/DOMHelpers';
 import './styles/main.css';
 
-// Component interfaces
 interface Component {
 	render(): Promise<void>;
 	updateAuthState?(isAuthenticated: boolean, user: any): void;
 }
 
-// Global variables
 let componentInstances: Component[] = [];
 let isComponentsLoaded = false;
 
-/**
- * Initialize application when script loads
- */
 console.log('🚀 main.ts script loaded and executing...');
 console.log('📅 Current time:', new Date().toISOString());
 console.log('🌐 Document ready state:', document.readyState);
 
-// Start initialization
 initializeApplication();
 
-/**
- * Main initialization function
- */
-async function initializeApplication(): Promise<void> {
+async function initializeApplication(): Promise<void>
+{
 	console.log('🚀 Starting FT_PONG application initialization...');
 
-	try {
-		// Wait for DOM to be ready
+	try
+	{
 		await waitForDOM();
 		console.log('✅ DOM is ready!');
 
-		// Hide loading screen
 		hideLoadingScreen();
 
-		// Try to load components with better error handling
 		await loadComponents();
 
-	} catch (error) {
+	}
+	catch (error)
+	{
 		console.error('❌ Failed to initialize application:', error);
 		showInitializationError(error);
 	}
 }
 
-/**
- * Load and initialize components
- */
-async function loadComponents(): Promise<void> {
+async function loadComponents(): Promise<void>
+{
 	console.log('📦 Attempting to load components...');
 
-	try {
-		// Dynamic imports with individual error handling
+	try
+	{
 		const componentPromises = [
 			loadComponent('./components/navbar/Navbar', 'Navbar'),
 			loadComponent('./components/home/NotificationBox', 'NotificationBox'),
@@ -67,139 +56,135 @@ async function loadComponents(): Promise<void> {
 
 		console.log(`📊 Component loading results: ${successful} successful, ${failed} failed`);
 
-		if (successful >= 1) {
-			// At least some components loaded successfully
+		if (successful >= 1)
+			{
 			console.log('✅ Some components loaded, initializing with available components...');
 			await initializeWithComponents(results);
 			isComponentsLoaded = true;
-		} else {
-			// All components failed to load
-			throw new Error('All components failed to load');
 		}
+		else
+			throw new Error('All components failed to load');
 
-	} catch (error) {
+	}
+	catch (error)
+	{
 		console.error('❌ Component loading failed:', error);
 		console.log('🔄 Falling back to basic content...');
 		await initializeBasicContent();
 	}
 }
 
-/**
- * Load a single component with error handling
- */
-async function loadComponent(path: string, componentName: string): Promise<any> {
-  try {
+async function loadComponent(path: string, componentName: string): Promise<any>
+{
+  try
+  {
     console.log(`📦 Loading ${componentName} from ${path}...`);
-    // Add the @vite-ignore comment to suppress the warning
     const module = await import(/* @vite-ignore */ path);
 
-    if (module[componentName]) {
+    if (module[componentName])
+	{
       console.log(`✅ ${componentName} loaded successfully`);
       return { name: componentName, constructor: module[componentName], module };
-    } else {
-      throw new Error(`${componentName} not found in module`);
     }
-  } catch (error) {
+	else
+      throw new Error(`${componentName} not found in module`);
+  }
+  catch (error)
+  {
     console.error(`❌ Failed to load ${componentName}:`, error);
     throw error;
   }
 }
-/**
- * Initialize with successfully loaded TypeScript components
- */
-async function initializeWithComponents(results: PromiseSettledResult<any>[]): Promise<void> {
+
+async function initializeWithComponents(results: PromiseSettledResult<any>[]): Promise<void>
+{
 	console.log('🧩 Initializing with loaded components...');
 
-	// Extract successful components
 	const components = results
 		.filter((result): result is PromiseFulfilledResult<any> => result.status === 'fulfilled')
 		.map(result => result.value);
 
-	try {
-		// Initialize modal service first (if available)
+	try
+	{
 		const modalServiceComponent = components.find(c => c.name === 'ModalService');
-		if (modalServiceComponent) {
+		if (modalServiceComponent)
+		{
 			const modalService = new modalServiceComponent.constructor();
 			(window as any).modalService = modalService;
 			console.log('🔑 Modal service initialized');
-		} else {
-			// Create basic modal service as fallback
-			createBasicModalService();
 		}
+		else
+			createBasicModalService();
 
-		// Add basic jumbotron content
 		addBasicJumbotron();
 
-		// Initialize other components
 		const componentPromises: Promise<void>[] = [];
 		const instancesCreated: Component[] = [];
 
-		for (const component of components) {
-			if (component.name !== 'ModalService') {
-				try {
+		for (const component of components)
+		{
+			if (component.name !== 'ModalService')
+			{
+				try
+				{
 					console.log(`🧩 Initializing ${component.name}...`);
 					const instance = new component.constructor() as Component;
 					instancesCreated.push(instance);
 					componentPromises.push(instance.render());
-				} catch (error) {
+				}
+				catch (error)
+				{
 					console.error(`❌ Failed to initialize ${component.name}:`, error);
 				}
 			}
 		}
 
-		// Wait for all component renders
 		const renderResults = await Promise.allSettled(componentPromises);
 		const successfulRenders = renderResults.filter(result => result.status === 'fulfilled').length;
 
 		console.log(`✅ ${successfulRenders}/${componentPromises.length} components rendered successfully!`);
 
-		// Store successful instances
 		componentInstances = instancesCreated;
 
-		// Setup authentication state listening
 		setupAuthListeners(instancesCreated);
-
-		// Check initial auth state
 		updateAuthState(instancesCreated);
 
-		// Add fallback content for any missing components
 		addFallbackContent();
 
 		console.log('🎮 FT_PONG Application initialized successfully with TypeScript components!');
 
-	} catch (error) {
+	}
+	catch (error)
+	{
 		console.error('❌ Failed to initialize with components:', error);
 		throw error;
 	}
 }
 
-/**
- * Fallback to basic content if TypeScript components fail
- */
-async function initializeBasicContent(): Promise<void> {
+async function initializeBasicContent(): Promise<void>
+{
 	console.log('🔄 Initializing with basic content fallback...');
 
-	try {
-		// Create basic modal service
+	try
+	{
 		createBasicModalService();
 
-		// Add basic content
 		addBasicNavbar();
 		addBasicJumbotron();
 		addBasicContentBoxes();
 
 		console.log('✅ Basic content initialized successfully!');
 
-	} catch (error) {
+	}
+	catch (error)
+	{
 		console.error('❌ Failed to initialize basic content:', error);
 		showInitializationError(error);
 	}
 }
 
-/**
- * Hide loading screen
- */
-function hideLoadingScreen(): void {
+function hideLoadingScreen(): void
+{
 	const loadingScreen = document.getElementById('loading-screen');
 	if (loadingScreen) {
 		console.log('✅ Loading screen found, hiding it...');
@@ -208,12 +193,10 @@ function hideLoadingScreen(): void {
 	}
 }
 
-/**
- * Create basic modal service as fallback
- */
-// In main.ts - Update the modal service creation section
-function createBasicModalService(): void {
-  (window as any).modalService = {
+function createBasicModalService(): void
+{
+  (window as any).modalService =
+  {
     showLoginModal: () => {
       console.log('🔑 Basic login modal');
       showBasicAuthModal('login');
@@ -232,11 +215,6 @@ function createBasicModalService(): void {
     },
     showPlayGameModal: () => {
       console.log('🎮 Basic play game modal');
-      showBasicPlayGameModal(); // We'll create this function
-    },
-    // Add test version
-    showPlayGameModalTest: () => {
-      console.log('🎮 Basic play game modal test');
       showBasicPlayGameModal();
     },
     closeModal: () => {
@@ -248,9 +226,9 @@ function createBasicModalService(): void {
   console.log('🔑 Basic modal service created');
 }
 
-// Add this new function for basic play game modal
-function showBasicPlayGameModal(): void {
-  closeBasicModal(); // Close any existing modal
+function showBasicPlayGameModal(): void
+{
+  closeBasicModal();
 
   const modal = document.createElement('div');
   modal.id = 'basic-modal';
@@ -283,18 +261,17 @@ function showBasicPlayGameModal(): void {
     </div>
   `;
 
-  // Close on backdrop click
-  modal.addEventListener('click', (e) => {
-    if (e.target === modal) {
+  modal.addEventListener('click', (e) =>
+	{
+    if (e.target === modal)
       closeBasicModal();
-    }
   });
 
   document.body.appendChild(modal);
 }
 
-// Add game mode selection handler
-(window as any).selectGameMode = function(mode: string) {
+(window as any).selectGameMode = function(mode: string)
+{
   console.log('🎮 Game mode selected:', mode);
 
   const user = JSON.parse(localStorage.getItem('ft_pong_user_data') || '{}');
@@ -308,21 +285,15 @@ function showBasicPlayGameModal(): void {
   };
 
   closeBasicModal();
-  showBasicToast('success', 'Game Starting!', `${mode} mode selected`);
+  showBasicToast('success', 'Game Starting!');
 
-  // Dispatch game start event
-  window.dispatchEvent(new CustomEvent('game-start-requested', {
+  window.dispatchEvent(new CustomEvent('game-start-requested',{
     detail: gameData
   }));
 };
 
-
-
-/**
- * Show basic authentication modal
- */
-function showBasicAuthModal(type: 'login' | 'signup'): void {
-	// Remove existing modal
+function showBasicAuthModal(type: 'login' | 'signup'): void
+{
 	closeBasicModal();
 
 	const isLogin = type === 'login';
@@ -366,42 +337,28 @@ function showBasicAuthModal(type: 'login' | 'signup'): void {
 				<p class="text-gray-400">${isLogin ? "Don't have an account?" : "Already have an account?"}
 					<button onclick="switchBasicAuthModal('${isLogin ? 'signup' : 'login'}')" class="text-lime-500 hover:text-lime-400 transition-colors duration-300">${isLogin ? 'Sign up' : 'Login'}</button>
 				</p>
-				${isLogin ? `
-					<div class="mt-4 pt-4 border-t border-gray-700">
-						<p class="text-xs text-gray-500 mb-2">Demo Account:</p>
-						<p class="text-xs text-gray-400">Email: demo@ftpong.com</p>
-						<p class="text-xs text-gray-400">Password: demo123</p>
-					</div>
-				` : ''}
 			</div>
 		</div>
 	`;
 
-	// Close on backdrop click
-	modal.addEventListener('click', (e) => {
-		if (e.target === modal) {
+	modal.addEventListener('click', (e) =>
+	{
+		if (e.target === modal)
 			closeBasicModal();
-		}
 	});
 
 	document.body.appendChild(modal);
 
-	// Setup form submission
 	const form = modal.querySelector('#basic-auth-form') as HTMLFormElement;
-	if (form) {
+	if (form)
 		form.addEventListener('submit', (e) => handleBasicAuth(e, type));
-	}
 
-	// Focus first input
 	const firstInput = modal.querySelector('input') as HTMLInputElement;
 	if (firstInput) {
 		setTimeout(() => firstInput.focus(), 100);
 	}
 }
 
-/**
- * Handle basic authentication
- */
 function handleBasicAuth(event: Event, type: 'login' | 'signup'): void {
 	event.preventDefault();
 
@@ -419,14 +376,16 @@ function handleBasicAuth(event: Event, type: 'login' | 'signup'): void {
 
 	errorDiv?.classList.add('hidden');
 
-	if (!email || !password) {
+	if (!email || !password)
+	{
 		showBasicError('Please fill in all fields');
 		return;
 	}
 
-	if (type === 'login') {
-		// Demo login
-		if (email === 'demo@ftpong.com' && password === 'demo123') {
+	if (type === 'login')
+	{
+		if (email === 'demo@ftpong.com' && password === 'demo123')
+		{
 			const userData = {
 				id: '1',
 				firstName: 'Demo',
@@ -444,11 +403,12 @@ function handleBasicAuth(event: Event, type: 'login' | 'signup'): void {
 			closeBasicModal();
 			showBasicToast('success', 'Welcome back, Demo!');
 			triggerAuthUpdate(true, userData);
-		} else {
-			showBasicError('Invalid credentials. Try: demo@ftpong.com / demo123');
 		}
-	} else {
-		// Signup
+		else
+			showBasicError('Invalid credentials. Try: demo@ftpong.com / demo123');
+	}
+	else
+	{
 		const firstNameInput = modal.querySelector('#firstName') as HTMLInputElement;
 		const lastNameInput = modal.querySelector('#lastName') as HTMLInputElement;
 
@@ -487,40 +447,39 @@ function handleBasicAuth(event: Event, type: 'login' | 'signup'): void {
 	}
 }
 
-/**
- * Show basic error
- */
-function showBasicError(message: string): void {
+function showBasicError(message: string): void
+{
 	const errorDiv = document.querySelector('#auth-error') as HTMLElement;
-	if (errorDiv) {
+	if (errorDiv)
+	{
 		errorDiv.textContent = message;
 		errorDiv.classList.remove('hidden');
 	}
 }
 
-/**
- * Switch between login and signup
- */
 function switchBasicAuthModal(type: 'login' | 'signup'): void {
 	showBasicAuthModal(type);
 }
 
-/**
- * Show basic profile modal
- */
-function showBasicProfileModal(): void {
+
+function showBasicProfileModal(): void
+{
 	closeBasicModal();
 
 	const userData = localStorage.getItem('ft_pong_user_data');
 	let user = null;
 
-	try {
+	try
+	{
 		user = userData ? JSON.parse(userData) : null;
-	} catch (error) {
+	}
+	catch (error)
+	{
 		console.error('Error parsing user data:', error);
 	}
 
-	if (!user) {
+	if (!user)
+	{
 		showBasicToast('error', 'No profile data found');
 		return;
 	}
@@ -569,7 +528,6 @@ function showBasicProfileModal(): void {
 		</div>
 	`;
 
-	// Close on backdrop click
 	modal.addEventListener('click', (e) => {
 		if (e.target === modal) {
 			closeBasicModal();
@@ -579,10 +537,8 @@ function showBasicProfileModal(): void {
 	document.body.appendChild(modal);
 }
 
-/**
- * Show basic info modal
- */
-function showBasicInfoModal(type: string): void {
+function showBasicInfoModal(type: string): void
+{
 	closeBasicModal();
 
 	const titles = {
@@ -631,7 +587,6 @@ function showBasicInfoModal(type: string): void {
 		</div>
 	`;
 
-	// Close on backdrop click
 	modal.addEventListener('click', (e) => {
 		if (e.target === modal) {
 			closeBasicModal();
@@ -641,9 +596,6 @@ function showBasicInfoModal(type: string): void {
 	document.body.appendChild(modal);
 }
 
-/**
- * Close basic modal
- */
 function closeBasicModal(): void {
 	const modal = document.getElementById('basic-modal');
 	if (modal) {
@@ -651,9 +603,6 @@ function closeBasicModal(): void {
 	}
 }
 
-/**
- * Show basic toast notification
- */
 function showBasicToast(type: 'success' | 'error' | 'info', message: string): void {
 	const colors = {
 		success: 'bg-green-600',
@@ -687,26 +636,26 @@ function showBasicToast(type: 'success' | 'error' | 'info', message: string): vo
 	}, 3000);
 }
 
-// Make functions globally available
 (window as any).closeBasicModal = closeBasicModal;
 (window as any).switchBasicAuthModal = switchBasicAuthModal;
 
-/**
- * Add basic navbar with profile functionality
- */
 function addBasicNavbar(): void {
 	const navbar = document.getElementById('navbar');
-	if (navbar) {
-		// Check auth state to determine what to show
+	if (navbar)
+		{
 		const authToken = localStorage.getItem('ft_pong_auth_token');
 		const userData = localStorage.getItem('ft_pong_user_data');
 		const isAuthenticated = !!(authToken && userData);
 
 		let user = null;
-		if (userData) {
-			try {
+		if (userData)
+		{
+			try
+			{
 				user = JSON.parse(userData);
-			} catch (error) {
+			}
+			catch (error)
+			{
 				console.error('Error parsing user data:', error);
 			}
 		}
@@ -911,8 +860,7 @@ function setupProfileDropdown(): void {
     console.error('❌ Modal service or showPlayGameModal method not available');
     console.log('📋 Available modal service methods:', modalService ? Object.keys(modalService) : 'No modal service');
 
-    // Fallback if modal service not available
-    showBasicToast('error', 'Game Modal Error', 'Game modal service not available. Please refresh the page.');
+    showBasicToast('error', 'Game Modal Error');
   }
 };
 
@@ -937,7 +885,6 @@ function setupProfileDropdown(): void {
 (window as any).testLogoutModal = function() {
   console.log('🧪 Testing logout modal...');
 
-  // Create a mini modal directly for testing
   const testConfig = {
     type: 'logout' as const,
     title: 'Confirm Logout',
@@ -960,11 +907,62 @@ function setupProfileDropdown(): void {
     console.log('✅ Using modal service');
     (window as any).modalService.showMiniModal(testConfig);
   } else {
-    console.log('❌ Modal service not available, creating direct instance');
-    // Import and create MiniModal directly
-    // Note: This might not work if MiniModal is not globally available
-    // In that case, check your import structure
-    console.error('Modal service not found. Make sure ModalService is properly initialized.');
+    console.log('❌ Modal service not available, creating direct modal');
+
+    // ADD THIS: Create the modal directly (same code as testLogoutModalDirect)
+    const backdrop = document.createElement('div');
+    backdrop.className = 'fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm transition-all duration-300';
+    backdrop.id = 'test-logout-modal';
+
+    backdrop.innerHTML = `
+      <div class="bg-gray-800 rounded-lg shadow-2xl max-w-sm w-full mx-4 p-6 border border-gray-700">
+        <div class="flex justify-between items-center mb-6">
+          <h2 class="text-2xl font-bold text-lime-500">${testConfig.title}</h2>
+          <button id="test-close" class="text-gray-400 hover:text-white text-2xl transition-colors duration-300">&times;</button>
+        </div>
+        <div class="text-center">
+          <div class="w-12 h-12 mx-auto mb-4 bg-red-100 rounded-full flex items-center justify-center">
+            <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013 3v1"></path>
+            </svg>
+          </div>
+          <p class="text-gray-300 mb-6">${testConfig.message}</p>
+          <div class="flex space-x-3">
+            <button id="test-cancel" class="flex-1 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors duration-300">
+              ${testConfig.cancelText}
+            </button>
+            <button id="test-confirm" class="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors duration-300">
+              ${testConfig.confirmText}
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(backdrop);
+
+    // Add event listeners
+    const closeBtn = backdrop.querySelector('#test-close');
+    const cancelBtn = backdrop.querySelector('#test-cancel');
+    const confirmBtn = backdrop.querySelector('#test-confirm');
+
+    const closeModal = () => {
+      backdrop.remove();
+    };
+
+    closeBtn?.addEventListener('click', closeModal);
+    cancelBtn?.addEventListener('click', () => {
+      testConfig.onCancel();
+      closeModal();
+    });
+    confirmBtn?.addEventListener('click', () => {
+      testConfig.onConfirm();
+      closeModal();
+    });
+
+    backdrop.addEventListener('click', (e) => {
+      if (e.target === backdrop) closeModal();
+    });
   }
 };
 
@@ -1032,60 +1030,59 @@ function setupProfileDropdown(): void {
 };
 
 
-// Updated handleLogout function using the new MiniModal class
 (window as any).handleLogout = function() {
   console.log('👋 Logout clicked...');
-  console.log('🔍 Modal service available:', !!(window as any).modalService);
-  console.log('🔍 showMiniModal method available:', !!((window as any).modalService && (window as any).modalService.showMiniModal));
+//   console.log('🔍 Modal service available:', !!(window as any).modalService);
+//   console.log('🔍 showMiniModal method available:', !!((window as any).modalService && (window as any).modalService.showMiniModal));
 
-  // Use the modal service to show mini modal
-  if ((window as any).modalService && (window as any).modalService.showMiniModal) {
-    console.log('✅ Using modal service for logout');
+//   // Use the modal service to show mini modal
+//   if ((window as any).modalService && (window as any).modalService.showMiniModal) {
+//     console.log('✅ Using modal service for logout');
 
-    const config = {
-      type: 'logout' as const,
-      title: 'Confirm Logout',
-      message: 'Are you sure you want to logout? You will need to login again to access your account.',
-      confirmText: 'Yes, Logout',
-      cancelText: 'Cancel',
-      onConfirm: () => {
-        console.log('✅ Logout confirmed');
+//     const config = {
+//       type: 'logout' as const,
+//       title: 'Confirm Logout',
+//       message: 'Are you sure you want to logout? You will need to login again to access your account.',
+//       confirmText: 'Yes, Logout',
+//       cancelText: 'Cancel',
+//       onConfirm: () => {
+//         console.log('✅ Logout confirmed');
 
-        // Clear authentication data
-        localStorage.removeItem('ft_pong_auth_token');
-        localStorage.removeItem('ft_pong_user_data');
+//         // Clear authentication data
+//         localStorage.removeItem('ft_pong_auth_token');
+//         localStorage.removeItem('ft_pong_user_data');
 
-        // Refresh navbar to show login button
-        if (typeof (window as any).addBasicNavbar === 'function') {
-          (window as any).addBasicNavbar();
-        }
+//         // Refresh navbar to show login button
+//         if (typeof (window as any).addBasicNavbar === 'function') {
+//           (window as any).addBasicNavbar();
+//         }
 
-        // Refresh the Jumbotron
-        if (typeof (window as any).updateJumbotronButton === 'function') {
-          (window as any).updateJumbotronButton();
-        }
+//         // Refresh the Jumbotron
+//         if (typeof (window as any).updateJumbotronButton === 'function') {
+//           (window as any).updateJumbotronButton();
+//         }
 
-        // Dispatch auth state change event
-        window.dispatchEvent(new CustomEvent('auth-state-changed', {
-          detail: { isAuthenticated: false, user: null }
-        }));
+//         // Dispatch auth state change event
+//         window.dispatchEvent(new CustomEvent('auth-state-changed', {
+//           detail: { isAuthenticated: false, user: null }
+//         }));
 
-        console.log('✅ User logged out successfully');
+//         console.log('✅ User logged out successfully');
 
-        // Show success message
-        if (typeof (window as any).showBasicToast === 'function') {
-          (window as any).showBasicToast('success', 'You have been logged out successfully!');
-        }
-      },
-      onCancel: () => {
-        console.log('📝 Logout cancelled');
-      }
-    };
+//         // Show success message
+//         if (typeof (window as any).showBasicToast === 'function') {
+//           (window as any).showBasicToast('success', 'You have been logged out successfully!');
+//         }
+//       },
+//       onCancel: () => {
+//         console.log('📝 Logout cancelled');
+//       }
+//     };
 
-    console.log('🔍 Logout config:', config);
-    (window as any).modalService.showMiniModal(config);
-  } else {
-    console.log('❌ Modal service not available, using fallback');
+//     console.log('🔍 Logout config:', config);
+//     (window as any).modalService.showMiniModal(config);
+//   } else {
+//     console.log('❌ Modal service not available, using fallback');
     // Fallback to basic confirm if modal service not available
     const confirmed = confirm('Are you sure you want to logout?');
     if (confirmed) {
@@ -1111,7 +1108,6 @@ function setupProfileDropdown(): void {
       }
     }
   }
-};
 
 /**
  * Add Pong-themed jumbotron with game integration
@@ -1516,12 +1512,12 @@ function handleGameStartRequest(gameData: any): void {
 			extraInfo = ` (${gameData.playerCount} players)`;
 		}
 
-		showBasicToast('success', 'Game Configuration Saved!', `${modeText}${extraInfo} ready to start`);
+		showBasicToast('success', 'Game Configuration Saved!');
 
 		// TODO: Replace this section with actual game initialization
 		// For now, we'll just log and show a message
 		setTimeout(() => {
-			showBasicToast('info', 'Game Handler Required', 'Waiting for game component to handle this configuration...');
+			showBasicToast('info', 'Game Handler Required');
 		}, 1500);
 
 		// The actual game handler should listen for 'game-start-requested' event
@@ -1529,7 +1525,7 @@ function handleGameStartRequest(gameData: any): void {
 
 	} catch (error) {
 		console.error('Error handling game start request:', error);
-		showBasicToast('error', 'Game Start Failed', 'Could not initialize game. Please try again.');
+		showBasicToast('error', 'Game Start Failed');
 	}
 }
 
@@ -1630,20 +1626,18 @@ function showInitializationError(error: unknown): void {
 (window as any).handleStartGame = async function() {
 	console.log('🎮 Starting 3D Pong game...');
 
-	try {
-		// Import your existing game modules
+	try
+	{
 		const [{ TournamentManager }, pongModule] = await Promise.all([
 			import('./components/game/TournamentManager'),
 			import('./components/game/PongGame') // This will be your existing file
 		]);
 
-		// Get jumbotron container
 		const jumbotron = document.getElementById('jumbotron');
 		if (!jumbotron) {
 			throw new Error('Jumbotron container not found');
 		}
 
-		// Replace jumbotron content with game canvas
 		jumbotron.innerHTML = `
 			<div class="min-h-screen bg-black relative">
 				<canvas id="gameCanvas" class="w-full h-full"></canvas>
@@ -1653,16 +1647,13 @@ function showInitializationError(error: unknown): void {
 			</div>
 		`;
 
-		// Setup exit button
 		const exitBtn = document.getElementById('exit-game');
 		if (exitBtn) {
 			exitBtn.addEventListener('click', () => {
-				// Restore jumbotron
 				addBasicJumbotron();
 			});
 		}
 
-		// Start your existing game logic
 		const config = await renderGameMenu();
 		const tm = new TournamentManager();
 
@@ -1671,20 +1662,17 @@ function showInitializationError(error: unknown): void {
 			tm.displayCurrentMatch();
 		}
 
-		// Start the game using your existing classes
+
 		const game = new (pongModule as any).Pong3D(config, tm);
 		game.init();
 		game.animate();
 
 	} catch (error) {
 		console.error('❌ Failed to start game:', error);
-		showBasicToast('error', 'Game Error', 'Failed to load the game');
+		showBasicToast('error', 'Game Error');
 	}
 };
 
-/**
- * Render game configuration menu (simplified version of your Menu class)
- */
 async function renderGameMenu(): Promise<any> {
 	return new Promise(resolve => {
 		const overlay = document.createElement('div');
