@@ -55,7 +55,17 @@ type RemoteMsg =
       };
       paddles: { x: number; y: number; z: number }[];
       scores: number[];
-    };
+    }
+  | {
+      t: "seed"; // host -> guests (obstacles determinism)
+      seed: number;
+      width: number;
+      height: number;
+      playerCount: PlayerCount;
+    }
+  | { t: "start" } // host -> guests (explicit start gate)
+  | { t: "pong" } // relay -> clients
+  | { t: "ping" }; // clients -> relay
 
 // ---------------- Utilities for UI cleanup ----------------
 function clearPongUI() {
@@ -140,7 +150,7 @@ class Menu {
               <input id="tournScore" type="number" min="1" max="21" value="10" style="width:60px;">
             </label>
             <div style="margin-top:8px; font-size:12px; opacity:.8;">
-              Tournament runs as sequential 2P **remote** matches. Each match uses its own room id.
+              Tournament runs as sequential 2P <b>remote</b> matches. Each match uses its own room id.
             </div>
           </div>
 
@@ -327,6 +337,7 @@ class Pong3D {
 
   private paddles: import("@babylonjs/core").Mesh[] = [];
   private obstacles: import("@babylonjs/core").Mesh[] = [];
+  private obstacleCaps: import("@babylonjs/core").Mesh[] = [];
   private corners: import("@babylonjs/core").Mesh[] = [];
 
   private keys: Record<string, boolean> = {};
@@ -334,10 +345,12 @@ class Pong3D {
   // who controls each paddle: 'human' | 'ai' | 'remoteGuest'
   private control: ("human" | "ai" | "remoteGuest")[] = [];
 
-  // per-AI params
-  private aiError: number[] = [0, 0, 0, 0];
+  // --------- AI (brutal at 10)
+  private aiTarget: number[] = [0, 0, 0, 0];
+  private aiNextThinkAt: number[] = [0, 0, 0, 0];
   private aiErrorRangePerPaddle: number[] = [2, 2, 2, 2];
-  private aiLerpPerPaddle: number[] = [0.08, 0.08, 0.08, 0.08];
+  private aiReactionMsPerPaddle: number[] = [300, 300, 300, 300];
+  private aiLookaheadBounces: number[] = [0, 0, 0, 0];
 
   // scores [L, R, B, T]
   private scores = [0, 0, 0, 0];
@@ -345,6 +358,9 @@ class Pong3D {
   private lastScorer = -1;
   private lastHitter = -1;
   private touchedOnce = false;
+
+  // penalty tracking
+  private hadObstacleSinceLastTouch = false;
 
   // dimensions / physics
   private ballRadius = 0.2;
@@ -366,13 +382,22 @@ class Pong3D {
   private matchReady = true; // pause sim until true
   private waitUI?: HTMLDivElement;
 
+  // deterministic obstacles
+  private fieldWidth = 20;
+  private fieldHeight: number = 10;
+  private obstacleSeed: number = Math.floor(Math.random() * 2 ** 31);
+  private obstaclesInitialized = false;
+
+  // keepalive
+  private lastPingAt = 0;
+
   constructor(private config: GameConfig) {
     const canvas = document.getElementById("gameCanvas") as HTMLCanvasElement;
     this.engine = new Engine(canvas, true);
     this.scene = new Scene(this.engine);
     this.scene.clearColor = new Color4(0.08, 0.08, 0.14, 1);
 
-    // Camera (top-ish, locked)
+    // Camera
     this.camera = new ArcRotateCamera(
       "cam",
       Math.PI / 2,
@@ -396,7 +421,7 @@ class Pong3D {
       (e) => (this.keys[e.key.toLowerCase()] = false)
     );
 
-    // Remote gate
+    // Remote role
     this.isHost =
       this.config.connection === "remoteHost" ||
       this.config.connection === "remote4Host";
@@ -545,8 +570,8 @@ class Pong3D {
 
   // ---------- Scene setup ----------
   private init() {
-    const width = 20;
-    const height = this.config.playerCount === 4 ? 20 : 10;
+    this.fieldWidth = 20;
+    this.fieldHeight = this.config.playerCount === 4 ? 20 : 10;
 
     // Lights
     new HemisphericLight("hemi", new Vector3(0, 1, 0), this.scene);
@@ -558,7 +583,7 @@ class Pong3D {
     fieldMat.diffuseColor = new Color3(0.25, 0.25, 0.28);
     const field = MeshBuilder.CreateGround(
       "field",
-      { width, height },
+      { width: this.fieldWidth, height: this.fieldHeight },
       this.scene
     );
     field.material = fieldMat;
@@ -576,17 +601,23 @@ class Pong3D {
       m.position.set(x, h / 2, z);
       m.material = wallMat;
     };
-    wall(width + t, t, 0, height / 2 + t / 2, "wallTop");
-    wall(width + t, t, 0, -height / 2 - t / 2, "wallBottom");
-    wall(t, height + t, -width / 2 - t / 2, 0, "wallLeft");
-    wall(t, height + t, width / 2 + t / 2, 0, "wallRight");
+    wall(this.fieldWidth + t, t, 0, this.fieldHeight / 2 + t / 2, "wallTop");
+    wall(
+      this.fieldWidth + t,
+      t,
+      0,
+      -this.fieldHeight / 2 - t / 2,
+      "wallBottom"
+    );
+    wall(t, this.fieldHeight + t, -this.fieldWidth / 2 - t / 2, 0, "wallLeft");
+    wall(t, this.fieldHeight + t, this.fieldWidth / 2 + t / 2, 0, "wallRight");
 
-    // Corner blocks (thicker & shiny)
+    // Corner blocks
     this.cornerSize = t * 5;
     const cH = 1.0,
       cS = this.cornerSize;
-    const cx = width / 2 - t / 2 - cS / 2;
-    const cz = height / 2 - t / 2 - cS / 2;
+    const cx = this.fieldWidth / 2 - t / 2 - cS / 2;
+    const cz = this.fieldHeight / 2 - t / 2 - cS / 2;
     const cornerMat = shinyMat(this.scene, new Color3(0.45, 0.24, 0.12), 0.4);
     const makeCornerBox = (x: number, z: number, id: string) => {
       const box = MeshBuilder.CreateBox(
@@ -614,8 +645,10 @@ class Pong3D {
     this.ball.material = ballMat;
     this.ball.position = new Vector3(0, 0.3, 0);
 
-    // Paddles (shiny “rounded” look via fresnel+emissive; geometry remains box)
-    const dAxis = (this.config.playerCount === 4 ? height : width) / 2 - 0.3;
+    // Paddles
+    const dAxis =
+      (this.config.playerCount === 4 ? this.fieldHeight : this.fieldWidth) / 2 -
+      0.3;
     const newPaddle = (
       x: number,
       z: number,
@@ -636,8 +669,8 @@ class Pong3D {
     if (this.config.playerCount === 4) {
       newPaddle(-dAxis, 0, 0, 0, new Color3(0.35, 0.9, 0.6)); // left
       newPaddle(+dAxis, 0, 0, 1, new Color3(0.36, 0.63, 0.92)); // right
-      newPaddle(0, +dAxis, Math.PI / 2, 2, new Color3(0.97, 0.85, 0.35)); // bottom (+Z)
-      newPaddle(0, -dAxis, Math.PI / 2, 3, new Color3(0.92, 0.44, 0.39)); // top (-Z)
+      newPaddle(0, +dAxis, Math.PI / 2, 2, new Color3(0.97, 0.85, 0.35)); // bottom
+      newPaddle(0, -dAxis, Math.PI / 2, 3, new Color3(0.92, 0.44, 0.39)); // top
     } else {
       newPaddle(-dAxis, 0, 0, 0, new Color3(0.35, 0.9, 0.6));
       newPaddle(+dAxis, 0, 0, 1, new Color3(0.36, 0.63, 0.92));
@@ -668,8 +701,17 @@ class Pong3D {
       }
     }
 
-    // Obstacles (colored, shiny, non-overlapping)
-    this.spawnObstacles(width, height);
+    // Obstacles (deterministic for remote)
+    if (this.isHost || !this.isGuest) {
+      this.obstacleSeed =
+        (Date.now() ^ ((Math.random() * 2 ** 31) | 0)) >>> 0;
+      this.spawnObstaclesDeterministic(
+        this.fieldWidth,
+        this.fieldHeight,
+        this.obstacleSeed
+      );
+      this.obstaclesInitialized = true;
+    }
 
     // If remote waiting: park ball still until beginMatch()
     if (this.matchReady) this.resetBall(Math.random() < 0.5 ? 1 : -1);
@@ -680,26 +722,91 @@ class Pong3D {
 
     // Loop
     this.engine.runRenderLoop(() => {
-      this.update(width, height);
+      this.update(this.fieldWidth, this.fieldHeight);
       this.scene.render();
     });
 
     window.addEventListener("resize", () => this.engine.resize());
   }
 
+  // ---------- AI difficulty ----------
   private applyAIDifficulty(idxs: number[], difficulty: number) {
     const d = Math.min(10, Math.max(1, difficulty));
     const t = (d - 1) / 9; // 0..1
-    const errRange = lerp(2.5, 0.2, t);
-    const lerpAmt = lerp(0.05, 0.16, t);
+    const errRange = lerp(2.8, 0.05, t);
+    const reactMs = lerp(420, 40, t);
+    const bounces = Math.round(lerp(0, 2, t));
     idxs.forEach((i) => {
       this.aiErrorRangePerPaddle[i] = errRange;
-      this.aiLerpPerPaddle[i] = lerpAmt;
+      this.aiReactionMsPerPaddle[i] = reactMs;
+      this.aiLookaheadBounces[i] = bounces;
+      this.aiNextThinkAt[i] = 0;
+      this.aiTarget[i] = 0;
     });
   }
 
-  private spawnObstacles(width: number, height: number) {
-    const count = 3 + Math.floor(Math.random() * 3); // 3..5
+  private predictInterceptForPaddle(idx: number): number {
+    const w = this.fieldWidth,
+      h = this.fieldHeight,
+      t = this.wallThickness;
+
+    const pos = this.ball.position.clone();
+    const vel = this.ballVelocity.clone();
+
+    let planeCoord = 0;
+    let axis: "x" | "z";
+    if (idx === 0) {
+      axis = "x";
+      planeCoord = -w / 2 + this.ballRadius + t / 2 + 0.1;
+    } else if (idx === 1) {
+      axis = "x";
+      planeCoord = +w / 2 - this.ballRadius - t / 2 - 0.1;
+    } else if (idx === 2) {
+      axis = "z";
+      planeCoord = +h / 2 - this.ballRadius - t / 2 - 0.1;
+    } else {
+      axis = "z";
+      planeCoord = -h / 2 + this.ballRadius + t / 2 + 0.1;
+    }
+
+    const dt = 1;
+    let steps = 0;
+    const maxSteps = 1200;
+    let bounces = 0;
+
+    const limZ = h / 2 - this.ballRadius - t / 2;
+
+    while (steps++ < maxSteps) {
+      pos.addInPlace(vel.scale(dt));
+
+      if (this.config.playerCount !== 4) {
+        if (Math.abs(pos.z) > limZ) {
+          vel.z *= -1;
+          pos.z = clamp(pos.z, -limZ, limZ);
+          if (++bounces > this.aiLookaheadBounces[idx]) break;
+        }
+      }
+      if (axis === "x") {
+        if ((idx === 0 && pos.x <= planeCoord) || (idx === 1 && pos.x >= planeCoord))
+          return pos.z;
+      } else {
+        if ((idx === 2 && pos.z >= planeCoord) || (idx === 3 && pos.z <= planeCoord))
+          return pos.x;
+      }
+    }
+    return axis === "x" ? this.ball.position.x : this.ball.position.z;
+  }
+
+  // ---------- Obstacles ----------
+  private spawnObstaclesDeterministic(width: number, height: number, seed: number) {
+    // Clear previous
+    this.obstacles.forEach((o) => o.dispose());
+    this.obstacleCaps.forEach((c) => c.dispose());
+    this.obstacles.length = 0;
+    this.obstacleCaps.length = 0;
+
+    const rng = mulberry32(seed >>> 0);
+    const count = 3 + Math.floor(rng() * 3); // 3..5
     const chosen: Vector3[] = [];
     const minGap = 1.0;
 
@@ -708,11 +815,11 @@ class Pong3D {
         z = 0,
         ok = false,
         tries = 0;
-      const radius = 0.25 + Math.random() * 0.15;
+      const radius = 0.25 + rng() * 0.15;
       while (!ok && tries++ < 40) {
-        x = (Math.random() * 2 - 1) * (width / 2 - 2);
-        z = (Math.random() * 2 - 1) * (height / 2 - 2);
-        ok = Math.abs(x) > 1.2 || Math.abs(z) > 1.2; // avoid dead-center
+        x = (rng() * 2 - 1) * (width / 2 - 2);
+        z = (rng() * 2 - 1) * (height / 2 - 2);
+        ok = Math.abs(x) > 1.2 || Math.abs(z) > 1.2;
         if (ok) {
           for (const p of chosen) {
             if (Vector3.Distance(new Vector3(x, 0, z), p) < minGap + radius) {
@@ -725,15 +832,31 @@ class Pong3D {
       chosen.push(new Vector3(x, 0, z));
 
       const h = 1;
-      const m = MeshBuilder.CreateCylinder(
+      const cyl = MeshBuilder.CreateCylinder(
         `obs${i}`,
         { diameter: radius * 2, height: h, tessellation: 24 },
         this.scene
       );
-      m.position.set(x, h / 2, z);
-      m.material = shinyMat(this.scene, randColor(), 0.7, true);
-      (m as any).metadata = { radius };
-      this.obstacles.push(m);
+      cyl.position.set(x, h / 2, z);
+      cyl.material = shinyMat(this.scene, randColor(rng), 0.7, true);
+      (cyl as any).metadata = { radius };
+      this.obstacles.push(cyl);
+
+      // Top cap
+      const cap = MeshBuilder.CreateDisc(
+        `obsCap${i}`,
+        { radius, tessellation: 32 },
+        this.scene
+      );
+      cap.position.set(x, h + 0.005, z);
+      const capMat = shinyMat(
+        this.scene,
+        new Color3(1, 1, 1).scale(0.85).add(randColor(rng).scale(0.6)),
+        0.9,
+        true
+      );
+      cap.material = capMat;
+      this.obstacleCaps.push(cap);
     }
   }
 
@@ -746,14 +869,15 @@ class Pong3D {
       0.07 + Math.random() * 0.05,
       speed * Math.sin(angle)
     );
-    // refresh AI errors
     this.control.forEach((c, i) => {
-      if (c === "ai")
-        this.aiError[i] =
-          (Math.random() * 2 - 1) * this.aiErrorRangePerPaddle[i];
+      if (c === "ai") {
+        this.aiTarget[i] = 0;
+        this.aiNextThinkAt[i] = 0;
+      }
     });
     this.lastHitter = -1;
     this.touchedOnce = false;
+    this.hadObstacleSinceLastTouch = false;
   }
 
   // ---------- Remote ----------
@@ -768,10 +892,16 @@ class Pong3D {
           mode: this.config.playerCount === 4 ? "4p" : "2p",
         };
         this.ws?.send(JSON.stringify(hello));
+
+        // Host: broadcast obstacle seed right away
+        if (this.isHost) this.sendSeed();
       };
+
       this.ws.onmessage = (ev) => {
         const msg = safeParse<RemoteMsg>(ev.data);
         if (!msg) return;
+
+        if (msg.t === "pong") return; // ignore
 
         // Host sees joins -> count & maybe start
         if (msg.t === "join" && this.isHost) {
@@ -782,18 +912,61 @@ class Pong3D {
           this.updateWaitingOverlay(
             `Waiting for players… ${this.connectedGuests}/${this.requiredGuests}`
           );
-          if (this.connectedGuests >= this.requiredGuests && !this.matchReady)
+          // Re-broadcast seed on every join (late guest)
+          this.sendSeed();
+
+          if (this.connectedGuests >= this.requiredGuests && !this.matchReady) {
+            // tell guests to start explicitly
+            this.sendStart();
             this.beginMatch();
+          }
           return;
         }
 
         // Guest learns index
         if (msg.t === "assign" && this.isGuest) {
+          // If -1 returned (room full), retry request index after a short delay.
+          if (typeof msg.idx !== "number" || msg.idx < 0) {
+            setTimeout(() => {
+              try {
+                this.ws?.send(
+                  JSON.stringify({
+                    t: "join",
+                    roomId: this.config.roomId!,
+                  })
+                );
+              } catch {}
+            }, 500);
+            return;
+          }
           this.remoteIndex = (msg.idx as 0 | 1 | 2 | 3) ?? 1;
           return;
         }
 
-        // Guest receives state -> hide overlay first time
+        // Guests build identical obstacles
+        if (msg.t === "seed" && this.isGuest) {
+          if (!this.obstaclesInitialized) {
+            this.fieldWidth = msg.width;
+            this.fieldHeight = msg.height;
+            this.spawnObstaclesDeterministic(
+              this.fieldWidth,
+              this.fieldHeight,
+              msg.seed >>> 0
+            );
+            this.obstaclesInitialized = true;
+          }
+          return;
+        }
+
+        // Explicit start from host
+        if (msg.t === "start" && this.isGuest) {
+          this.matchReady = true;
+          this.hideWaitingOverlay();
+          // ball state will be synced by 'state'
+          return;
+        }
+
+        // Guest receives state
         if (msg.t === "state" && this.isGuest) {
           this.ball.position.set(msg.ball.x, msg.ball.y, msg.ball.z);
           this.ballVelocity.set(msg.ball.vx, msg.ball.vy, msg.ball.vz);
@@ -803,23 +976,31 @@ class Pong3D {
           for (let i = 0; i < this.scores.length && i < msg.scores.length; i++)
             this.scores[i] = msg.scores[i];
           this.updateScoreUI();
-          if (!this.matchReady) {
-            this.matchReady = true;
-            this.hideWaitingOverlay();
-          }
           return;
         }
 
         // Host receives guest inputs
         if (msg.t === "input" && this.isHost) {
-          this.guestInputs[msg.idx] = { up: !!msg.up, down: !!msg.down };
+          this.guestInputs[(msg as any).idx] = {
+            up: !!(msg as any).up,
+            down: !!(msg as any).down,
+          };
           return;
         }
       };
 
-      // Guests: send inputs continuously
-      if (this.isGuest) {
-        const sendInputs = () => {
+      this.ws.onclose = () => {
+        if (!this.isGuest) return;
+        this.matchReady = false;
+        this.showWaitingOverlay("Connection lost. Reconnecting…");
+        // naive auto-reload to reconnect
+        setTimeout(() => location.reload(), 1200);
+      };
+
+      // Guests: send inputs continuously + keepalive
+      const tickNet = () => {
+        const now = performance.now();
+        if (this.isGuest) {
           const up = !!this.keys["w"] || !!this.keys["arrowup"];
           const down = !!this.keys["s"] || !!this.keys["arrowdown"];
           const pkt: RemoteMsg = {
@@ -831,14 +1012,41 @@ class Pong3D {
           try {
             this.ws?.send(JSON.stringify(pkt));
           } catch {}
-          requestAnimationFrame(sendInputs);
-        };
-        requestAnimationFrame(sendInputs);
-      }
+        }
+        // keepalive every 10s
+        if (now - this.lastPingAt > 10000) {
+          try {
+            this.ws?.send(JSON.stringify({ t: "ping" as const }));
+          } catch {}
+          this.lastPingAt = now;
+        }
+        requestAnimationFrame(tickNet);
+      };
+      requestAnimationFrame(tickNet);
     } catch {
       // best effort
     }
   }
+
+  private sendSeed() {
+    const seedMsg: RemoteMsg = {
+      t: "seed",
+      seed: this.obstacleSeed >>> 0,
+      width: this.fieldWidth,
+      height: this.fieldHeight,
+      playerCount: this.config.playerCount,
+    };
+    try {
+      this.ws?.send(JSON.stringify(seedMsg));
+    } catch {}
+  }
+
+  private sendStart() {
+    try {
+      this.ws?.send(JSON.stringify({ t: "start" as const }));
+    } catch {}
+  }
+
   private broadcastState(now: number) {
     if (!this.ws || !this.isHost) return;
     if (now - this.lastStateSent < 33) return; // ~30Hz
@@ -869,7 +1077,7 @@ class Pong3D {
   private update(width: number, height: number) {
     const now = performance.now();
 
-    // Pause everything until match is ready
+    // Pause simulation until match is ready (but host continues broadcasting)
     if (!this.matchReady) {
       if (this.isHost) this.broadcastState(now);
       return;
@@ -908,25 +1116,19 @@ class Pong3D {
 
       [0, 1, 2, 3].forEach((i) => {
         if (this.control[i] !== "ai") return;
+        if (now >= this.aiNextThinkAt[i]) {
+          const pred = this.predictInterceptForPaddle(i);
+          const err = (Math.random() * 2 - 1) * this.aiErrorRangePerPaddle[i];
+          this.aiTarget[i] = pred + err;
+          this.aiNextThinkAt[i] = now + this.aiReactionMsPerPaddle[i];
+        }
         const p = this.paddles[i];
-        const err = this.aiError[i];
-        const lerpAmt = this.aiLerpPerPaddle[i];
         if (i < 2) {
-          const limZ = height / 2 - 1;
-          const targetZ = clamp(this.ball.position.z + err, -limZ, limZ);
-          p.position.z = Vector3.Lerp(
-            p.position,
-            new Vector3(p.position.x, 0, targetZ),
-            lerpAmt
-          ).z;
+          if (p.position.z < this.aiTarget[i] - 0.02) p.position.z += move;
+          else if (p.position.z > this.aiTarget[i] + 0.02) p.position.z -= move;
         } else {
-          const limX = width / 2 - 1;
-          const targetX = clamp(this.ball.position.x + err, -limX, limX);
-          p.position.x = Vector3.Lerp(
-            p.position,
-            new Vector3(targetX, 0, p.position.z),
-            lerpAmt
-          ).x;
+          if (p.position.x < this.aiTarget[i] - 0.02) p.position.x += move;
+          else if (p.position.x > this.aiTarget[i] + 0.02) p.position.x -= move;
         }
       });
     } else {
@@ -934,17 +1136,14 @@ class Pong3D {
       if (this.keys["arrowdown"]) p1.position.z += move;
 
       if (this.control[1] === "ai") {
-        const limZ = height / 2 - 1;
-        const targetZ = clamp(
-          this.ball.position.z + this.aiError[1],
-          -limZ,
-          limZ
-        );
-        p2.position.z = Vector3.Lerp(
-          p2.position,
-          new Vector3(0, 0, targetZ),
-          this.aiLerpPerPaddle[1]
-        ).z;
+        if (now >= this.aiNextThinkAt[1]) {
+          const pred = this.predictInterceptForPaddle(1);
+          const err = (Math.random() * 2 - 1) * this.aiErrorRangePerPaddle[1];
+          this.aiTarget[1] = pred + err;
+          this.aiNextThinkAt[1] = now + this.aiReactionMsPerPaddle[1];
+        }
+        if (p2.position.z < this.aiTarget[1] - 0.02) p2.position.z += move;
+        else if (p2.position.z > this.aiTarget[1] + 0.02) p2.position.z -= move;
       } else if (this.config.connection === "remoteHost") {
         if (this.guestInputs[1]?.up) p2.position.z -= move;
         if (this.guestInputs[1]?.down) p2.position.z += move;
@@ -954,41 +1153,36 @@ class Pong3D {
       }
     }
 
-    // Clamp paddles within walls and keep out of corners
-    const padW2 = 0.1,
-      padD2 = 1.0; // half extents (box width=0.2, depth=2)
-    const margin = 0.02,
-      t = this.wallThickness;
-    const limZ = height / 2 - padD2 - t / 2 - margin;
-    const limX = width / 2 - padD2 - t / 2 - margin;
+    // Clamp paddles & keep out of corners
+    const padD2 = 1.0;
+    const t = this.wallThickness;
+    const limZ = height / 2 - padD2 - t / 2 - 0.02;
+    const limX = width / 2 - padD2 - t / 2 - 0.02;
     this.paddles.forEach((p, i) => {
       if (i < 2) p.position.z = clamp(p.position.z, -limZ, limZ);
       else p.position.x = clamp(p.position.x, -limX, limX);
     });
 
-    const cHalf = this.cornerSize / 2,
-      padMargin = 0.01;
+    const cHalf = this.cornerSize / 2;
     for (let i = 0; i < Math.min(2, this.paddles.length); i++) {
-      // left/right paddles
       const p = this.paddles[i];
       for (const c of this.corners) {
         const overlapX = Math.abs(p.position.x - c.position.x) < 0.1 + cHalf;
         const overlapZ = Math.abs(p.position.z - c.position.z) < 1.0 + cHalf;
         if (overlapX && overlapZ) {
           const signZ = p.position.z - c.position.z >= 0 ? 1 : -1;
-          p.position.z = c.position.z + signZ * (1.0 + cHalf + padMargin);
+          p.position.z = c.position.z + signZ * (1.0 + cHalf + 0.01);
         }
       }
     }
     for (let i = 2; i < Math.min(4, this.paddles.length); i++) {
-      // bottom/top paddles
       const p = this.paddles[i];
       for (const c of this.corners) {
         const overlapX = Math.abs(p.position.x - c.position.x) < 1.0 + cHalf;
         const overlapZ = Math.abs(p.position.z - c.position.z) < 0.1 + cHalf;
         if (overlapX && overlapZ) {
           const signX = p.position.x - c.position.x >= 0 ? 1 : -1;
-          p.position.x = c.position.x + signX * (1.0 + cHalf + padMargin);
+          p.position.x = c.position.x + signX * (1.0 + cHalf + 0.01);
         }
       }
     }
@@ -1004,7 +1198,7 @@ class Pong3D {
       this.ballVelocity.y *= -0.6;
     }
 
-    // Corner collisions (reverse X & Z)
+    // Corner collisions
     const cornerRadius = (this.cornerSize * Math.SQRT2) / 2;
     for (const c of this.corners) {
       const dist = Vector3.Distance(this.ball.position, c.position);
@@ -1017,7 +1211,7 @@ class Pong3D {
       }
     }
 
-    // Z walls bounce only in 2P (in 4P Z edges are goals)
+    // Z walls bounce in 2P
     if (this.config.playerCount !== 4) {
       if (
         Math.abs(this.ball.position.z) >
@@ -1032,10 +1226,9 @@ class Pong3D {
       }
     }
 
-    // Paddle collisions with angle
+    // Paddle collisions
     const clamp01 = (v: number) => Math.max(-1, Math.min(1, v));
 
-    // Left(0)/Right(1): collide in X
     for (let idx = 0; idx < Math.min(2, this.paddles.length); idx++) {
       const p = this.paddles[idx];
       const dx = this.ball.position.x - p.position.x;
@@ -1055,11 +1248,11 @@ class Pong3D {
 
         this.lastHitter = idx;
         this.touchedOnce = true;
+        this.hadObstacleSinceLastTouch = false;
         flashPaddle(p);
       }
     }
 
-    // Bottom(2,+Z)/Top(3,-Z): collide in Z
     for (let idx = 2; idx < Math.min(4, this.paddles.length); idx++) {
       const p = this.paddles[idx];
       const dx = this.ball.position.x - p.position.x;
@@ -1071,7 +1264,7 @@ class Pong3D {
         (idx === 3 && this.ballVelocity.z < 0);
       if (Math.abs(dx) < xThr && Math.abs(dz) < zThr && movingIn) {
         this.ballVelocity.z = -this.ballVelocity.z * 1.05;
-        const sign = idx === 2 ? -1 : +1; // bottom pushes -Z, top pushes +Z
+        const sign = idx === 2 ? -1 : +1;
         this.ball.position.z = p.position.z + sign * zThr;
         const dxNorm = clamp01(dx / 1.0);
         this.ballVelocity.x += dxNorm * 0.18;
@@ -1079,11 +1272,12 @@ class Pong3D {
 
         this.lastHitter = idx;
         this.touchedOnce = true;
+        this.hadObstacleSinceLastTouch = false;
         flashPaddle(p);
       }
     }
 
-    // Obstacles: precise cylinder in XZ
+    // Obstacles
     for (const o of this.obstacles) {
       const oR = ((o as any).metadata?.radius as number) ?? 0.25;
       const dx = this.ball.position.x - o.position.x;
@@ -1101,26 +1295,54 @@ class Pong3D {
         this.ballVelocity.z -= 2 * dot * nz;
         this.ballVelocity.x *= 1.02;
         this.ballVelocity.z *= 1.02;
+
+        if (this.lastHitter >= 0) this.hadObstacleSinceLastTouch = true;
       }
     }
 
-    // Scoring
+    // Scoring + penalty
     const halfW = width / 2 - this.ballRadius;
     const halfH = height / 2 - this.ballRadius;
     const target = this.config.winScore ?? 10;
 
+    const penaltyIfOwnSide = (sideIdx: number) => {
+      if (
+        this.touchedOnce &&
+        this.lastHitter === sideIdx &&
+        this.hadObstacleSinceLastTouch
+      ) {
+        this.scores[sideIdx] = Math.max(0, this.scores[sideIdx] - 1);
+        this.endAndToast(
+          `Penalty -1 for ${["L", "R", "B", "T"][sideIdx]} (own wall after obstacle)`
+        );
+        this.lastScorer = -1;
+        this.updateScoreUI();
+        this.hadObstacleSinceLastTouch = false;
+      }
+    };
+
     if (this.config.playerCount === 4) {
-      const outX = Math.abs(this.ball.position.x) > halfW;
-      const outZ = Math.abs(this.ball.position.z) > halfH;
-      if (outX || outZ) {
+      const outXLeft = this.ball.position.x < -halfW;
+      const outXRight = this.ball.position.x > halfW;
+      const outZTop = this.ball.position.z < -halfH;
+      const outZBottom = this.ball.position.z > halfH;
+
+      if (outXLeft || outXRight || outZTop || outZBottom) {
         if (this.touchedOnce && this.lastHitter >= 0) {
+          if (outXLeft) penaltyIfOwnSide(0);
+          if (outXRight) penaltyIfOwnSide(1);
+          if (outZBottom) penaltyIfOwnSide(2);
+          if (outZTop) penaltyIfOwnSide(3);
+
           this.scores[this.lastHitter]++;
           this.lastScorer = this.lastHitter;
           this.updateScoreUI();
+
           if (this.scores[this.lastHitter] >= target)
             this.endAndToast(
               `Player ${["L", "R", "B", "T"][this.lastHitter]} wins!`
             );
+
           this.resetBall(
             this.lastHitter === 0
               ? 1
@@ -1136,6 +1358,7 @@ class Pong3D {
       }
     } else {
       if (this.ball.position.x > halfW) {
+        penaltyIfOwnSide(1);
         if (this.touchedOnce) {
           this.scores[1]++;
           this.lastScorer = 1;
@@ -1144,6 +1367,7 @@ class Pong3D {
         }
         this.resetBall(-1);
       } else if (this.ball.position.x < -halfW) {
+        penaltyIfOwnSide(0);
         if (this.touchedOnce) {
           this.scores[0]++;
           this.lastScorer = 0;
@@ -1222,7 +1446,16 @@ function shinyMat(
   (m as any).emissiveFresnelParameters = f;
   return m;
 }
-function randColor() {
+function mulberry32(a: number) {
+  return function () {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function randColor(rng: () => number = Math.random) {
   const palette = [
     new Color3(0.9, 0.4, 0.4),
     new Color3(0.4, 0.9, 0.6),
@@ -1230,7 +1463,7 @@ function randColor() {
     new Color3(0.95, 0.85, 0.4),
     new Color3(0.8, 0.5, 0.9),
   ];
-  return palette[Math.floor(Math.random() * palette.length)];
+  return palette[Math.floor(rng() * palette.length)];
 }
 function flashPaddle(p: import("@babylonjs/core").Mesh) {
   const mat = p.material as StandardMaterial;
@@ -1298,29 +1531,8 @@ window.addEventListener("load", async () => {
         roomId,
         winScore: config.winScore ?? 10,
       };
-      const game = new Pong3D(matchCfg);
+      new Pong3D(matchCfg);
 
-      // A very simple way for the host to select winner: we decide by left/right score reaching winScore.
-      // If you want manual override UI, you can add it here.
-      const interval = setInterval(() => {
-        // If the overlay for victory shows and you want to capture, you can extend Pong3D to expose scores.
-        // For simplicity, we rebuild next match when someone hits winScore (handled inside the game toast).
-        // We'll just poll UI presence as a signal-free approach is more code. Keep lightweight.
-        const hudGone = !document.querySelector("[data-pong-ui='1']"); // crude, but we show next screen anyway
-        if (hudGone) {
-          clearInterval(interval);
-        }
-      }, 1500);
-
-      // When the tab is reloaded or you want to continue, call:
-      const checkLoop = setInterval(() => {
-        // after a little while post-win, show next
-        // (You can replace w/ a cleaner event from Pong3D if you expose one)
-        // To keep it robust, just offer a "Next" button on top on demand.
-      }, 2000);
-
-      // After a short delay, ask who won and move bracket. You can hook into your own signal here.
-      // For now, we provide a manual "Continue" button to pick the winner:
       const cont =
         showOverlay(`<div style="padding:18px 22px; background:#111; border-radius:12px; text-align:center;">
         <div style="font-size:14px; opacity:.85;">Match finished?</div>
