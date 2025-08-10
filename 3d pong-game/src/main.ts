@@ -16,7 +16,10 @@ import {
   FresnelParameters,
 } from "@babylonjs/core";
 
-// ---------------- Types & config ----------------
+/* =========================================================
+   TYPES
+   ========================================================= */
+
 type Connection =
   | "local"
   | "ai" // 2P vs AI
@@ -32,17 +35,31 @@ interface GameConfig {
   playerCount: PlayerCount;
   connection: Connection;
   aiDifficulty?: number; // 1..10
-  wsUrl?: string; // remote only
-  roomId?: string; // remote only
+  // When using backend APIs, these are filled automatically:
+  wsUrl?: string;
+  roomId?: string; // opaque ID from backend; code is human-readable
   winScore?: number; // default 10
+  // Metadata for DB recording:
+  matchId?: string; // returned by API when creating/joining online game
+  tournament?: {
+    tournamentId: string;
+    round: number;
+    matchIndex: number;
+    leftUserId: string;
+    rightUserId: string;
+  };
+  currentUser?: User | null;
+  sessionId?: string | null; // for socket auth/telemetry
+  // UI:
+  displayNames?: string[]; // e.g., ["You", "AI lvl 7"] or players' names
 }
 
-// Messages for the tiny relay
+// Relay messages. Server is pass-through; host is authoritative.
 type RemoteMsg =
-  | { t: "hello"; roomId: string; mode: "2p" | "4p" }
-  | { t: "join"; roomId: string; idx?: 0 | 1 | 2 | 3 } // relay echoes join to host
+  | { t: "hello"; roomId: string; mode: "2p" | "4p"; sid?: string }
+  | { t: "join"; roomId: string; idx?: 0 | 1 | 2 | 3 } // echoed to host on guest join
   | { t: "assign"; idx: number } // relay -> guest
-  | { t: "input"; idx: number; up: boolean; down: boolean } // guest -> host
+  | { t: "start" } // host -> guests
   | {
       t: "state"; // host -> guests
       ball: {
@@ -55,19 +72,135 @@ type RemoteMsg =
       };
       paddles: { x: number; y: number; z: number }[];
       scores: number[];
+      obstacles: {
+        x: number;
+        z: number;
+        radius: number;
+        color: [number, number, number];
+        cap: [number, number, number];
+      }[];
     }
-  | {
-      t: "seed"; // host -> guests (obstacles determinism)
-      seed: number;
-      width: number;
-      height: number;
-      playerCount: PlayerCount;
-    }
-  | { t: "start" } // host -> guests (explicit start gate)
-  | { t: "pong" } // relay -> clients
-  | { t: "ping" }; // clients -> relay
+  // guest -> host: “neg/pos” = along paddle axis (Z for L/R; X for B/T)
+  | { t: "input"; idx: number; neg: boolean; pos: boolean; sid?: string };
 
-// ---------------- Utilities for UI cleanup ----------------
+/* =========================================================
+   LIGHTWEIGHT SITE INTEGRATION (API CLIENT)
+   Replace endpoints with yours. These are minimal, robust stubs.
+   Every call uses credentials: 'include' (cookie sessions OK).
+   ========================================================= */
+
+type User = { id: string; name: string; avatarUrl?: string };
+type Session = { user: User; sessionId: string };
+
+class ApiClient {
+  // ---- Auth
+  static async me(): Promise<Session | null> {
+    try {
+      const r = await fetch("/api/auth/me", { credentials: "include" });
+      if (!r.ok) return null;
+      return (await r.json()) as Session;
+    } catch {
+      return null;
+    }
+  }
+
+  // ---- Online Matchmaking
+  static async createOnlineMatch(params: {
+    playerCount: PlayerCount;
+  }): Promise<{
+    wsUrl: string;
+    roomId: string;
+    code: string;
+    matchId: string;
+  }> {
+    const r = await fetch("/api/pong/matches", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ playerCount: params.playerCount }),
+    });
+    if (!r.ok) throw new Error("Failed to create match");
+    return r.json();
+  }
+
+  static async joinOnlineMatch(params: {
+    code: string;
+  }): Promise<{ wsUrl: string; roomId: string; matchId: string }> {
+    const r = await fetch(`/api/pong/matches/join`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code: params.code }),
+    });
+    if (!r.ok) throw new Error("Failed to join match");
+    return r.json();
+  }
+
+  static async postMatchResult(params: {
+    matchId: string;
+    winnerUserId?: string | null;
+    scores: number[];
+  }) {
+    await fetch(
+      `/api/pong/matches/${encodeURIComponent(params.matchId)}/result`,
+      {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(params),
+      }
+    ).catch(() => {});
+  }
+
+  // ---- Tournament
+  static async listOnlinePlayers(): Promise<User[]> {
+    const r = await fetch("/api/pong/players/online", {
+      credentials: "include",
+    });
+    if (!r.ok) return [];
+    return r.json();
+  }
+
+  static async createTournament(params: {
+    size: 8 | 16;
+    participants: string[]; // userIds
+  }): Promise<{ tournamentId: string; code: string }> {
+    const r = await fetch("/api/pong/tournaments", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(params),
+    });
+    if (!r.ok) throw new Error("Failed to create tournament");
+    return r.json();
+  }
+
+  static async reportTournamentMatch(params: {
+    tournamentId: string;
+    round: number;
+    matchIndex: number;
+    leftUserId: string;
+    rightUserId: string;
+    leftScore: number;
+    rightScore: number;
+    winnerUserId: string;
+  }) {
+    await fetch(
+      `/api/pong/tournaments/${encodeURIComponent(params.tournamentId)}/report`,
+      {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(params),
+      }
+    ).catch(() => {});
+  }
+}
+
+/* =========================================================
+   UI HELPERS
+   ========================================================= */
+
 function clearPongUI() {
   document
     .querySelectorAll<HTMLElement>("[data-pong-ui='1']")
@@ -77,13 +210,25 @@ function markUI(el: HTMLElement) {
   el.setAttribute("data-pong-ui", "1");
   return el;
 }
+function genCode(len = 6) {
+  const a = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let s = "";
+  for (let i = 0; i < len; i++) s += a[(Math.random() * a.length) | 0];
+  return s;
+}
 
-// ---------------- Menu UI (vanilla DOM) ----------------
+/* =========================================================
+   MENU
+   ========================================================= */
+
 class Menu {
-  static render(): Promise<GameConfig> {
-    return new Promise((resolve) => {
-      clearPongUI();
+  static async render(): Promise<GameConfig> {
+    clearPongUI();
 
+    const session = await ApiClient.me(); // may be null
+    const you = session?.user;
+
+    return new Promise((resolve) => {
       const root = markUI(document.createElement("div"));
       Object.assign(root.style, {
         position: "fixed",
@@ -97,188 +242,313 @@ class Menu {
       });
 
       root.innerHTML = `
-        <div style="background:#111; padding:20px 24px; border-radius:12px; width:min(760px, 92vw); box-shadow:0 10px 30px rgba(0,0,0,.45);">
-          <h1 style="margin:0 0 12px; font-size:22px;">3D Pong — Setup</h1>
-
-          <fieldset style="border:none; margin:0; padding:0;">
-            <legend style="margin-bottom:8px;">Mode</legend>
-            <label style="display:block; margin:.25rem 0;"><input type="radio" name="mode" value="2p" checked> 2 Players (local)</label>
-            <label style="display:block; margin:.25rem 0;"><input type="radio" name="mode" value="ai2"> 1 Player vs AI (2P)</label>
-            <label style="display:block; margin:.25rem 0;"><input type="radio" name="mode" value="4p"> 4 Players (local)</label>
-            <label style="display:block; margin:.25rem 0;"><input type="radio" name="mode" value="4pai"> 4 Players: You vs 3 AI</label>
-
-            <div style="height:8px"></div>
-            <div style="opacity:.9; font-size:13px; margin:6px 0 2px;">Remote</div>
-            <label style="display:block; margin:.25rem 0;"><input type="radio" name="mode" value="remote"> 2 Players (Remote)</label>
-            <label style="display:block; margin:.25rem 0;"><input type="radio" name="mode" value="remote4"> 4 Players (Remote)</label>
-
-            <div style="height:8px"></div>
-            <div style="opacity:.9; font-size:13px; margin:6px 0 2px;">Tournament (Remote only)</div>
-            <label style="display:block; margin:.25rem 0;"><input type="radio" name="mode" value="tourn"> Tournament Bracket (8/16 players, remote 2P)</label>
-          </fieldset>
-
-          <div id="aiRow" style="margin-top:10px; display:none;">
-            <label>AI Difficulty:
-              <input id="aiSlider" type="range" min="1" max="10" step="1" value="5" style="vertical-align:middle;">
-              <span id="aiVal">5</span>/10
-            </label>
+        <div style="background:#0f1115; padding:22px 24px; border-radius:14px; width:min(880px, 94vw); box-shadow:0 10px 36px rgba(0,0,0,.5);">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+            <h1 style="margin:0; font-size:22px; letter-spacing:.3px;">3D Pong — Match Setup</h1>
+            <div style="font-size:13px; opacity:.9;">${
+              you
+                ? `Signed in as <b>${you.name}</b>`
+                : `<span style="opacity:.8">Not signed in</span>`
+            }</div>
           </div>
 
-          <div id="remoteRow" style="margin-top:10px; display:none;">
-            <div style="display:flex; gap:8px; flex-wrap:wrap;">
-              <label style="flex:1 1 260px;">WebSocket URL
-                <input id="wsUrl" type="text" value="ws://localhost:8080" style="width:100%;">
-              </label>
-              <label style="flex:1 1 160px;">Room
-                <input id="roomId" type="text" value="room1" style="width:100%;">
-              </label>
+          <div style="display:grid; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); gap:14px;">
+            <div style="background:#12141b; border-radius:12px; padding:12px;">
+              <div style="font-size:13px; opacity:.8; margin-bottom:6px;">Local</div>
+              <button data-action="local2" class="btn">2P Local (Player One vs Player Two)</button>
+              <div style="height:6px"></div>
+              <div>
+                <label style="font-size:12px; opacity:.85;">Vs AI Difficulty</label>
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <input id="aiSlider" type="range" min="1" max="10" step="1" value="6" style="flex:1;">
+                  <span id="aiVal" style="width:22px; text-align:center;">6</span>
+                </div>
+                <button data-action="ai2" class="btn" style="margin-top:8px;">1P vs AI</button>
+              </div>
             </div>
-            <div style="margin-top:8px;">
-              <label><input type="radio" name="remoteRole" value="host" checked> Host</label>
-              <label style="margin-left:10px;"><input type="radio" name="remoteRole" value="guest"> Join</label>
-            </div>
-          </div>
 
-          <div id="tournRow" style="margin-top:10px; display:none;">
-            <label>Size:
-              <select id="tournSize">
-                <option value="8" selected>8</option>
-                <option value="16">16</option>
-              </select>
-            </label>
-            <label style="margin-left:10px;">Win score:
-              <input id="tournScore" type="number" min="1" max="21" value="10" style="width:60px;">
-            </label>
-            <div style="margin-top:8px; font-size:12px; opacity:.8;">
-              Tournament runs as sequential 2P <b>remote</b> matches. Each match uses its own room id.
+            <div style="background:#12141b; border-radius:12px; padding:12px;">
+              <div style="font-size:13px; opacity:.8; margin-bottom:6px;">Online</div>
+              <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <button data-action="host2" class="btn">Create 2P Match</button>
+                <button data-action="join2" class="btn btn-subtle">Join 2P (Enter Code)</button>
+                <button data-action="host4" class="btn">Create 4P Match</button>
+                <button data-action="join4" class="btn btn-subtle">Join 4P (Enter Code)</button>
+              </div>
+              <div style="font-size:12px; opacity:.8; margin-top:8px;">Online modes require login.</div>
             </div>
-          </div>
 
-          <div style="margin-top:14px; display:flex; gap:8px; justify-content:flex-end;">
-            <button id="startBtn" style="padding:.5rem .8rem; font-weight:600;">Start</button>
+            <div style="background:#12141b; border-radius:12px; padding:12px;">
+              <div style="font-size:13px; opacity:.8; margin-bottom:6px;">Tournament</div>
+              <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                <label>Size:
+                  <select id="tSize">
+                    <option value="8" selected>8</option>
+                    <option value="16">16</option>
+                  </select>
+                </label>
+                <button data-action="tourn" class="btn">Create Tournament</button>
+              </div>
+              <div style="font-size:12px; opacity:.8; margin-top:8px;">Players must be online to join. Results are posted to DB.</div>
+            </div>
           </div>
         </div>
       `;
+
+      const css = document.createElement("style");
+      css.setAttribute("data-pong-ui", "1");
+      css.textContent = `
+        .btn{background:#1a1d27; border:1px solid #262b3a; color:#fff; padding:.5rem .7rem; border-radius:10px; cursor:pointer; font-weight:600;}
+        .btn:hover{background:#202536;}
+        .btn-subtle{background:transparent;}
+        .ov{position:fixed; inset:0; display:grid; place-items:center; background:rgba(0,0,0,.7); z-index:10001; font-family:system-ui,sans-serif; color:#fff;}
+        .card{background:#0f1115; border:1px solid #252a38; padding:16px; border-radius:12px; min-width:320px;}
+        .muted{opacity:.85; font-size:12px;}
+        input,select{background:#0c0e13; color:#fff; border:1px solid #252a38; border-radius:8px; padding:.35rem .5rem;}
+        code{background:#0c0e13; padding:.15rem .35rem; border-radius:6px; border:1px solid #232836;}
+      ";
+      `;
+      document.head.appendChild(css);
       document.body.appendChild(root);
 
-      const aiRow = root.querySelector("#aiRow") as HTMLDivElement;
-      const remoteRow = root.querySelector("#remoteRow") as HTMLDivElement;
-      const tournRow = root.querySelector("#tournRow") as HTMLDivElement;
       const aiSlider = root.querySelector("#aiSlider") as HTMLInputElement;
       const aiVal = root.querySelector("#aiVal") as HTMLSpanElement;
-      const startBtn = root.querySelector("#startBtn") as HTMLButtonElement;
-      const wsUrl = root.querySelector("#wsUrl") as HTMLInputElement;
-      const roomId = root.querySelector("#roomId") as HTMLInputElement;
-      const tournSizeSel = root.querySelector(
-        "#tournSize"
-      ) as HTMLSelectElement;
-      const tournScoreInput = root.querySelector(
-        "#tournScore"
-      ) as HTMLInputElement;
-
-      const modeInputs =
-        root.querySelectorAll<HTMLInputElement>('input[name="mode"]');
-      const showRows = () => {
-        const mode =
-          Array.from(modeInputs).find((i) => i.checked)?.value ?? "2p";
-        aiRow.style.display =
-          mode === "ai2" || mode === "4pai" ? "block" : "none";
-        remoteRow.style.display =
-          mode === "remote" || mode === "remote4" || mode === "tourn"
-            ? "block"
-            : "none";
-        tournRow.style.display = mode === "tourn" ? "block" : "none";
-      };
-      modeInputs.forEach((r) => r.addEventListener("change", showRows));
       aiSlider.addEventListener(
         "input",
         () => (aiVal.textContent = aiSlider.value)
       );
-      showRows();
 
-      startBtn.addEventListener("click", () => {
-        const mode =
-          Array.from(modeInputs).find((i) => i.checked)?.value ?? "2p";
-        let cfg: GameConfig;
+      const tSizeSel = root.querySelector("#tSize") as HTMLSelectElement;
 
-        if (mode === "4p") {
-          cfg = { playerCount: 4, connection: "local", winScore: 10 };
-        } else if (mode === "4pai") {
-          cfg = {
-            playerCount: 4,
-            connection: "ai3",
-            aiDifficulty: parseInt(aiSlider.value, 10),
-            winScore: 10,
-          };
-        } else if (mode === "ai2") {
-          cfg = {
-            playerCount: 2,
-            connection: "ai",
-            aiDifficulty: parseInt(aiSlider.value, 10),
-            winScore: 10,
-          };
-        } else if (mode === "remote") {
-          const role =
-            (
-              root.querySelector(
-                'input[name="remoteRole"]:checked'
-              ) as HTMLInputElement
-            )?.value ?? "host";
-          cfg = {
-            playerCount: 2,
-            connection: role === "host" ? "remoteHost" : "remoteGuest",
-            wsUrl: wsUrl.value.trim(),
-            roomId: roomId.value.trim(),
-            winScore: 10,
-          };
-        } else if (mode === "remote4") {
-          const role =
-            (
-              root.querySelector(
-                'input[name="remoteRole"]:checked'
-              ) as HTMLInputElement
-            )?.value ?? "host";
-          cfg = {
-            playerCount: 4,
-            connection: role === "host" ? "remote4Host" : "remote4Guest",
-            wsUrl: wsUrl.value.trim(),
-            roomId: roomId.value.trim(),
-            winScore: 10,
-          };
-        } else if (mode === "tourn") {
-          const n = parseInt(tournSizeSel.value, 10) as 8 | 16;
-          const names: string[] = [];
-          for (let i = 0; i < n; i++)
-            names.push(
-              prompt(`Alias for player ${i + 1}:`, `P${i + 1}`) || `P${i + 1}`
-            );
+      const ensureLogin = async (): Promise<Session> => {
+        const s = await ApiClient.me();
+        if (!s) {
+          overlay(`<div class="card">
+            <div style="font-weight:700; margin-bottom:6px;">Sign in required</div>
+            <div class="muted">Please sign in on the website, then come back.</div>
+            <div style="margin-top:10px; text-align:right;"><button class="btn" data-close>OK</button></div>
+          </div>`);
+          throw new Error("not-signed-in");
+        }
+        return s;
+      };
 
-          const role =
-            (
-              root.querySelector(
-                'input[name="remoteRole"]:checked'
-              ) as HTMLInputElement
-            )?.value ?? "host";
-          cfg = {
-            playerCount: 2,
-            connection: role === "host" ? "remoteHost" : "remoteGuest",
-            wsUrl: wsUrl.value.trim(),
-            roomId: roomId.value.trim(),
-            winScore: parseInt(tournScoreInput.value, 10) || 10,
+      function overlay(html: string) {
+        const ov = markUI(document.createElement("div"));
+        ov.className = "ov";
+        ov.innerHTML = html;
+        ov.addEventListener("click", (e) => {
+          const t = e.target as HTMLElement;
+          if (t && t.hasAttribute("data-close")) ov.remove();
+        });
+        document.body.appendChild(ov);
+        return ov;
+      }
+
+      async function startLocal2P() {
+        const cfg: GameConfig = {
+          playerCount: 2,
+          connection: "local",
+          winScore: 10,
+          currentUser: you || null,
+          displayNames: ["Player One", "Player Two"],
+        };
+        root.remove();
+        new Pong3D(cfg);
+      }
+
+      async function startVsAI() {
+        const lvl = parseInt(aiSlider.value, 10);
+        const cfg: GameConfig = {
+          playerCount: 2,
+          connection: "ai",
+          aiDifficulty: lvl,
+          winScore: 10,
+          currentUser: you || null,
+          displayNames: [you?.name || "You", `AI (lvl ${lvl})`],
+        };
+        root.remove();
+        new Pong3D(cfg);
+      }
+
+      async function createOnline(playerCount: PlayerCount) {
+        const s = await ensureLogin();
+        const ov = overlay(`<div class="card">
+          <div style="font-weight:700; margin-bottom:8px;">Creating ${playerCount}P Match…</div>
+          <div class="muted">Please wait…</div>
+        </div>`);
+
+        try {
+          const { wsUrl, roomId, code, matchId } =
+            await ApiClient.createOnlineMatch({ playerCount });
+          ov.innerHTML = `<div class="card">
+            <div style="font-weight:700; margin-bottom:8px;">Match Created</div>
+            <div class="muted">Share this code with your friend(s):</div>
+            <div style="font-size:20px; font-weight:800; margin:6px 0;"><code>${code}</code></div>
+            <div class="muted">Waiting for players to join…</div>
+            <div style="margin-top:10px; text-align:right;"><button class="btn" data-go>Launch</button></div>
+          </div>`;
+
+          (ov.querySelector("[data-go]") as HTMLButtonElement).onclick = () => {
+            ov.remove();
+            const cfg: GameConfig = {
+              playerCount,
+              connection: playerCount === 4 ? "remote4Host" : "remoteHost",
+              wsUrl,
+              roomId,
+              winScore: 10,
+              matchId,
+              currentUser: s.user,
+              sessionId: s.sessionId,
+              displayNames:
+                playerCount === 2
+                  ? [s.user.name, "Waiting…"]
+                  : [s.user.name, "…", "…", "…"],
+            };
+            root.remove();
+            new Pong3D(cfg);
           };
-          (window as any).__TOURNAMENT__ = { size: n, names };
-        } else {
-          cfg = { playerCount: 2, connection: "local", winScore: 10 };
+        } catch (e: any) {
+          ov.innerHTML = `<div class="card">
+            <div style="font-weight:700; margin-bottom:8px;">Unable to create match</div>
+            <div class="muted">${e?.message || "Please try again."}</div>
+            <div style="margin-top:10px; text-align:right;"><button class="btn" data-close>Close</button></div>
+          </div>`;
+        }
+      }
+
+      async function joinOnline(playerCount: PlayerCount) {
+        const s = await ensureLogin();
+        const ov = overlay(`<div class="card">
+          <div style="font-weight:700; margin-bottom:8px;">Join ${playerCount}P Match</div>
+          <div class="muted">Enter the code:</div>
+          <div style="display:flex; gap:8px; margin-top:8px;">
+            <input id="joinCode" placeholder="ABC123" style="flex:1; text-transform:uppercase;">
+            <button class="btn" id="joinBtn">Join</button>
+          </div>
+        </div>`);
+        const btn = ov.querySelector("#joinBtn") as HTMLButtonElement;
+        const inp = ov.querySelector("#joinCode") as HTMLInputElement;
+        btn.onclick = async () => {
+          btn.disabled = true;
+          try {
+            const { wsUrl, roomId, matchId } = await ApiClient.joinOnlineMatch({
+              code: inp.value.trim().toUpperCase(),
+            });
+            ov.remove();
+            const cfg: GameConfig = {
+              playerCount,
+              connection: playerCount === 4 ? "remote4Guest" : "remoteGuest",
+              wsUrl,
+              roomId,
+              winScore: 10,
+              matchId,
+              currentUser: s.user,
+              sessionId: s.sessionId,
+              displayNames:
+                playerCount === 2
+                  ? [s.user.name, "Host"]
+                  : [s.user.name, "…", "…", "…"],
+            };
+            root.remove();
+            new Pong3D(cfg);
+          } catch (e: any) {
+            btn.disabled = false;
+            (ov.querySelector(".muted") as HTMLElement).textContent =
+              "Invalid code or match is full.";
+          }
+        };
+      }
+
+      async function createTournament() {
+        const s = await ensureLogin();
+        const size = parseInt(tSizeSel.value, 10) as 8 | 16;
+        const ov = overlay(`<div class="card">
+          <div style="font-weight:700; margin-bottom:8px;">Create Tournament (${size})</div>
+          <div class="muted">Fetching online players…</div>
+        </div>`);
+
+        const players = await ApiClient.listOnlinePlayers();
+        if (!players.length) {
+          ov.innerHTML = `<div class="card">
+            <div style="font-weight:700; margin-bottom:8px;">No online players</div>
+            <div class="muted">Ask players to sign in and come online.</div>
+            <div style="margin-top:10px; text-align:right;"><button class="btn" data-close>Close</button></div>
+          </div>`;
+          return;
         }
 
-        root.remove();
-        resolve(cfg);
+        ov.innerHTML = `<div class="card">
+          <div style="font-weight:700; margin-bottom:8px;">Select ${size} players</div>
+          <div style="max-height:280px; overflow:auto; margin:8px 0;">
+            ${players
+              .map(
+                (
+                  p
+                ) => `<label style="display:flex; align-items:center; gap:8px; margin:6px 0;">
+                  <input type="checkbox" value="${p.id}"> ${p.name}
+                </label>`
+              )
+              .join("")}
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div class="muted">You’re included automatically if selected.</div>
+            <button class="btn" id="go">Create</button>
+          </div>
+        </div>`;
+
+        (ov.querySelector("#go") as HTMLButtonElement).onclick = async () => {
+          const ids = Array.from(
+            ov.querySelectorAll<HTMLInputElement>(
+              'input[type="checkbox"]:checked'
+            )
+          ).map((i) => i.value);
+          if (ids.length !== size) {
+            alert(`Please select exactly ${size} players.`);
+            return;
+          }
+          try {
+            const { tournamentId, code } = await ApiClient.createTournament({
+              size,
+              participants: ids,
+            });
+            ov.innerHTML = `<div class="card">
+              <div style="font-weight:700; margin-bottom:6px;">Tournament Created</div>
+              <div class="muted">Share this code with participants:</div>
+              <div style="font-size:20px; font-weight:800; margin:6px 0;"><code>${code}</code></div>
+              <div class="muted">When each match starts, this app will post results to your DB automatically.</div>
+              <div style="margin-top:10px; text-align:right;"><button class="btn" data-close>Done</button></div>
+            </div>`;
+          } catch (e: any) {
+            ov.innerHTML = `<div class="card">
+              <div style="font-weight:700; margin-bottom:8px;">Couldn’t create tournament</div>
+              <div class="muted">${e?.message || "Please try again."}</div>
+              <div style="margin-top:10px; text-align:right;"><button class="btn" data-close>Close</button></div>
+            </div>`;
+          }
+        };
+      }
+
+      root.addEventListener("click", (e) => {
+        const t = e.target as HTMLElement;
+        if (!t || !t.dataset.action) return;
+        const a = t.dataset.action;
+        if (a === "local2") startLocal2P();
+        if (a === "ai2") startVsAI();
+        if (a === "host2") createOnline(2);
+        if (a === "join2") joinOnline(2);
+        if (a === "host4") createOnline(4);
+        if (a === "join4") joinOnline(4);
+        if (a === "tourn") createTournament();
       });
     });
   }
 }
 
-// ---------------- Tournament (remote only) ----------------
+/* =========================================================
+   TOURNAMENT (light bracket manager used when needed)
+   ========================================================= */
+
 type Match = { a: string; b: string; winner?: string };
 class TournamentManager {
   private size: 8 | 16;
@@ -326,7 +596,10 @@ class TournamentManager {
   }
 }
 
-// ---------------- Game ----------------
+/* =========================================================
+   GAME
+   ========================================================= */
+
 class Pong3D {
   private engine: Engine;
   private scene: Scene;
@@ -337,72 +610,80 @@ class Pong3D {
 
   private paddles: import("@babylonjs/core").Mesh[] = [];
   private obstacles: import("@babylonjs/core").Mesh[] = [];
-  private obstacleCaps: import("@babylonjs/core").Mesh[] = [];
+  private obstacleInfo: {
+    x: number;
+    z: number;
+    radius: number;
+    color: [number, number, number];
+    cap: [number, number, number];
+  }[] = [];
+  private builtObstaclesFromNet = false;
   private corners: import("@babylonjs/core").Mesh[] = [];
 
   private keys: Record<string, boolean> = {};
-
-  // who controls each paddle: 'human' | 'ai' | 'remoteGuest'
   private control: ("human" | "ai" | "remoteGuest")[] = [];
 
-  // --------- AI (brutal at 10)
-  private aiTarget: number[] = [0, 0, 0, 0];
-  private aiNextThinkAt: number[] = [0, 0, 0, 0];
+  private aiError: number[] = [0, 0, 0, 0];
   private aiErrorRangePerPaddle: number[] = [2, 2, 2, 2];
-  private aiReactionMsPerPaddle: number[] = [300, 300, 300, 300];
-  private aiLookaheadBounces: number[] = [0, 0, 0, 0];
+  private aiLerpPerPaddle: number[] = [0.08, 0.08, 0.08, 0.08];
+  private aiVel: number[] = [0, 0, 0, 0];
 
-  // scores [L, R, B, T]
   private scores = [0, 0, 0, 0];
   private scoreElems: HTMLSpanElement[] = [];
+  private nameElems: HTMLSpanElement[] = [];
   private lastScorer = -1;
   private lastHitter = -1;
   private touchedOnce = false;
+  private obstacleAfterHit = false;
 
-  // penalty tracking
-  private hadObstacleSinceLastTouch = false;
-
-  // dimensions / physics
   private ballRadius = 0.2;
   private speedIncrement = 1.0001;
   private wallThickness = 0.1;
   private cornerSize = this.wallThickness * 5;
 
-  // remote
   private ws?: WebSocket;
-  private remoteIndex: 0 | 1 | 2 | 3 = 1;
-  private guestInputs: Record<number, { up: boolean; down: boolean }> = {};
+  private remoteIndex: 0 | 1 | 2 | 3 = 0; // your assigned index online
+  private guestInputs: Record<number, { neg: boolean; pos: boolean }> = {};
   private lastStateSent = 0;
 
-  // host waiting gate
   private isHost = false;
   private isGuest = false;
   private requiredGuests = 0; // 1 (2P) or 3 (4P)
-  private connectedGuests = 0; // host's count
-  private matchReady = true; // pause sim until true
+  private connectedGuests = 0;
+  private matchReady = true;
   private waitUI?: HTMLDivElement;
 
-  // deterministic obstacles
-  private fieldWidth = 20;
-  private fieldHeight: number = 10;
-  private obstacleSeed: number = Math.floor(Math.random() * 2 ** 31);
-  private obstaclesInitialized = false;
-
-  // keepalive
-  private lastPingAt = 0;
+  // camera “always my paddle on the left”:
+  private baseAlpha = Math.PI / 2; // default
+  private viewTheta = 0; // extra Y rotation so my paddle becomes left
 
   constructor(private config: GameConfig) {
-    const canvas = document.getElementById("gameCanvas") as HTMLCanvasElement;
+    const canvas =
+      (document.getElementById("gameCanvas") as HTMLCanvasElement) ||
+      (() => {
+        const c = document.createElement("canvas");
+        c.id = "gameCanvas";
+        Object.assign(c.style, {
+          position: "fixed",
+          inset: "0",
+          width: "100%",
+          height: "100%",
+          display: "block",
+          background: "#0a0c12",
+        });
+        document.body.appendChild(c);
+        return c;
+      })();
+
     this.engine = new Engine(canvas, true);
     this.scene = new Scene(this.engine);
-    this.scene.clearColor = new Color4(0.08, 0.08, 0.14, 1);
+    this.scene.clearColor = new Color4(0.06, 0.07, 0.1, 1);
 
-    // Camera
     this.camera = new ArcRotateCamera(
       "cam",
-      Math.PI / 2,
-      Math.PI / 4.2,
-      28,
+      this.baseAlpha, // alpha
+      Math.PI / 4.2, // beta
+      28, // radius
       Vector3.Zero(),
       this.scene
     );
@@ -411,15 +692,26 @@ class Pong3D {
     this.camera.inputs.removeByType("ArcRotateCameraMouseWheelInput");
     this.camera.inputs.removeByType("ArcRotateCameraKeyboardMoveInput");
 
-    // Input
-    window.addEventListener(
-      "keydown",
-      (e) => (this.keys[e.key.toLowerCase()] = true)
-    );
-    window.addEventListener(
-      "keyup",
-      (e) => (this.keys[e.key.toLowerCase()] = false)
-    );
+    // Input — track arrows + W/S (and Shift if you still use it elsewhere)
+    const onKey = (v: boolean) => (e: KeyboardEvent) => {
+      const k = e.key.toLowerCase();
+      if (
+        [
+          "arrowup",
+          "arrowdown",
+          "arrowleft",
+          "arrowright",
+          "w",
+          "s",
+          "shift",
+        ].includes(k)
+      ) {
+        this.keys[k] = v;
+        e.preventDefault();
+      }
+    };
+    window.addEventListener("keydown", onKey(true));
+    window.addEventListener("keyup", onKey(false));
 
     // Remote role
     this.isHost =
@@ -428,23 +720,28 @@ class Pong3D {
     this.isGuest =
       this.config.connection === "remoteGuest" ||
       this.config.connection === "remote4Guest";
+
+    // Waiting overlay text
     if (this.isHost) {
-      this.requiredGuests = this.config.connection === "remote4Host" ? 3 : 1;
+      this.requiredGuests = this.config.playerCount === 4 ? 3 : 1;
       this.connectedGuests = 0;
       this.matchReady = this.requiredGuests === 0;
       this.showWaitingOverlay(`Waiting for players… 0/${this.requiredGuests}`);
+      this.remoteIndex = 0; // host is index 0 (Left)
+      this.setViewRotationForIndex(0);
     } else if (this.isGuest) {
       this.matchReady = false;
-      this.showWaitingOverlay("Waiting for host…");
+      this.showWaitingOverlay("Connecting to host…");
+      // index will be set after "assign"
     }
 
     this.createScoreUI();
     this.init();
-
     if (this.isHost || this.isGuest) this.initRemote();
   }
 
-  // ---------- UI ----------
+  /* ---------------- UI ---------------- */
+
   private createScoreUI() {
     const hud = markUI(document.createElement("div"));
     Object.assign(hud.style, {
@@ -465,10 +762,9 @@ class Pong3D {
         "0 6px 16px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.06)",
     });
 
-    const slots =
-      this.config.playerCount === 4 ? ["L", "R", "B", "T"] : ["L", "R"];
+    const slots = this.config.playerCount === 4 ? 4 : 2;
     const colors = ["#58d68d", "#5dade2", "#f7dc6f", "#ec7063"];
-    for (let i = 0; i < slots.length; i++) {
+    for (let i = 0; i < slots; i++) {
       const badge = document.createElement("div");
       Object.assign(badge.style, {
         display: "flex",
@@ -497,22 +793,41 @@ class Pong3D {
         opacity: ".85",
         letterSpacing: ".4px",
       });
-      label.textContent = slots[i];
+      label.textContent = ["L", "R", "B", "T"][i];
+
+      const name = document.createElement("span");
+      Object.assign(name.style, { fontSize: "12px", opacity: ".85" });
+      name.textContent =
+        (this.config.displayNames && this.config.displayNames[i]) || "";
 
       const score = document.createElement("span");
       Object.assign(score.style, {
-        fontWeight: "700",
+        fontWeight: "800",
         fontSize: "18px",
-        minWidth: "20px",
+        minWidth: "26px",
         textAlign: "right",
       });
       score.textContent = "0";
 
-      badge.append(dot, label, score);
+      const wrap = document.createElement("div");
+      wrap.style.display = "flex";
+      wrap.style.flexDirection = "column";
+      wrap.append(label, name);
+
+      badge.append(dot, wrap, score);
       hud.appendChild(badge);
+      this.nameElems.push(name);
       this.scoreElems.push(score);
     }
     document.body.appendChild(hud);
+  }
+  private updateNamesUI() {
+    const slots = this.config.playerCount === 4 ? 4 : 2;
+    for (let i = 0; i < slots; i++) {
+      if (!this.nameElems[i]) continue;
+      this.nameElems[i].textContent =
+        (this.config.displayNames && this.config.displayNames[i]) || "";
+    }
   }
   private pulseScorer(idx: number) {
     if (idx < 0) return;
@@ -533,7 +848,6 @@ class Pong3D {
     if (this.lastScorer >= 0) this.pulseScorer(this.lastScorer);
   }
 
-  // waiting overlay
   private showWaitingOverlay(text: string) {
     const d = markUI(document.createElement("div"));
     Object.assign(d.style, {
@@ -557,21 +871,27 @@ class Pong3D {
     const el = this.waitUI.querySelector<HTMLDivElement>("#waitText");
     if (el) el.textContent = text;
   }
-
   private hideWaitingOverlay() {
     this.waitUI?.remove();
     this.waitUI = undefined;
   }
+
   private beginMatch() {
     this.matchReady = true;
     this.hideWaitingOverlay();
     this.resetBall(Math.random() < 0.5 ? 1 : -1);
+    if (this.isHost) {
+      try {
+        this.ws?.send(JSON.stringify({ t: "start" } as RemoteMsg));
+      } catch {}
+    }
   }
 
-  // ---------- Scene setup ----------
+  /* ---------------- Scene ---------------- */
+
   private init() {
-    this.fieldWidth = 20;
-    this.fieldHeight = this.config.playerCount === 4 ? 20 : 10;
+    const width = 20;
+    const height = this.config.playerCount === 4 ? 20 : 10;
 
     // Lights
     new HemisphericLight("hemi", new Vector3(0, 1, 0), this.scene);
@@ -580,10 +900,10 @@ class Pong3D {
 
     // Field
     const fieldMat = new StandardMaterial("fieldMat", this.scene);
-    fieldMat.diffuseColor = new Color3(0.25, 0.25, 0.28);
+    fieldMat.diffuseColor = new Color3(0.18, 0.2, 0.26);
     const field = MeshBuilder.CreateGround(
       "field",
-      { width: this.fieldWidth, height: this.fieldHeight },
+      { width, height },
       this.scene
     );
     field.material = fieldMat;
@@ -601,23 +921,17 @@ class Pong3D {
       m.position.set(x, h / 2, z);
       m.material = wallMat;
     };
-    wall(this.fieldWidth + t, t, 0, this.fieldHeight / 2 + t / 2, "wallTop");
-    wall(
-      this.fieldWidth + t,
-      t,
-      0,
-      -this.fieldHeight / 2 - t / 2,
-      "wallBottom"
-    );
-    wall(t, this.fieldHeight + t, -this.fieldWidth / 2 - t / 2, 0, "wallLeft");
-    wall(t, this.fieldHeight + t, this.fieldWidth / 2 + t / 2, 0, "wallRight");
+    wall(width + t, t, 0, height / 2 + t / 2, "wallTop");
+    wall(width + t, t, 0, -height / 2 - t / 2, "wallBottom");
+    wall(t, height + t, -width / 2 - t / 2, 0, "wallLeft");
+    wall(t, height + t, width / 2 + t / 2, 0, "wallRight");
 
-    // Corner blocks
+    // Corners
     this.cornerSize = t * 5;
     const cH = 1.0,
       cS = this.cornerSize;
-    const cx = this.fieldWidth / 2 - t / 2 - cS / 2;
-    const cz = this.fieldHeight / 2 - t / 2 - cS / 2;
+    const cx = width / 2 - t / 2 - cS / 2;
+    const cz = height / 2 - t / 2 - cS / 2;
     const cornerMat = shinyMat(this.scene, new Color3(0.45, 0.24, 0.12), 0.4);
     const makeCornerBox = (x: number, z: number, id: string) => {
       const box = MeshBuilder.CreateBox(
@@ -645,16 +959,15 @@ class Pong3D {
     this.ball.material = ballMat;
     this.ball.position = new Vector3(0, 0.3, 0);
 
-    // Paddles
-    const dAxis =
-      (this.config.playerCount === 4 ? this.fieldHeight : this.fieldWidth) / 2 -
-      0.3;
+    // Paddles (L,R,B,T indices)
+    const dAxis = (this.config.playerCount === 4 ? height : width) / 2 - 0.3;
     const newPaddle = (
       x: number,
       z: number,
       rotY: number,
       idx: number,
-      color: Color3
+      color: Color3,
+      name?: string
     ) => {
       const p = MeshBuilder.CreateBox(
         `paddle${idx}`,
@@ -663,201 +976,158 @@ class Pong3D {
       );
       p.position.set(x, 0.5, z);
       p.rotation.y = rotY;
-      p.material = shinyMat(this.scene, color, 0.6, /*glow*/ true);
+      p.material = shinyMat(this.scene, color, 0.6, true);
       this.paddles.push(p);
+      if (name && this.config.displayNames)
+        this.config.displayNames[idx] = name;
     };
     if (this.config.playerCount === 4) {
-      newPaddle(-dAxis, 0, 0, 0, new Color3(0.35, 0.9, 0.6)); // left
-      newPaddle(+dAxis, 0, 0, 1, new Color3(0.36, 0.63, 0.92)); // right
-      newPaddle(0, +dAxis, Math.PI / 2, 2, new Color3(0.97, 0.85, 0.35)); // bottom
-      newPaddle(0, -dAxis, Math.PI / 2, 3, new Color3(0.92, 0.44, 0.39)); // top
+      newPaddle(-dAxis, 0, 0, 0, new Color3(0.35, 0.9, 0.6));
+      newPaddle(+dAxis, 0, 0, 1, new Color3(0.36, 0.63, 0.92));
+      newPaddle(0, +dAxis, Math.PI / 2, 2, new Color3(0.97, 0.85, 0.35));
+      newPaddle(0, -dAxis, Math.PI / 2, 3, new Color3(0.92, 0.44, 0.39));
     } else {
       newPaddle(-dAxis, 0, 0, 0, new Color3(0.35, 0.9, 0.6));
       newPaddle(+dAxis, 0, 0, 1, new Color3(0.36, 0.63, 0.92));
     }
+    this.updateNamesUI();
 
     // Control roles
     if (this.config.playerCount === 4) {
       if (this.config.connection === "ai3") {
-        this.control = ["human", "ai", "ai", "ai"]; // you control LEFT
-        this.applyAIDifficulty([1, 2, 3], this.config.aiDifficulty ?? 5);
+        this.control = ["human", "ai", "ai", "ai"];
+        this.applyAIDifficulty([1, 2, 3], this.config.aiDifficulty ?? 6);
+        this.setViewRotationForIndex(0);
       } else if (this.config.connection === "remote4Host") {
         this.control = ["human", "remoteGuest", "remoteGuest", "remoteGuest"];
+        this.setViewRotationForIndex(0);
       } else if (this.config.connection === "remote4Guest") {
-        this.control = ["human", "human", "human", "human"]; // guest renders only
+        this.control = ["human", "human", "human", "human"]; // render only; your input is sent to host
       } else {
         this.control = ["human", "human", "human", "human"];
+        this.setViewRotationForIndex(0);
       }
     } else {
       if (this.config.connection === "ai") {
         this.control = ["human", "ai"];
-        this.applyAIDifficulty([1], this.config.aiDifficulty ?? 5);
+        this.applyAIDifficulty([1], this.config.aiDifficulty ?? 6);
+        this.setViewRotationForIndex(0);
       } else if (this.config.connection === "remoteHost") {
-        this.control = ["human", "remoteGuest"]; // host = left
+        this.control = ["human", "remoteGuest"];
+        this.setViewRotationForIndex(0);
       } else if (this.config.connection === "remoteGuest") {
         this.control = ["human", "human"]; // render only
       } else {
+        // Local 2P: neutral camera so both players see a standard field
         this.control = ["human", "human"];
+        this.camera.alpha = this.baseAlpha;
       }
     }
 
-    // Obstacles (deterministic for remote)
-    if (this.isHost || !this.isGuest) {
-      this.obstacleSeed =
-        (Date.now() ^ ((Math.random() * 2 ** 31) | 0)) >>> 0;
-      this.spawnObstaclesDeterministic(
-        this.fieldWidth,
-        this.fieldHeight,
-        this.obstacleSeed
-      );
-      this.obstaclesInitialized = true;
-    }
+    // Obstacles: host/local spawns; guests build from net
+    if (!this.isGuest) this.spawnObstacles(width, height);
 
-    // If remote waiting: park ball still until beginMatch()
     if (this.matchReady) this.resetBall(Math.random() < 0.5 ? 1 : -1);
     else {
       this.ball.position.set(0, 0.3, 0);
       this.ballVelocity.set(0, 0, 0);
     }
 
-    // Loop
     this.engine.runRenderLoop(() => {
-      this.update(this.fieldWidth, this.fieldHeight);
+      this.update(width, height);
       this.scene.render();
     });
 
     window.addEventListener("resize", () => this.engine.resize());
   }
 
-  // ---------- AI difficulty ----------
-  private applyAIDifficulty(idxs: number[], difficulty: number) {
-    const d = Math.min(10, Math.max(1, difficulty));
-    const t = (d - 1) / 9; // 0..1
-    const errRange = lerp(2.8, 0.05, t);
-    const reactMs = lerp(420, 40, t);
-    const bounces = Math.round(lerp(0, 2, t));
+  private setViewRotationForIndex(idx: 0 | 1 | 2 | 3) {
+    // Rotate camera so your paddle appears on the LEFT
+    const map: Record<number, number> = {
+      0: 0, // Left stays left
+      1: Math.PI, // Right → left
+      2: -Math.PI / 2, // Bottom(+Z) → left
+      3: +Math.PI / 2, // Top(-Z) → left
+    };
+    this.viewTheta = map[idx] ?? 0;
+    this.camera.alpha = this.baseAlpha + this.viewTheta;
+  }
+
+  private applyAIDifficulty(idxs: number[], d: number) {
+    const t = Math.min(10, Math.max(1, d));
+    const s = (t - 1) / 9; // 0..1
+    const errRange = lerp(2.2, 0.0, s);
+    const lerpAmt = lerp(0.06, 0.18, s);
     idxs.forEach((i) => {
       this.aiErrorRangePerPaddle[i] = errRange;
-      this.aiReactionMsPerPaddle[i] = reactMs;
-      this.aiLookaheadBounces[i] = bounces;
-      this.aiNextThinkAt[i] = 0;
-      this.aiTarget[i] = 0;
+      this.aiLerpPerPaddle[i] = lerpAmt;
     });
   }
 
-  private predictInterceptForPaddle(idx: number): number {
-    const w = this.fieldWidth,
-      h = this.fieldHeight,
-      t = this.wallThickness;
-
-    const pos = this.ball.position.clone();
-    const vel = this.ballVelocity.clone();
-
-    let planeCoord = 0;
-    let axis: "x" | "z";
-    if (idx === 0) {
-      axis = "x";
-      planeCoord = -w / 2 + this.ballRadius + t / 2 + 0.1;
-    } else if (idx === 1) {
-      axis = "x";
-      planeCoord = +w / 2 - this.ballRadius - t / 2 - 0.1;
-    } else if (idx === 2) {
-      axis = "z";
-      planeCoord = +h / 2 - this.ballRadius - t / 2 - 0.1;
-    } else {
-      axis = "z";
-      planeCoord = -h / 2 + this.ballRadius + t / 2 + 0.1;
-    }
-
-    const dt = 1;
-    let steps = 0;
-    const maxSteps = 1200;
-    let bounces = 0;
-
-    const limZ = h / 2 - this.ballRadius - t / 2;
-
-    while (steps++ < maxSteps) {
-      pos.addInPlace(vel.scale(dt));
-
-      if (this.config.playerCount !== 4) {
-        if (Math.abs(pos.z) > limZ) {
-          vel.z *= -1;
-          pos.z = clamp(pos.z, -limZ, limZ);
-          if (++bounces > this.aiLookaheadBounces[idx]) break;
-        }
-      }
-      if (axis === "x") {
-        if ((idx === 0 && pos.x <= planeCoord) || (idx === 1 && pos.x >= planeCoord))
-          return pos.z;
-      } else {
-        if ((idx === 2 && pos.z >= planeCoord) || (idx === 3 && pos.z <= planeCoord))
-          return pos.x;
-      }
-    }
-    return axis === "x" ? this.ball.position.x : this.ball.position.z;
-  }
-
-  // ---------- Obstacles ----------
-  private spawnObstaclesDeterministic(width: number, height: number, seed: number) {
-    // Clear previous
-    this.obstacles.forEach((o) => o.dispose());
-    this.obstacleCaps.forEach((c) => c.dispose());
-    this.obstacles.length = 0;
-    this.obstacleCaps.length = 0;
-
-    const rng = mulberry32(seed >>> 0);
-    const count = 3 + Math.floor(rng() * 3); // 3..5
+  private spawnObstacles(width: number, height: number) {
+    const count = 5;
     const chosen: Vector3[] = [];
     const minGap = 1.0;
 
+    this.obstacleInfo = [];
     for (let i = 0; i < count; i++) {
       let x = 0,
         z = 0,
         ok = false,
         tries = 0;
-      const radius = 0.25 + rng() * 0.15;
-      while (!ok && tries++ < 40) {
-        x = (rng() * 2 - 1) * (width / 2 - 2);
-        z = (rng() * 2 - 1) * (height / 2 - 2);
+      const radius = 0.26 + Math.random() * 0.2;
+      while (!ok && tries++ < 60) {
+        x = (Math.random() * 2 - 1) * (width / 2 - 2);
+        z = (Math.random() * 2 - 1) * (height / 2 - 2);
         ok = Math.abs(x) > 1.2 || Math.abs(z) > 1.2;
-        if (ok) {
-          for (const p of chosen) {
+        if (ok)
+          for (const p of chosen)
             if (Vector3.Distance(new Vector3(x, 0, z), p) < minGap + radius) {
               ok = false;
               break;
             }
-          }
-        }
       }
       chosen.push(new Vector3(x, 0, z));
-
-      const h = 1;
-      const cyl = MeshBuilder.CreateCylinder(
-        `obs${i}`,
-        { diameter: radius * 2, height: h, tessellation: 24 },
-        this.scene
-      );
-      cyl.position.set(x, h / 2, z);
-      cyl.material = shinyMat(this.scene, randColor(rng), 0.7, true);
-      (cyl as any).metadata = { radius };
-      this.obstacles.push(cyl);
-
-      // Top cap
-      const cap = MeshBuilder.CreateDisc(
-        `obsCap${i}`,
-        { radius, tessellation: 32 },
-        this.scene
-      );
-      cap.position.set(x, h + 0.005, z);
-      const capMat = shinyMat(
-        this.scene,
-        new Color3(1, 1, 1).scale(0.85).add(randColor(rng).scale(0.6)),
-        0.9,
-        true
-      );
-      cap.material = capMat;
-      this.obstacleCaps.push(cap);
+      const bodyCol = randColor();
+      const capCol = randWhiteTint(); // <-- different white-ish per obstacle
+      const bodyArr: [number, number, number] = [
+        bodyCol.r,
+        bodyCol.g,
+        bodyCol.b,
+      ];
+      const capArr: [number, number, number] = [capCol.r, capCol.g, capCol.b];
+      this.obstacleInfo.push({ x, z, radius, color: bodyArr, cap: capArr });
+      this.buildObstacleMesh(x, z, radius, bodyCol, capCol);
     }
+  }
+
+  private buildObstacleMesh(
+    x: number,
+    z: number,
+    radius: number,
+    bodyCol: Color3,
+    capCol: Color3
+  ) {
+    const h = 1;
+    const body = MeshBuilder.CreateCylinder(
+      `obs-${x.toFixed(3)}-${z.toFixed(3)}`,
+      { diameter: radius * 2, height: h, tessellation: 24 },
+      this.scene
+    );
+    body.position.set(x, h / 2, z);
+    body.material = shinyMat(this.scene, bodyCol, 0.7, true);
+    (body as any).metadata = { radius };
+    this.obstacles.push(body);
+
+    const cap = MeshBuilder.CreateCylinder(
+      `cap-${x.toFixed(3)}-${z.toFixed(3)}`,
+      { diameter: radius * 2 * 0.96, height: 0.06, tessellation: 24 },
+      this.scene
+    );
+    cap.position.set(x, h + 0.03, z);
+    const capMat = shinyMat(this.scene, capCol, 1.0, true);
+    capMat.emissiveColor = capCol.scale(1.15);
+    cap.material = capMat;
   }
 
   private resetBall(dirX = Math.random() < 0.5 ? 1 : -1) {
@@ -870,17 +1140,27 @@ class Pong3D {
       speed * Math.sin(angle)
     );
     this.control.forEach((c, i) => {
-      if (c === "ai") {
-        this.aiTarget[i] = 0;
-        this.aiNextThinkAt[i] = 0;
-      }
+      if (c === "ai")
+        this.aiError[i] =
+          (Math.random() * 2 - 1) * this.aiErrorRangePerPaddle[i];
+      this.aiVel[i] = 0;
     });
     this.lastHitter = -1;
     this.touchedOnce = false;
-    this.hadObstacleSinceLastTouch = false;
+    this.obstacleAfterHit = false;
   }
 
-  // ---------- Remote ----------
+  // Randomize the rebound direction a bit, then clamp horizontal speed
+  private jitterBounce(axis: "x" | "z" | "xz", amount = 0.08) {
+    const rx = (Math.random() * 2 - 1) * amount;
+    const rz = (Math.random() * 2 - 1) * (amount * 0.6);
+    if (axis === "x" || axis === "xz") this.ballVelocity.x += rx;
+    if (axis === "z" || axis === "xz") this.ballVelocity.z += rz;
+    clampHorizontal(this.ballVelocity, 0.6);
+  }
+
+  /* ---------------- Remote ---------------- */
+
   private initRemote() {
     if (!this.config.wsUrl || !this.config.roomId) return;
     try {
@@ -890,20 +1170,14 @@ class Pong3D {
           t: this.isHost ? "hello" : "join",
           roomId: this.config.roomId!,
           mode: this.config.playerCount === 4 ? "4p" : "2p",
+          sid: this.config.sessionId || undefined,
         };
         this.ws?.send(JSON.stringify(hello));
-
-        // Host: broadcast obstacle seed right away
-        if (this.isHost) this.sendSeed();
       };
-
       this.ws.onmessage = (ev) => {
         const msg = safeParse<RemoteMsg>(ev.data);
         if (!msg) return;
 
-        if (msg.t === "pong") return; // ignore
-
-        // Host sees joins -> count & maybe start
         if (msg.t === "join" && this.isHost) {
           this.connectedGuests = Math.min(
             this.requiredGuests,
@@ -912,139 +1186,103 @@ class Pong3D {
           this.updateWaitingOverlay(
             `Waiting for players… ${this.connectedGuests}/${this.requiredGuests}`
           );
-          // Re-broadcast seed on every join (late guest)
-          this.sendSeed();
-
-          if (this.connectedGuests >= this.requiredGuests && !this.matchReady) {
-            // tell guests to start explicitly
-            this.sendStart();
+          if (this.connectedGuests >= this.requiredGuests && !this.matchReady)
             this.beginMatch();
-          }
           return;
         }
 
-        // Guest learns index
         if (msg.t === "assign" && this.isGuest) {
-          // If -1 returned (room full), retry request index after a short delay.
-          if (typeof msg.idx !== "number" || msg.idx < 0) {
-            setTimeout(() => {
-              try {
-                this.ws?.send(
-                  JSON.stringify({
-                    t: "join",
-                    roomId: this.config.roomId!,
-                  })
-                );
-              } catch {}
-            }, 500);
-            return;
-          }
           this.remoteIndex = (msg.idx as 0 | 1 | 2 | 3) ?? 1;
+          // Always rotate so *your* paddle is on the left
+          this.setViewRotationForIndex(this.remoteIndex);
+          if (!this.matchReady) this.updateWaitingOverlay("Waiting for start…");
           return;
         }
 
-        // Guests build identical obstacles
-        if (msg.t === "seed" && this.isGuest) {
-          if (!this.obstaclesInitialized) {
-            this.fieldWidth = msg.width;
-            this.fieldHeight = msg.height;
-            this.spawnObstaclesDeterministic(
-              this.fieldWidth,
-              this.fieldHeight,
-              msg.seed >>> 0
-            );
-            this.obstaclesInitialized = true;
+        if (msg.t === "start" && this.isGuest) {
+          if (!this.matchReady) {
+            this.matchReady = true;
+            this.hideWaitingOverlay();
           }
           return;
         }
 
-        // Explicit start from host
-        if (msg.t === "start" && this.isGuest) {
-          this.matchReady = true;
-          this.hideWaitingOverlay();
-          // ball state will be synced by 'state'
-          return;
-        }
-
-        // Guest receives state
         if (msg.t === "state" && this.isGuest) {
           this.ball.position.set(msg.ball.x, msg.ball.y, msg.ball.z);
           this.ballVelocity.set(msg.ball.vx, msg.ball.vy, msg.ball.vz);
+
+          if (!this.builtObstaclesFromNet && msg.obstacles?.length) {
+            this.obstacles.forEach((m) => m.dispose());
+            this.obstacles = [];
+            this.obstacleInfo = [];
+            for (const o of msg.obstacles) {
+              const body = new Color3(o.color[0], o.color[1], o.color[2]);
+              const cap = new Color3(o.cap[0], o.cap[1], o.cap[2]);
+              this.obstacleInfo.push(o);
+              this.buildObstacleMesh(o.x, o.z, o.radius, body, cap);
+            }
+            this.builtObstaclesFromNet = true;
+          }
+
           msg.paddles.forEach((pp, i) =>
             this.paddles[i]?.position.set(pp.x, pp.y, pp.z)
           );
           for (let i = 0; i < this.scores.length && i < msg.scores.length; i++)
             this.scores[i] = msg.scores[i];
           this.updateScoreUI();
+          if (!this.matchReady) {
+            this.matchReady = true;
+            this.hideWaitingOverlay();
+          }
           return;
         }
 
-        // Host receives guest inputs
         if (msg.t === "input" && this.isHost) {
-          this.guestInputs[(msg as any).idx] = {
-            up: !!(msg as any).up,
-            down: !!(msg as any).down,
+          this.guestInputs[msg.idx] = {
+            neg: !!(msg as any).neg,
+            pos: !!(msg as any).pos,
           };
           return;
         }
       };
 
-      this.ws.onclose = () => {
-        if (!this.isGuest) return;
-        this.matchReady = false;
-        this.showWaitingOverlay("Connection lost. Reconnecting…");
-        // naive auto-reload to reconnect
-        setTimeout(() => location.reload(), 1200);
-      };
+      if (this.isGuest) {
+        const sendInputs = () => {
+          // Map arrows to generic axis (neg/pos) based on your assigned paddle index.
+          let neg = false,
+            pos = false;
+          const idx = this.remoteIndex;
+          if (idx === 0 || idx === 1) {
+            // L/R → move Z (neg=up, pos=down)
+            neg = !!this.keys["arrowup"];
+            pos = !!this.keys["arrowdown"];
+          } else if (idx === 2) {
+            // Bottom(+Z) → move X (neg=left, pos=right)
+            neg = !!this.keys["arrowleft"];
+            pos = !!this.keys["arrowright"];
+          } else if (idx === 3) {
+            // Top(-Z) → move X mirrored (neg=right, pos=left)
+            neg = !!this.keys["arrowright"];
+            pos = !!this.keys["arrowleft"];
+          }
 
-      // Guests: send inputs continuously + keepalive
-      const tickNet = () => {
-        const now = performance.now();
-        if (this.isGuest) {
-          const up = !!this.keys["w"] || !!this.keys["arrowup"];
-          const down = !!this.keys["s"] || !!this.keys["arrowdown"];
           const pkt: RemoteMsg = {
             t: "input",
-            idx: this.remoteIndex,
-            up,
-            down,
+            idx,
+            neg,
+            pos,
+            sid: this.config.sessionId || undefined,
           };
           try {
             this.ws?.send(JSON.stringify(pkt));
           } catch {}
-        }
-        // keepalive every 10s
-        if (now - this.lastPingAt > 10000) {
-          try {
-            this.ws?.send(JSON.stringify({ t: "ping" as const }));
-          } catch {}
-          this.lastPingAt = now;
-        }
-        requestAnimationFrame(tickNet);
-      };
-      requestAnimationFrame(tickNet);
+          requestAnimationFrame(sendInputs);
+        };
+        requestAnimationFrame(sendInputs);
+      }
     } catch {
       // best effort
     }
-  }
-
-  private sendSeed() {
-    const seedMsg: RemoteMsg = {
-      t: "seed",
-      seed: this.obstacleSeed >>> 0,
-      width: this.fieldWidth,
-      height: this.fieldHeight,
-      playerCount: this.config.playerCount,
-    };
-    try {
-      this.ws?.send(JSON.stringify(seedMsg));
-    } catch {}
-  }
-
-  private sendStart() {
-    try {
-      this.ws?.send(JSON.stringify({ t: "start" as const }));
-    } catch {}
   }
 
   private broadcastState(now: number) {
@@ -1067,17 +1305,17 @@ class Pong3D {
         z: p.position.z,
       })),
       scores: [...this.scores],
+      obstacles: this.obstacleInfo.map((o) => ({ ...o })),
     };
     try {
       this.ws.send(JSON.stringify(msg));
     } catch {}
   }
 
-  // ---------- Per-frame update ----------
+  /* ---------------- Tick ---------------- */
+
   private update(width: number, height: number) {
     const now = performance.now();
-
-    // Pause simulation until match is ready (but host continues broadcasting)
     if (!this.matchReady) {
       if (this.isHost) this.broadcastState(now);
       return;
@@ -1086,84 +1324,75 @@ class Pong3D {
     const move = 0.2;
     const [p1, p2, p3, p4] = this.paddles;
 
-    // Input / AI / Remote
+    // Arrow-only control for local/host
+    // L/R paddles use Up/Down for Z. Bottom uses Left/Right for X. Top uses Right/Left mirrored.
     if (this.config.playerCount === 4) {
+      // Left (host or local)
       if (this.control[0] === "human") {
         if (this.keys["arrowup"]) p1.position.z -= move;
         if (this.keys["arrowdown"]) p1.position.z += move;
       }
-      if (this.control[1] === "human") {
-        if (this.keys["w"]) p2.position.z -= move;
-        if (this.keys["s"]) p2.position.z += move;
-      }
-      if (this.control[2] === "human") {
-        if (this.keys["i"]) p3.position.x -= move;
-        if (this.keys["k"]) p3.position.x += move;
-      }
-      if (this.control[3] === "human") {
-        if (this.keys["n"]) p4.position.x += move;
-        if (this.keys["m"]) p4.position.x -= move;
-      }
 
       if (this.config.connection === "remote4Host") {
-        if (this.guestInputs[1]?.up) this.paddles[1].position.z -= move;
-        if (this.guestInputs[1]?.down) this.paddles[1].position.z += move;
-        if (this.guestInputs[2]?.up) this.paddles[2].position.x -= move;
-        if (this.guestInputs[2]?.down) this.paddles[2].position.x += move;
-        if (this.guestInputs[3]?.up) this.paddles[3].position.x += move;
-        if (this.guestInputs[3]?.down) this.paddles[3].position.x -= move;
+        if (this.guestInputs[1]?.neg) this.paddles[1].position.z -= move; // right Z-
+        if (this.guestInputs[1]?.pos) this.paddles[1].position.z += move; // right Z+
+        if (this.guestInputs[2]?.neg) this.paddles[2].position.x -= move; // bottom X-
+        if (this.guestInputs[2]?.pos) this.paddles[2].position.x += move; // bottom X+
+        if (this.guestInputs[3]?.neg) this.paddles[3].position.x += move; // top X+ (mirrored)
+        if (this.guestInputs[3]?.pos) this.paddles[3].position.x -= move; // top X-
+      } else {
+        // local 4P (fallback): allow arrow-left/right to move Bottom, arrow-up/down Left
+        if (this.control[2] === "human") {
+          if (this.keys["arrowleft"]) p3.position.x -= move;
+          if (this.keys["arrowright"]) p3.position.x += move;
+        }
       }
 
-      [0, 1, 2, 3].forEach((i) => {
-        if (this.control[i] !== "ai") return;
-        if (now >= this.aiNextThinkAt[i]) {
-          const pred = this.predictInterceptForPaddle(i);
-          const err = (Math.random() * 2 - 1) * this.aiErrorRangePerPaddle[i];
-          this.aiTarget[i] = pred + err;
-          this.aiNextThinkAt[i] = now + this.aiReactionMsPerPaddle[i];
-        }
-        const p = this.paddles[i];
-        if (i < 2) {
-          if (p.position.z < this.aiTarget[i] - 0.02) p.position.z += move;
-          else if (p.position.z > this.aiTarget[i] + 0.02) p.position.z -= move;
-        } else {
-          if (p.position.x < this.aiTarget[i] - 0.02) p.position.x += move;
-          else if (p.position.x > this.aiTarget[i] + 0.02) p.position.x -= move;
-        }
-      });
+      // AI for the rest (if any)
+      [0, 1, 2, 3].forEach((i) => this.runAI(i, width, height, move));
     } else {
-      if (this.keys["arrowup"]) p1.position.z -= move;
-      if (this.keys["arrowdown"]) p1.position.z += move;
-
+      // ---------- 2P ----------
       if (this.control[1] === "ai") {
-        if (now >= this.aiNextThinkAt[1]) {
-          const pred = this.predictInterceptForPaddle(1);
-          const err = (Math.random() * 2 - 1) * this.aiErrorRangePerPaddle[1];
-          this.aiTarget[1] = pred + err;
-          this.aiNextThinkAt[1] = now + this.aiReactionMsPerPaddle[1];
-        }
-        if (p2.position.z < this.aiTarget[1] - 0.02) p2.position.z += move;
-        else if (p2.position.z > this.aiTarget[1] + 0.02) p2.position.z -= move;
+        // P1 (you) on Up/Down
+        if (this.keys["arrowup"]) p1.position.z -= move;
+        if (this.keys["arrowdown"]) p1.position.z += move;
+        // P2 is AI
+        this.runAI(1, width, height, move);
       } else if (this.config.connection === "remoteHost") {
-        if (this.guestInputs[1]?.up) p2.position.z -= move;
-        if (this.guestInputs[1]?.down) p2.position.z += move;
+        // P1 (host) on Up/Down
+        if (this.keys["arrowup"]) p1.position.z -= move;
+        if (this.keys["arrowdown"]) p1.position.z += move;
+        // P2 from guest
+        if (this.guestInputs[1]?.neg) p2.position.z -= move;
+        if (this.guestInputs[1]?.pos) p2.position.z += move;
+      } else if (this.config.connection === "remoteGuest") {
+        // Guest renders only; inputs are sent in initRemote()
       } else {
-        if (this.keys["w"]) p2.position.z -= move;
-        if (this.keys["s"]) p2.position.z += move;
+        // ---- LOCAL 2P ----
+        // Left paddle (p1) = W/S
+        if (this.keys["w"]) p1.position.z -= move;
+        if (this.keys["s"]) p1.position.z += move;
+
+        // Right paddle (p2) = Arrow Up/Down
+        if (this.keys["arrowup"]) p2.position.z -= move;
+        if (this.keys["arrowdown"]) p2.position.z += move;
       }
     }
 
-    // Clamp paddles & keep out of corners
-    const padD2 = 1.0;
-    const t = this.wallThickness;
-    const limZ = height / 2 - padD2 - t / 2 - 0.02;
-    const limX = width / 2 - padD2 - t / 2 - 0.02;
+    // Clamp paddles and keep out of corners
+    const padW2 = 0.1,
+      padD2 = 1.0;
+    const margin = 0.02,
+      t = this.wallThickness;
+    const limZ = height / 2 - padD2 - t / 2 - margin;
+    const limX = width / 2 - padD2 - t / 2 - margin;
     this.paddles.forEach((p, i) => {
       if (i < 2) p.position.z = clamp(p.position.z, -limZ, limZ);
       else p.position.x = clamp(p.position.x, -limX, limX);
     });
 
-    const cHalf = this.cornerSize / 2;
+    const cHalf = this.cornerSize / 2,
+      padMargin = 0.01;
     for (let i = 0; i < Math.min(2, this.paddles.length); i++) {
       const p = this.paddles[i];
       for (const c of this.corners) {
@@ -1171,7 +1400,7 @@ class Pong3D {
         const overlapZ = Math.abs(p.position.z - c.position.z) < 1.0 + cHalf;
         if (overlapX && overlapZ) {
           const signZ = p.position.z - c.position.z >= 0 ? 1 : -1;
-          p.position.z = c.position.z + signZ * (1.0 + cHalf + 0.01);
+          p.position.z = c.position.z + signZ * (1.0 + cHalf + padMargin);
         }
       }
     }
@@ -1182,7 +1411,7 @@ class Pong3D {
         const overlapZ = Math.abs(p.position.z - c.position.z) < 0.1 + cHalf;
         if (overlapX && overlapZ) {
           const signX = p.position.x - c.position.x >= 0 ? 1 : -1;
-          p.position.x = c.position.x + signX * (1.0 + cHalf + 0.01);
+          p.position.x = c.position.x + signX * (1.0 + cHalf + padMargin);
         }
       }
     }
@@ -1198,7 +1427,7 @@ class Pong3D {
       this.ballVelocity.y *= -0.6;
     }
 
-    // Corner collisions
+    // Corners (optional tiny randomness here too)
     const cornerRadius = (this.cornerSize * Math.SQRT2) / 2;
     for (const c of this.corners) {
       const dist = Vector3.Distance(this.ball.position, c.position);
@@ -1208,27 +1437,22 @@ class Pong3D {
         this.ballVelocity.z *= -1;
         const n = this.ball.position.subtract(c.position).normalize();
         this.ball.position = c.position.add(n.scale(hitR + 0.02));
+        this.jitterBounce("xz", 0.05);
       }
     }
 
-    // Z walls bounce in 2P
+    // Z bounces for 2P only (randomize every time)
     if (this.config.playerCount !== 4) {
-      if (
-        Math.abs(this.ball.position.z) >
-        height / 2 - this.ballRadius - t / 2
-      ) {
+      const zLimit = height / 2 - this.ballRadius - t / 2;
+      if (Math.abs(this.ball.position.z) > zLimit) {
         this.ballVelocity.z *= -1;
-        this.ball.position.z = clamp(
-          this.ball.position.z,
-          -height / 2 + this.ballRadius + t / 2,
-          height / 2 - this.ballRadius - t / 2
-        );
+        this.jitterBounce("xz", 0.08);
+        this.ball.position.z = clamp(this.ball.position.z, -zLimit, zLimit);
       }
     }
 
-    // Paddle collisions
+    // Paddles collisions
     const clamp01 = (v: number) => Math.max(-1, Math.min(1, v));
-
     for (let idx = 0; idx < Math.min(2, this.paddles.length); idx++) {
       const p = this.paddles[idx];
       const dx = this.ball.position.x - p.position.x;
@@ -1245,14 +1469,12 @@ class Pong3D {
         const dzNorm = clamp01(dz / 1.0);
         this.ballVelocity.z += dzNorm * 0.18;
         clampHorizontal(this.ballVelocity, 0.6);
-
         this.lastHitter = idx;
         this.touchedOnce = true;
-        this.hadObstacleSinceLastTouch = false;
+        this.obstacleAfterHit = false;
         flashPaddle(p);
       }
     }
-
     for (let idx = 2; idx < Math.min(4, this.paddles.length); idx++) {
       const p = this.paddles[idx];
       const dx = this.ball.position.x - p.position.x;
@@ -1269,10 +1491,9 @@ class Pong3D {
         const dxNorm = clamp01(dx / 1.0);
         this.ballVelocity.x += dxNorm * 0.18;
         clampHorizontal(this.ballVelocity, 0.6);
-
         this.lastHitter = idx;
         this.touchedOnce = true;
-        this.hadObstacleSinceLastTouch = false;
+        this.obstacleAfterHit = false;
         flashPaddle(p);
       }
     }
@@ -1295,8 +1516,8 @@ class Pong3D {
         this.ballVelocity.z -= 2 * dot * nz;
         this.ballVelocity.x *= 1.02;
         this.ballVelocity.z *= 1.02;
-
-        if (this.lastHitter >= 0) this.hadObstacleSinceLastTouch = true;
+        if (this.lastHitter >= 0 && this.touchedOnce)
+          this.obstacleAfterHit = true;
       }
     }
 
@@ -1305,44 +1526,33 @@ class Pong3D {
     const halfH = height / 2 - this.ballRadius;
     const target = this.config.winScore ?? 10;
 
-    const penaltyIfOwnSide = (sideIdx: number) => {
-      if (
-        this.touchedOnce &&
-        this.lastHitter === sideIdx &&
-        this.hadObstacleSinceLastTouch
-      ) {
-        this.scores[sideIdx] = Math.max(0, this.scores[sideIdx] - 1);
-        this.endAndToast(
-          `Penalty -1 for ${["L", "R", "B", "T"][sideIdx]} (own wall after obstacle)`
-        );
-        this.lastScorer = -1;
+    const applyPenaltyIfNeeded = (idx: number) => {
+      if (this.obstacleAfterHit && this.lastHitter === idx) {
+        this.scores[idx] -= 1;
+        this.lastScorer = idx;
         this.updateScoreUI();
-        this.hadObstacleSinceLastTouch = false;
       }
+      this.obstacleAfterHit = false;
     };
 
     if (this.config.playerCount === 4) {
-      const outXLeft = this.ball.position.x < -halfW;
-      const outXRight = this.ball.position.x > halfW;
-      const outZTop = this.ball.position.z < -halfH;
-      const outZBottom = this.ball.position.z > halfH;
-
-      if (outXLeft || outXRight || outZTop || outZBottom) {
+      const outX = Math.abs(this.ball.position.x) > halfW;
+      const outZ = Math.abs(this.ball.position.z) > halfH;
+      if (outX || outZ) {
         if (this.touchedOnce && this.lastHitter >= 0) {
-          if (outXLeft) penaltyIfOwnSide(0);
-          if (outXRight) penaltyIfOwnSide(1);
-          if (outZBottom) penaltyIfOwnSide(2);
-          if (outZTop) penaltyIfOwnSide(3);
+          if (this.ball.position.x < -halfW) applyPenaltyIfNeeded(0);
+          if (this.ball.position.x > +halfW) applyPenaltyIfNeeded(1);
+          if (this.ball.position.z > +halfH) applyPenaltyIfNeeded(2);
+          if (this.ball.position.z < -halfH) applyPenaltyIfNeeded(3);
 
           this.scores[this.lastHitter]++;
           this.lastScorer = this.lastHitter;
           this.updateScoreUI();
 
-          if (this.scores[this.lastHitter] >= target)
-            this.endAndToast(
-              `Player ${["L", "R", "B", "T"][this.lastHitter]} wins!`
-            );
-
+          if (this.scores[this.lastHitter] >= target) {
+            this.finishAndReport(this.lastHitter);
+            return;
+          }
           this.resetBall(
             this.lastHitter === 0
               ? 1
@@ -1358,28 +1568,130 @@ class Pong3D {
       }
     } else {
       if (this.ball.position.x > halfW) {
-        penaltyIfOwnSide(1);
         if (this.touchedOnce) {
+          applyPenaltyIfNeeded(1);
           this.scores[1]++;
           this.lastScorer = 1;
           this.updateScoreUI();
-          if (this.scores[1] >= target) this.endAndToast("Right wins!");
+          if (this.scores[1] >= target) {
+            this.finishAndReport(1);
+            return;
+          }
         }
         this.resetBall(-1);
       } else if (this.ball.position.x < -halfW) {
-        penaltyIfOwnSide(0);
         if (this.touchedOnce) {
+          applyPenaltyIfNeeded(0);
           this.scores[0]++;
           this.lastScorer = 0;
           this.updateScoreUI();
-          if (this.scores[0] >= target) this.endAndToast("Left wins!");
+          if (this.scores[0] >= target) {
+            this.finishAndReport(0);
+            return;
+          }
         }
         this.resetBall(1);
       }
     }
 
-    // Remote broadcast
     if (this.isHost) this.broadcastState(now);
+  }
+
+  private runAI(i: number, width: number, height: number, maxStep: number) {
+    if (this.control[i] !== "ai") return;
+    const lerpAmt = this.aiLerpPerPaddle[i];
+    const err = this.aiError[i];
+
+    const isLR = i < 2;
+    const axisPos = isLR
+      ? this.paddles[i].position.x
+      : this.paddles[i].position.z;
+    const ballPos = this.ball.position.clone();
+    const ballVel = this.ballVelocity.clone();
+
+    let target = isLR ? ballPos.z : ballPos.x;
+    {
+      const simulate = ballPos.clone();
+      const v = ballVel.clone();
+      const limitZ = height / 2 - this.ballRadius - this.wallThickness / 2;
+      const horizon = 60;
+      for (let k = 0; k < horizon; k++) {
+        simulate.addInPlace(v);
+        if (this.config.playerCount === 2) {
+          if (simulate.z > limitZ || simulate.z < -limitZ) v.z *= -1;
+        }
+        if (isLR) {
+          if (
+            (i === 0 && simulate.x < axisPos) ||
+            (i === 1 && simulate.x > axisPos)
+          ) {
+            target = simulate.z;
+            break;
+          }
+        } else {
+          if (
+            (i === 2 && simulate.z > axisPos) ||
+            (i === 3 && simulate.z < axisPos)
+          ) {
+            target = simulate.x;
+            break;
+          }
+        }
+      }
+    }
+    target += err;
+
+    const p = this.paddles[i];
+    const current = isLR ? p.position.z : p.position.x;
+    const delta = target - current;
+    const accel = delta * lerpAmt;
+    this.aiVel[i] = this.aiVel[i] * 0.8 + accel * 0.2;
+    let step = this.aiVel[i];
+    if (step > maxStep) step = maxStep;
+    if (step < -maxStep) step = -maxStep;
+    if (isLR) p.position.z += step;
+    else p.position.x += step;
+  }
+
+  private async finishAndReport(winnerIdx: number) {
+    this.matchReady = false;
+    const text =
+      this.config.playerCount === 4
+        ? `Player ${["L", "R", "B", "T"][winnerIdx]} wins!`
+        : winnerIdx === 0
+        ? (this.config.displayNames?.[0] || "Left") + " wins!"
+        : (this.config.displayNames?.[1] || "Right") + " wins!";
+    this.endAndToast(text);
+
+    // Post to DB if this is an online match or tournament. Host does the reporting.
+    if (this.isHost) {
+      const scores = [...this.scores];
+      try {
+        if (this.config.tournament) {
+          const t = this.config.tournament;
+          const leftScore = scores[0] || 0,
+            rightScore = scores[1] || 0;
+          const winnerUserId = winnerIdx === 0 ? t.leftUserId : t.rightUserId;
+          await ApiClient.reportTournamentMatch({
+            tournamentId: t.tournamentId,
+            round: t.round,
+            matchIndex: t.matchIndex,
+            leftUserId: t.leftUserId,
+            rightUserId: t.rightUserId,
+            leftScore,
+            rightScore,
+            winnerUserId,
+          });
+        } else if (this.config.matchId) {
+          const winnerUserId = this.config.currentUser?.id || null;
+          await ApiClient.postMatchResult({
+            matchId: this.config.matchId,
+            winnerUserId,
+            scores,
+          });
+        }
+      } catch {}
+    }
   }
 
   private endAndToast(text: string) {
@@ -1397,13 +1709,17 @@ class Pong3D {
       fontFamily: "system-ui,sans-serif",
       boxShadow: "0 10px 24px rgba(0,0,0,.45)",
     });
-    t.textContent = text;
+    t.innerHTML = `${text} &nbsp; <button id="re" style="margin-left:8px;">Play again</button>`;
     document.body.appendChild(t);
-    setTimeout(() => t.remove(), 1600);
+    (t.querySelector("#re") as HTMLButtonElement).onclick = () =>
+      location.reload();
   }
 }
 
-// ---------------- Helpers ----------------
+/* =========================================================
+   HELPERS
+   ========================================================= */
+
 function clamp(v: number, a: number, b: number) {
   return Math.max(a, Math.min(b, v));
 }
@@ -1435,9 +1751,7 @@ function shinyMat(
   m.diffuseColor = base;
   m.specularColor = new Color3(1, 1, 1);
   m.specularPower = 64;
-  if (glow) {
-    m.emissiveColor = base.scale(glowStrength * 0.6);
-  }
+  if (glow) m.emissiveColor = base.scale(glowStrength * 0.6);
   const f = new FresnelParameters();
   f.bias = 0.2;
   f.power = 2;
@@ -1446,16 +1760,7 @@ function shinyMat(
   (m as any).emissiveFresnelParameters = f;
   return m;
 }
-function mulberry32(a: number) {
-  return function () {
-    a |= 0;
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-function randColor(rng: () => number = Math.random) {
+function randColor() {
   const palette = [
     new Color3(0.9, 0.4, 0.4),
     new Color3(0.4, 0.9, 0.6),
@@ -1463,108 +1768,32 @@ function randColor(rng: () => number = Math.random) {
     new Color3(0.95, 0.85, 0.4),
     new Color3(0.8, 0.5, 0.9),
   ];
-  return palette[Math.floor(rng() * palette.length)];
+  return palette[(Math.random() * palette.length) | 0];
+}
+function randWhiteTint() {
+  // varied “white” caps: warm/cool, slight brightness variation
+  const choices = [
+    new Color3(1.0, 1.0, 1.0),
+    new Color3(0.98, 0.98, 1.0),
+    new Color3(1.0, 0.98, 0.98),
+    new Color3(0.97, 1.0, 0.97),
+    new Color3(0.96, 0.99, 1.0),
+  ];
+  return choices[(Math.random() * choices.length) | 0];
 }
 function flashPaddle(p: import("@babylonjs/core").Mesh) {
   const mat = p.material as StandardMaterial;
   const prev = mat.emissiveColor.clone();
-  mat.emissiveColor = new Color3(1, 0.2, 0.2);
+  mat.emissiveColor = new Color3(1, 0.3, 0.3);
   setTimeout(() => (mat.emissiveColor = prev), 100);
 }
 
-// ---------------- Bootstrap ----------------
+/* =========================================================
+   BOOTSTRAP
+   ========================================================= */
+
 window.addEventListener("load", async () => {
   clearPongUI();
-
-  const config = await Menu.render();
-  const tdata = (window as any).__TOURNAMENT__ as
-    | { size: 8 | 16; names: string[] }
-    | undefined;
-
-  if (!tdata) {
-    clearPongUI();
-    new Pong3D(config);
-    return;
-  }
-
-  // Remote-only tournament bracket (each match is a separate room)
-  const t = new TournamentManager(tdata.size, tdata.names);
-  const baseRoom = config.roomId || "room1";
-
-  const showOverlay = (html: string) => {
-    const ov = markUI(document.createElement("div"));
-    Object.assign(ov.style, {
-      position: "fixed",
-      inset: "0",
-      display: "grid",
-      placeItems: "center",
-      background: "rgba(0,0,0,.75)",
-      color: "#fff",
-      zIndex: "9999",
-      fontFamily: "system-ui,sans-serif",
-    });
-    ov.innerHTML = html;
-    document.body.appendChild(ov);
-    return ov;
-  };
-
-  const nextMatch = () => {
-    clearPongUI();
-    const m = t.current();
-    if (!m) return;
-    const roomId = `${baseRoom}-r${t.getRound()}-m${t.getIndex() + 1}`;
-    const html = `<div style="padding:18px 22px; background:#111; border-radius:12px;">
-      <div style="font-size:13px; opacity:.8; margin-bottom:6px;">Round ${t.getRound()}</div>
-      <div style="font-size:20px; font-weight:700; margin-bottom:6px;">${
-        m.a
-      } vs ${m.b}</div>
-      <div style="font-size:12px; opacity:.85; margin-bottom:8px;">Room: <code>${roomId}</code></div>
-      <div style="margin-top:10px; text-align:right;"><button id="goBtn">Start match</button></div>
-    </div>`;
-    const ov = showOverlay(html);
-    (ov.querySelector("#goBtn") as HTMLButtonElement).onclick = () => {
-      ov.remove();
-      clearPongUI();
-      const matchCfg: GameConfig = {
-        ...config,
-        playerCount: 2,
-        roomId,
-        winScore: config.winScore ?? 10,
-      };
-      new Pong3D(matchCfg);
-
-      const cont =
-        showOverlay(`<div style="padding:18px 22px; background:#111; border-radius:12px; text-align:center;">
-        <div style="font-size:14px; opacity:.85;">Match finished?</div>
-        <div style="margin-top:8px;">
-          <button id="leftW" style="margin-right:8px;">Left won</button>
-          <button id="rightW">Right won</button>
-        </div>
-      </div>`);
-      (cont.querySelector("#leftW") as HTMLButtonElement).onclick = () => {
-        cont.remove();
-        const champ = t.reportWinner(m.a);
-        champ ? showChampion(champ) : nextMatch();
-      };
-      (cont.querySelector("#rightW") as HTMLButtonElement).onclick = () => {
-        cont.remove();
-        const champ = t.reportWinner(m.b);
-        champ ? showChampion(champ) : nextMatch();
-      };
-    };
-  };
-
-  const showChampion = (name: string) => {
-    clearPongUI();
-    const ov =
-      showOverlay(`<div style="padding:22px 26px; background:#111; border-radius:12px; text-align:center;">
-      <div style="font-size:14px; opacity:.8; margin-bottom:6px;">Champion</div>
-      <div style="font-size:24px; font-weight:800; letter-spacing:.4px;">${name}</div>
-      <div style="margin-top:12px;"><button id="okBtn">Done</button></div>
-    </div>`);
-    (ov.querySelector("#okBtn") as HTMLButtonElement).onclick = () =>
-      location.reload();
-  };
-
-  nextMatch();
+  const cfg = await Menu.render();
+  new Pong3D(cfg);
 });

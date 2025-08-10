@@ -1,63 +1,48 @@
 // relay-logged.js
-// Tiny relay (WS). Now supports 'start' and keepalive ping/pong.
-// Works on LAN/WAN: run on the host machine and point guests to ws://HOST_IP:8080
+// Run with: node relay-logged.js
+// Listen on 0.0.0.0 so other machines on your LAN can connect.
+// Use ws://<host-lan-ip>:8080 in the game menu on the guest.
 
 const WebSocket = require('ws');
 const PORT = process.env.PORT || 8080;
-const wss = new WebSocket.Server({ port: PORT });
+const wss = new WebSocket.Server({ host: '0.0.0.0', port: PORT });
 const rooms = Object.create(null);
-
-const getRoom = (id) =>
-  (rooms[id] ||= { mode: '2p', host: null, guests: new Set(), usedIdx: new Set() });
-
-const send = (ws, o) => {
-  try {
-    ws.readyState === 1 && ws.send(JSON.stringify(o));
-  } catch {}
-};
+const getRoom = id => rooms[id] ||= { mode:'2p', host:null, guests:new Set(), usedIdx:new Set() };
+const send = (ws, o) => { try{ ws.readyState===1 && ws.send(JSON.stringify(o)); }catch{} };
 
 wss.on('connection', (ws) => {
-  ws.meta = { roomId: null, role: null, idx: null, lastPing: Date.now() };
+  ws.meta = { roomId:null, role:null, idx:null };
   console.log('[conn]');
 
-  const heartbeat = setInterval(() => {
-    if (Date.now() - ws.meta.lastPing > 30000) {
-      try { ws.terminate(); } catch {}
-    }
-  }, 10000);
-
   ws.on('message', (buf) => {
-    let msg; try { msg = JSON.parse(String(buf)); } catch { return; }
-    // console.log('[recv]', msg);
-
-    if (msg.t === 'ping') { ws.meta.lastPing = Date.now(); send(ws, { t:'pong' }); return; }
+    let msg; try{ msg = JSON.parse(String(buf)); }catch{ return; }
+    console.log('[recv]', msg);
 
     if (msg.t === 'hello' && msg.roomId) {
-      const r = getRoom(msg.roomId);
-      r.mode = msg.mode === '4p' ? '4p' : '2p';
-      r.host = ws;
-      ws.meta = { roomId: msg.roomId, role: 'host', idx: null, lastPing: Date.now() };
+      const r = getRoom(msg.roomId); r.mode = msg.mode === '4p' ? '4p' : '2p';
+      // close previous host (if any)
+      if (r.host && r.host !== ws) { try{ r.host.close(); }catch{}; r.host = null; }
+      r.host = ws; ws.meta = { roomId: msg.roomId, role:'host', idx:null };
+      // (optional) notify existing guests to reconnect if host changed
       console.log(`[host] room=${msg.roomId} mode=${r.mode}`);
       return;
     }
 
     if (msg.t === 'join' && msg.roomId) {
-      const r = getRoom(msg.roomId);
-      ws.meta = { roomId: msg.roomId, role: 'guest', idx: null, lastPing: Date.now() };
+      const r = getRoom(msg.roomId); ws.meta = { roomId: msg.roomId, role:'guest', idx:null };
       r.guests.add(ws);
-      let idx = null;
-      const cand = r.mode === '4p' ? [1, 2, 3] : [1];
+      let idx = null; const cand = r.mode === '4p' ? [1,2,3] : [1];
       for (const c of cand) if (!r.usedIdx.has(c)) { idx = c; break; }
-      if (idx == null) { send(ws, { t: 'assign', idx: -1 }); return; }
+      if (idx == null) { send(ws, { t:'assign', idx:-1 }); return; }
       ws.meta.idx = idx; r.usedIdx.add(idx);
-      send(ws, { t: 'assign', idx });
-      if (r.host) send(r.host, { t: 'join', roomId: msg.roomId, idx });
+      send(ws, { t:'assign', idx });
+      if (r.host) send(r.host, { t:'join', roomId: msg.roomId, idx });
       console.log(`[guest] room=${msg.roomId} idx=${idx}`);
       return;
     }
 
     if (msg.t === 'input' && ws.meta.role === 'guest') {
-      const r = rooms[ws.meta.roomId]; if (r?.host) send(r.host, { t: 'input', idx: ws.meta.idx, up: !!msg.up, down: !!msg.down });
+      const r = rooms[ws.meta.roomId]; if (r?.host) send(r.host, { t:'input', idx: ws.meta.idx, up:!!msg.up, down:!!msg.down });
       return;
     }
 
@@ -67,29 +52,22 @@ wss.on('connection', (ws) => {
       return;
     }
 
-    if (msg.t === 'seed' && ws.meta.role === 'host') {
-      const r = rooms[ws.meta.roomId]; if (!r) return;
-      for (const g of r.guests) send(g, msg);
-      return;
-    }
-
     if (msg.t === 'start' && ws.meta.role === 'host') {
       const r = rooms[ws.meta.roomId]; if (!r) return;
-      for (const g of r.guests) send(g, { t: 'start' });
+      for (const g of r.guests) send(g, { t:'start' });
       return;
     }
   });
 
   ws.on('close', () => {
-    clearInterval(heartbeat);
     const { roomId, role, idx } = ws.meta || {};
     console.log('[close]', role, roomId, idx);
     if (!roomId) return;
     const r = rooms[roomId]; if (!r) return;
-    if (role === 'guest') { r.guests.delete(ws); if (idx != null) r.usedIdx.delete(idx); }
+    if (role === 'guest') { r.guests.delete(ws); if (idx!=null) r.usedIdx.delete(idx); }
     if (role === 'host') {
       r.host = null;
-      for (const g of r.guests) try { g.close(); } catch {}
+      for (const g of r.guests) try{ g.close(); }catch{};
       delete rooms[roomId];
     }
   });
