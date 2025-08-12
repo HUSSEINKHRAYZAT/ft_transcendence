@@ -1,5 +1,6 @@
 import { waitForDOM } from './utils/DOMHelpers';
 import './styles/main.css';
+import { languageManager, t, SUPPORTED_LANGUAGES } from './langs/LanguageManager';
 
 interface Component {
 	render(): Promise<void>;
@@ -15,25 +16,42 @@ console.log('🌐 Document ready state:', document.readyState);
 
 initializeApplication();
 
-async function initializeApplication(): Promise<void>
-{
-	console.log('🚀 Starting FT_PONG application initialization...');
+async function initializeApplication(): Promise<void> {
+  console.log('🚀 Starting FT_PONG application initialization...');
 
-	try
-	{
-		await waitForDOM();
-		console.log('✅ DOM is ready!');
+  try {
+    await waitForDOM();
+    console.log('✅ DOM is ready!');
 
-		hideLoadingScreen();
+    // ADD THIS: Initialize language manager
+    console.log(`🌍 Language Manager initialized with: ${languageManager.getCurrentLanguage()}`);
 
-		await loadComponents();
+    // Listen for language changes globally
+    languageManager.onLanguageChange((newLanguage) => {
+      console.log(`🌍 Global language changed to: ${newLanguage}`);
+      updateGlobalTranslations();
+    });
 
-	}
-	catch (error)
-	{
-		console.error('❌ Failed to initialize application:', error);
-		showInitializationError(error);
-	}
+    hideLoadingScreen();
+    await loadComponents();
+  }
+  catch (error) {
+    console.error('❌ Failed to initialize application:', error);
+    showInitializationError(error);
+  }
+}
+
+function updateGlobalTranslations(): void {
+  console.log('🔄 Updating global translations...');
+
+  // Update navbar
+  addBasicNavbar();
+
+  // Update jumbotron button
+  updateJumbotronButton();
+
+  // Update any open modal content
+  updateOpenModals();
 }
 
 async function loadComponents(): Promise<void>
@@ -537,63 +555,60 @@ function showBasicProfileModal(): void
 	document.body.appendChild(modal);
 }
 
-function showBasicInfoModal(type: string): void
-{
-	closeBasicModal();
+function showBasicInfoModal(type: string): void {
+  closeBasicModal();
 
-	const titles = {
-		about: 'About Us',
-		project: 'Project Information',
-		home: 'Welcome to FT_PONG'
-	};
+  const titles = {
+    about: t('About Us'),
+    project: t('Project Information'),
+    home: t('Welcome to FT_PONG')
+  };
 
-	const content = {
-		about: `
-			<p class="mb-4">We are a team of five passionate 42-Beirut developers collaborating on the FT_TRANSCENDENCE project.</p>
-			<h4 class="text-lg font-bold text-lime-500 mb-3">Our Team:</h4>
-			<ul class="list-none space-y-2 text-lime-400">
-				<li>• Ali Fayad [ Frontend ]</li>
-				<li>• Fouad Dahouk [ Socket ]</li>
-				<li>• Hussein Khrayzat [ Game ]</li>
-				<li>• Hussein Chrief [ DevOps ]</li>
-				<li>• Mostafa Younes [ Backend ]</li>
-			</ul>
-		`,
-		project: `
-			<p class="mb-4">FT_TRANSCENDENCE is a Milestone 6 project at 42 Beirut, designed as a full-stack web application centered around a modern remake of the classic Pong game.</p>
-			<p class="text-gray-400 text-sm">Note: Full project carousel available with TypeScript components.</p>
-		`,
-		home: 'Welcome to FT_PONG! Get ready for some retro gaming fun!'
-	};
+  const content = {
+    about: `
+      <p class="mb-4">${t('We are a team of five passionate 42-Beirut developers collaborating on the FT_TRANSCENDENCE project')}</p>
+      <h4 class="text-lg font-bold text-lime-500 mb-3">${t('Our Team:')}</h4>
+      <ul class="list-none space-y-2 text-lime-400">
+        <li>• ${t('Ali Fayad [ Frontend ]')}</li>
+        <li>• ${t('Fouad Dahouk [ Socket ]')}</li>
+        <li>• ${t('Hussein Khrayzat [ Game ]')}</li>
+        <li>• ${t('Hussein Chrief [ DevOps ]')}</li>
+        <li>• ${t('Mostafa Younes [ Backend ]')}</li>
+      </ul>
+    `,
+    project: `
+      <p class="mb-4">${t('FT_TRANSCENDENCE is a Milestone 6 project at 42 Beirut, designed as a full-stack web application centered around a modern remake of the classic Pong game')}</p>
+      <p class="text-gray-400 text-sm">${t('Full project carousel available with TypeScript components')}</p>
+    `,
+    home: t('Get ready for some retro gaming fun!')
+  };
 
-	const modal = document.createElement('div');
-	modal.id = 'basic-modal';
-	modal.className = 'fixed inset-0 z-50 flex items-center justify-center modal-backdrop backdrop-blur-sm bg-black/75';
+  const modal = document.createElement('div');
+  modal.id = 'basic-modal';
+  modal.className = 'fixed inset-0 z-50 flex items-center justify-center modal-backdrop backdrop-blur-sm bg-black/75';
 
-	modal.innerHTML = `
-		<div class="bg-gray-800 rounded-lg shadow-2xl max-w-2xl w-full mx-4 p-6 transform transition-all duration-300 max-h-[80vh] overflow-y-auto">
-			<div class="flex justify-between items-center mb-6">
-				<h2 class="text-2xl font-bold text-lime-500">${titles[type as keyof typeof titles] || titles.home}</h2>
-				<button onclick="closeBasicModal()" class="text-gray-400 hover:text-white text-2xl transition-colors duration-300">&times;</button>
-			</div>
+  modal.innerHTML = `
+    <div class="bg-gray-800 rounded-lg shadow-2xl max-w-2xl w-full mx-4 p-6 transform transition-all duration-300 max-h-[80vh] overflow-y-auto">
+      <div class="flex justify-between items-center mb-6">
+        <h2 class="text-2xl font-bold text-lime-500">${titles[type as keyof typeof titles] || titles.home}</h2>
+        <button onclick="closeBasicModal()" class="text-gray-400 hover:text-white text-2xl transition-colors duration-300">&times;</button>
+      </div>
+      <div class="text-gray-300 mb-6">
+        ${content[type as keyof typeof content] || content.home}
+      </div>
+      <button onclick="closeBasicModal()" class="w-full bg-lime-500 hover:bg-lime-600 text-white font-bold py-2 px-4 rounded transition-all duration-300" data-i18n="Close">
+        ${t('Close')}
+      </button>
+    </div>
+  `;
 
-			<div class="text-gray-300 mb-6">
-				${content[type as keyof typeof content] || content.home}
-			</div>
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) {
+      closeBasicModal();
+    }
+  });
 
-			<button onclick="closeBasicModal()" class="w-full bg-lime-500 hover:bg-lime-600 text-white font-bold py-2 px-4 rounded transition-all duration-300">
-				Close
-			</button>
-		</div>
-	`;
-
-	modal.addEventListener('click', (e) => {
-		if (e.target === modal) {
-			closeBasicModal();
-		}
-	});
-
-	document.body.appendChild(modal);
+  document.body.appendChild(modal);
 }
 
 function closeBasicModal(): void {
@@ -640,87 +655,73 @@ function showBasicToast(type: 'success' | 'error' | 'info', message: string): vo
 (window as any).switchBasicAuthModal = switchBasicAuthModal;
 
 function addBasicNavbar(): void {
-	const navbar = document.getElementById('navbar');
-	if (navbar)
-		{
-		const authToken = localStorage.getItem('ft_pong_auth_token');
-		const userData = localStorage.getItem('ft_pong_user_data');
-		const isAuthenticated = !!(authToken && userData);
+  const navbar = document.getElementById('navbar');
+  if (navbar) {
+    const authToken = localStorage.getItem('ft_pong_auth_token');
+    const userData = localStorage.getItem('ft_pong_user_data');
+    const isAuthenticated = !!(authToken && userData);
 
-		let user = null;
-		if (userData)
-		{
-			try
-			{
-				user = JSON.parse(userData);
-			}
-			catch (error)
-			{
-				console.error('Error parsing user data:', error);
-			}
-		}
+    let user = null;
+    if (userData) {
+      try {
+        user = JSON.parse(userData);
+      } catch (error) {
+        console.error('Error parsing user data:', error);
+      }
+    }
 
-		const authSection = isAuthenticated && user ?
-			`<div class="relative">
-				 <button id="profile-dropdown-btn" class="flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium text-lime-500 bg-gray-700 hover:bg-gray-600 transition-colors duration-300">
-					 ${user.avatar ? `<img src="${user.avatar}" alt="Profile" class="w-6 h-6 rounded-full">` : '<div class="w-6 h-6 rounded-full bg-lime-500 flex items-center justify-center text-xs font-bold text-gray-900">' + (user.firstName ? user.firstName.charAt(0).toUpperCase() : (user.username ? user.username.charAt(0).toUpperCase() : 'U')) + '</div>'}
-					 <span>${user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : (user.username || user.email || 'User')}</span>
-					 <svg class="w-4 h-4 transition-transform duration-200" id="dropdown-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-					 </svg>
-				 </button>
+    const authSection = isAuthenticated && user ?
+      `<div class="relative">
+         <button id="profile-dropdown-btn" class="flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium text-lime-500 bg-gray-700 hover:bg-gray-600 transition-colors duration-300">
+           ${user.avatar ? `<img src="${user.avatar}" alt="Profile" class="w-6 h-6 rounded-full">` : '<div class="w-6 h-6 rounded-full bg-lime-500 flex items-center justify-center text-xs font-bold text-gray-900">' + (user.firstName ? user.firstName.charAt(0).toUpperCase() : (user.username ? user.username.charAt(0).toUpperCase() : 'U')) + '</div>'}
+           <span>${user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : (user.username || user.email || 'User')}</span>
+           <svg class="w-4 h-4 transition-transform duration-200" id="dropdown-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+           </svg>
+         </button>
 
-				 <!-- Dropdown Menu -->
-				 <div id="profile-dropdown-menu" class="absolute right-0 mt-2 w-48 bg-gray-800 rounded-md shadow-lg py-1 z-50 border border-gray-700 hidden opacity-0 transform scale-95 transition-all duration-200">
-					 <button onclick="handleProfile()" class="flex items-center w-full px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition-colors duration-300">
-						 <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-						 </svg>
-						 Profile
-					 </button>
-					 <button onclick="handleLogout()" class="flex items-center w-full px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-red-400 transition-colors duration-300">
-						 <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
-						 </svg>
-						 Logout
-					 </button>
-				 </div>
-			 </div>` :
-			`<button onclick="handleLogin()" class="bg-lime-500 hover:bg-lime-600 text-white font-bold py-2 px-4 rounded transition-all duration-300">Login</button>`;
+         <div id="profile-dropdown-menu" class="absolute right-0 mt-2 w-48 bg-gray-800 rounded-md shadow-lg py-1 z-50 border border-gray-700 hidden opacity-0 transform scale-95 transition-all duration-200">
+           <button onclick="handleProfile()" class="flex items-center w-full px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition-colors duration-300" data-i18n="Profile">
+             <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+             </svg>
+             ${t('Profile')}
+           </button>
+           <button onclick="handleLogout()" class="flex items-center w-full px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-red-400 transition-colors duration-300" data-i18n="Logout">
+             <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+             </svg>
+             ${t('Logout')}
+           </button>
+         </div>
+       </div>` :
+      `<button onclick="handleLogin()" class="bg-lime-500 hover:bg-lime-600 text-white font-bold py-2 px-4 rounded transition-all duration-300" data-i18n="Login">${t('Login')}</button>`;
 
-		navbar.innerHTML = `
-			<div class="bg-gray-800 border-b border-gray-700">
-				<div class="container mx-auto px-4">
-					<div class="grid grid-cols-3 items-center h-16">
-						<!-- Left Section: Logo -->
-						<div class="flex items-center justify-start">
-							<img src="https://img.icons8.com/color/48/ping-pong.png" alt="Pong Icon" class="w-6 h-6 mr-2">
-							<span class="text-2xl font-bold text-lime-500">FT_PONG</span>
-						</div>
+    navbar.innerHTML = `
+      <div class="bg-gray-800 border-b border-gray-700">
+        <div class="container mx-auto px-4">
+          <div class="grid grid-cols-3 items-center h-16">
+            <div class="flex items-center justify-start">
+              <img src="https://img.icons8.com/color/48/ping-pong.png" alt="Pong Icon" class="w-6 h-6 mr-2">
+              <span class="text-2xl font-bold text-lime-500">FT_PONG</span>
+            </div>
+            <div class="flex items-center justify-center space-x-4">
+              <button class="px-3 py-2 rounded-md text-sm font-medium text-lime-500 bg-gray-700" data-i18n="Home">${t('Home')}</button>
+              <button onclick="handleAbout()" class="px-3 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-lime-500 transition-colors duration-300" data-i18n="About">${t('About')}</button>
+              <button onclick="handleProject()" class="px-3 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-lime-500 transition-colors duration-300" data-i18n="Project">${t('Project')}</button>
+            </div>
+            <div class="flex items-center justify-end">
+              ${authSection}
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
 
-						<!-- Center Section: Navigation -->
-						<div class="flex items-center justify-center space-x-4">
-							<button class="px-3 py-2 rounded-md text-sm font-medium text-lime-500 bg-gray-700">HOME</button>
-							<button onclick="handleAbout()" class="px-3 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-lime-500 transition-colors duration-300">ABOUT US</button>
-							<button onclick="handleProject()" class="px-3 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-lime-500 transition-colors duration-300">PROJECT</button>
-						</div>
-
-						<!-- Right Section: Auth -->
-						<div class="flex items-center justify-end">
-							${authSection}
-						</div>
-					</div>
-				</div>
-			</div>
-		`;
-
-		// Setup dropdown functionality if user is authenticated
-		if (isAuthenticated && user) {
-			setupProfileDropdown();
-		}
-
-		console.log('✅ Basic navbar added with profile dropdown functionality');
-	}
+    if (isAuthenticated && user) {
+      setupProfileDropdown();
+    }
+  }
 }
 
 /**
@@ -1135,7 +1136,7 @@ export function addBasicJumbotron(): void {
 				<!-- Content -->
 				<div class="text-center max-w-600 p-8 z-10 relative">
 					<h1 class="text-6xl font-bold mb-6 bg-gradient-to-r from-lime-500 to-green-600 bg-clip-text text-transparent">FT_PONG</h1>
-					<p class="text-xl text-gray-100 mb-8">Experience the classic Pong game with a fresh lime twist!</p>
+					<p class="text-xl text-gray-100 mb-8">${t('Experience the classic Pong game with a fresh lime twist!')}</p>
 
 					<!-- Dynamic Button Container -->
 					<div id="jumbotron-button-container">
@@ -1160,55 +1161,41 @@ export function addBasicJumbotron(): void {
 /**
  * Update jumbotron button based on auth state
  */
-function updateJumbotronButton(): void
-{
-	const buttonContainer = document.getElementById('jumbotron-button-container');
-	if (!buttonContainer) return;
+function updateJumbotronButton(): void {
+  const buttonContainer = document.getElementById('jumbotron-button-container');
+  if (!buttonContainer) return;
 
-	// Check current authentication state
-	const authToken = localStorage.getItem('ft_pong_auth_token');
-	const userData = localStorage.getItem('ft_pong_user_data');
-	const isAuthenticated = !!(authToken && userData);
+  const authToken = localStorage.getItem('ft_pong_auth_token');
+  const userData = localStorage.getItem('ft_pong_user_data');
+  const isAuthenticated = !!(authToken && userData);
 
-	let user = null;
-	if (userData)
-	{
-		try
-		{
-			user = JSON.parse(userData);
-		}
-		catch (error)
-		{
-			console.error('Error parsing user data:', error);
-		}
-	}
+  let user = null;
+  if (userData) {
+    try {
+      user = JSON.parse(userData);
+    } catch (error) {
+      console.error('Error parsing user data:', error);
+    }
+  }
 
-	// Clear existing button
-	buttonContainer.innerHTML = '';
+  buttonContainer.innerHTML = '';
 
-	if (isAuthenticated && user)
-	{
-		// Show "Play Game" button for authenticated users
-		buttonContainer.innerHTML = `
-			<div class="space-y-4">
-				<button onclick="handlePlayGame()" class="bg-lime-500 hover:bg-lime-600 text-white font-bold py-4 px-8 text-xl rounded transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-lime-500/25">
-					🎮 Play Game
-				</button>
-				<p class="text-gray-300">Welcome back, <span class="text-lime-400 font-bold">${user.firstName || user.username || 'Player'}</span>!</p>
-			</div>
-		`;
-	}
-	else
-	{
-		// Show "Get Started" button for non-authenticated users
-		buttonContainer.innerHTML = `
-			<button onclick="handleGetStarted()" class="bg-lime-500 hover:bg-lime-600 text-white font-bold py-4 px-8 text-xl rounded transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-lime-500/25">
-				Get Started
-			</button>
-		`;
-	}
-
-	console.log('🔄 Jumbotron button updated for auth state:', isAuthenticated);
+  if (isAuthenticated && user) {
+    buttonContainer.innerHTML = `
+      <div class="space-y-4">
+        <button onclick="handlePlayGame()" class="bg-lime-500 hover:bg-lime-600 text-white font-bold py-4 px-8 text-xl rounded transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-lime-500/25" data-i18n="Play Game">
+          🎮 ${t('Play Game')}
+        </button>
+        <p class="text-gray-300">${t('Welcome back!')}, <span class="text-lime-400 font-bold">${user.firstName || user.username || 'Player'}</span>!</p>
+      </div>
+    `;
+  } else {
+    buttonContainer.innerHTML = `
+      <button onclick="handleGetStarted()" class="bg-lime-500 hover:bg-lime-600 text-white font-bold py-4 px-8 text-xl rounded transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-lime-500/25" data-i18n="Start Game">
+        ${t('Start Game')}
+      </button>
+    `;
+  }
 }
 
 (window as any).handleGetStarted = function() {
@@ -1738,3 +1725,32 @@ async function renderGameMenu(): Promise<any> {
 		});
 	});
 }
+
+function updateOpenModals(): void {
+  // Update any open modal buttons
+  const modalClose = document.querySelector('[data-i18n="Close"]');
+  if (modalClose) {
+    modalClose.textContent = t('Close');
+  }
+
+  const modalCancel = document.querySelector('[data-i18n="Cancel"]');
+  if (modalCancel) {
+    modalCancel.textContent = t('Cancel');
+  }
+
+  const modalConfirm = document.querySelector('[data-i18n="Confirm"]');
+  if (modalConfirm) {
+    modalConfirm.textContent = t('Confirm');
+  }
+}
+
+// 8. ADD event listener for settings changes:
+window.addEventListener('storage', (e) => {
+  if (e.key === 'ft_pong_game_settings') {
+    // Sync language manager with settings changes
+    languageManager.syncWithSettings();
+  }
+});
+
+// 9. ADD global function to make available:
+(window as any).updateGlobalTranslations = updateGlobalTranslations;

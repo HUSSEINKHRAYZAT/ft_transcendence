@@ -1,49 +1,56 @@
-// BaseModal.ts - Base class for all modals
 import { findElement, createElement } from '../../utils/DOMHelpers';
 import { globalEventManager, AppEvent } from '../../utils/EventManager';
+import { languageManager, t } from '../../langs/LanguageManager';
 
 export abstract class BaseModal {
   protected modalContainer: HTMLElement | null = null;
   protected backdropElement: HTMLElement | null = null;
   protected activeModal: string | null = null;
+  private unsubscribeLanguageChange?: () => void;
 
   constructor() {
-    this.modalContainer = document.getElementById('modal-container');
-    if (!this.modalContainer) {
-      console.error('❌ Modal container not found in DOM');
-    }
+    this.modalContainer = document.body;
+
+    // Listen for language changes
+    this.unsubscribeLanguageChange = languageManager.onLanguageChange(() => {
+      if (this.isOpen()) {
+        this.updateContent();
+        this.setupEventListeners();
+      }
+    });
   }
 
-  /**
-   * Abstract method to get modal content - must be implemented by subclasses
-   */
   protected abstract getModalContent(): string;
 
-  /**
-   * Abstract method to setup event listeners - must be implemented by subclasses
-   */
   protected abstract setupEventListeners(): void;
 
-  /**
-   * Get modal title - can be overridden by subclasses
-   */
   protected getModalTitle(): string {
-    return 'Modal';
+    return t('Modal');
   }
 
-  /**
-   * Get modal CSS classes - can be overridden by subclasses
-   */
   protected getModalClasses(): string {
     return 'bg-gray-800 rounded-lg shadow-2xl max-w-md w-full mx-4 p-6 transform transition-all duration-300 scale-95 opacity-0';
   }
 
-  /**
-   * Show the modal
-   */
+  protected updateContent(): void {
+    if (!this.activeModal || !this.backdropElement) return;
+
+    // Update the modal content with new translations
+    const modalContent = this.backdropElement.querySelector('.transform');
+    if (modalContent) {
+      modalContent.innerHTML = `
+        <div class="flex justify-between items-center mb-6">
+          <h2 class="text-2xl font-bold text-lime-500">${this.getModalTitle()}</h2>
+          <button id="modal-close" class="text-gray-400 hover:text-white text-2xl transition-colors duration-300">&times;</button>
+        </div>
+        ${this.getModalContent()}
+      `;
+    }
+  }
+
   show(modalId: string): void {
     console.log(`🔍 Opening ${modalId} modal...`);
-    this.close(); // Close any existing modal
+    this.close();
 
     if (!this.modalContainer) {
       console.error('❌ Modal container not found');
@@ -73,15 +80,11 @@ export abstract class BaseModal {
     this.animateIn();
   }
 
-  /**
-   * Close the modal
-   */
   close(): void {
     if (!this.activeModal || !this.modalContainer) return;
 
     console.log('❌ Closing modal:', this.activeModal);
 
-    // Animate out
     this.animateOut(() => {
       if (this.backdropElement && this.modalContainer) {
         this.modalContainer.removeChild(this.backdropElement);
@@ -90,13 +93,9 @@ export abstract class BaseModal {
       this.activeModal = null;
     });
 
-    // Emit close event
     globalEventManager.emit(AppEvent.MODAL_CLOSE);
   }
 
-  /**
-   * Create backdrop container
-   */
   protected createBackdrop(): void {
     if (!this.modalContainer) return;
 
@@ -104,31 +103,23 @@ export abstract class BaseModal {
       className: 'fixed inset-0 z-50 flex items-center justify-center modal-backdrop backdrop-blur-sm bg-black/75 opacity-0 transition-opacity duration-300'
     });
 
-    // Close on backdrop click
     this.backdropElement.addEventListener('click', (e) => {
       if (e.target === this.backdropElement) {
         this.close();
       }
     });
 
-    // Close on Escape key
     document.addEventListener('keydown', this.handleEscapeKey);
 
     this.modalContainer.appendChild(this.backdropElement);
   }
 
-  /**
-   * Handle escape key press
-   */
   protected handleEscapeKey = (e: KeyboardEvent): void => {
     if (e.key === 'Escape' && this.activeModal) {
       this.close();
     }
   };
 
-  /**
-   * Setup base event listeners (close button)
-   */
   protected setupBaseEventListeners(): void {
     const closeBtn = findElement('#modal-close');
     if (closeBtn) {
@@ -136,9 +127,6 @@ export abstract class BaseModal {
     }
   }
 
-  /**
-   * Animate modal in
-   */
   protected animateIn(): void {
     if (!this.backdropElement) return;
 
@@ -156,9 +144,6 @@ export abstract class BaseModal {
     }, 10);
   }
 
-  /**
-   * Animate modal out
-   */
   protected animateOut(callback: () => void): void {
     if (!this.backdropElement) {
       callback();
@@ -180,9 +165,6 @@ export abstract class BaseModal {
     }, 300);
   }
 
-  /**
-   * Show toast notification
-   */
   protected showToast(type: 'success' | 'error' | 'warning' | 'info', title: string, message: string): void {
     // Create toast container if it doesn't exist
     let toastContainer = findElement('#toast-container');
@@ -216,8 +198,8 @@ export abstract class BaseModal {
         <div class="flex items-start">
           <div class="text-xl mr-3">${iconMap[type]}</div>
           <div class="flex-1">
-            <div class="font-bold">${title}</div>
-            <div class="text-sm opacity-90">${message}</div>
+            <div class="font-bold">${t(title)}</div>
+            <div class="text-sm opacity-90">${t(message)}</div>
           </div>
           <button class="ml-3 text-white hover:text-gray-200 transition-colors duration-300" onclick="this.parentElement.parentElement.remove()">
             ✕
@@ -228,12 +210,10 @@ export abstract class BaseModal {
 
     toastContainer.appendChild(toast);
 
-    // Animate in
     setTimeout(() => {
       toast.classList.remove('translate-x-full', 'opacity-0');
     }, 100);
 
-    // Auto remove after 3 seconds
     setTimeout(() => {
       if (toast.parentElement) {
         toast.classList.add('translate-x-full', 'opacity-0');
@@ -246,27 +226,19 @@ export abstract class BaseModal {
     }, 3000);
   }
 
-  /**
-   * Show error in modal
-   */
   protected showError(errorId: string, message: string): void {
     const errorDiv = findElement(`#${errorId}`);
     if (errorDiv) {
-      errorDiv.textContent = message;
+      errorDiv.textContent = t(message);
       errorDiv.classList.remove('hidden');
     }
   }
 
-  /**
-   * Trigger authentication state update
-   */
   protected triggerAuthUpdate(isAuthenticated: boolean, user?: any): void {
-    // Dispatch custom event for components to listen to
     window.dispatchEvent(new CustomEvent('auth-state-changed', {
       detail: { isAuthenticated, user }
     }));
 
-    // Also trigger a page refresh for the main.ts addBasicNavbar function
     setTimeout(() => {
       if (typeof (window as any).addBasicNavbar === 'function') {
         (window as any).addBasicNavbar();
@@ -274,9 +246,6 @@ export abstract class BaseModal {
     }, 100);
   }
 
-  /**
-   * Get current user from localStorage
-   */
   protected getCurrentUser(): any {
     try {
       const userData = localStorage.getItem('ft_pong_user_data');
@@ -287,24 +256,19 @@ export abstract class BaseModal {
     }
   }
 
-  /**
-   * Check if modal is currently open
-   */
   isOpen(): boolean {
     return this.activeModal !== null;
   }
 
-  /**
-   * Get current active modal ID
-   */
   getActiveModalId(): string | null {
     return this.activeModal;
   }
 
-  /**
-   * Cleanup and destroy modal
-   */
   destroy(): void {
+    if (this.unsubscribeLanguageChange) {
+      this.unsubscribeLanguageChange();
+    }
+
     this.close();
     document.removeEventListener('keydown', this.handleEscapeKey);
   }

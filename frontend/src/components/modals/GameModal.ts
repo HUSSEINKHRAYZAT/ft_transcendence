@@ -1,6 +1,7 @@
-// GameModal.ts - Game modal component
+// GameModal.ts - Game modal component with i18n support
 import { BaseModal } from './BaseModal';
 import { findElement, createElement } from '../../utils/DOMHelpers';
+import { t } from '../../langs/LanguageManager';
 
 interface GameConfig {
   type: string;
@@ -12,10 +13,18 @@ interface GameConfig {
 export class GameModal extends BaseModal {
   private currentMode = 0; // 0: Single, 1: Local, 2: Online, 3: Tournament
   private modes = ['single', 'local', 'online', 'tournament'];
-  private titles = ['🎮 Single Player', '🏠 Local Play', '🌐 Online Play', '🏆 Tournament'];
+
+  private getTitles() {
+    return [
+      t('🎮 Single Player'),
+      t('🏠 Local Play'),
+      t('🌐 Online Play'),
+      t('🏆 Tournament')
+    ];
+  }
 
   protected getModalTitle(): string {
-    return this.titles[this.currentMode];
+    return this.getTitles()[this.currentMode];
   }
 
   protected getModalClasses(): string {
@@ -57,10 +66,10 @@ export class GameModal extends BaseModal {
 
         <div class="flex space-x-3">
           <button type="button" id="game-cancel" class="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-4 rounded transition-all duration-300">
-            Cancel
+            ${t('Cancel')}
           </button>
           <button type="submit" id="game-start" class="flex-1 bg-lime-500 hover:bg-lime-600 text-white font-bold py-3 px-4 rounded transition-all duration-300">
-            Start Game
+            ${t('Start Game')}
           </button>
         </div>
       </form>
@@ -126,7 +135,7 @@ export class GameModal extends BaseModal {
     if (!modeContent || !modalTitle) return;
 
     // Update title
-    modalTitle.textContent = this.titles[this.currentMode];
+    modalTitle.textContent = this.getTitles()[this.currentMode];
 
     // Update dots
     const dots = document.querySelectorAll('.dot');
@@ -144,7 +153,6 @@ export class GameModal extends BaseModal {
     if (prevBtn) prevBtn.disabled = this.currentMode === 0;
     if (nextBtn) nextBtn.disabled = this.currentMode === this.modes.length - 1;
 
-    // Update content with fade effect
     modeContent.style.opacity = '0';
     setTimeout(() => {
       modeContent.innerHTML = this.getModeContent(this.modes[this.currentMode]);
@@ -162,30 +170,30 @@ export class GameModal extends BaseModal {
         return `
           <div class="space-y-4">
             <div class="text-center mb-4">
-              <p class="text-gray-300">Play against AI opponents</p>
+              <p class="text-gray-300">${t('Play against AI opponents')}</p>
             </div>
 
             <div class="bg-gray-700 rounded-lg p-4">
-              <label class="block text-sm font-medium text-gray-300 mb-3">AI Players:</label>
+              <label class="block text-sm font-medium text-gray-300 mb-3">${t('AI Players:')}</label>
               <div class="grid grid-cols-3 gap-3">
                 <div class="flex items-center space-x-2">
                   <input type="radio" id="ai-1" name="aiPlayers" value="1" class="w-4 h-4 text-lime-500 focus:ring-lime-500" checked>
-                  <label for="ai-1" class="text-sm text-gray-300 cursor-pointer">1 AI</label>
+                  <label for="ai-1" class="text-sm text-gray-300 cursor-pointer">${t('1 AI')}</label>
                 </div>
                 <div class="flex items-center space-x-2">
                   <input type="radio" id="ai-2" name="aiPlayers" value="2" class="w-4 h-4 text-lime-500 focus:ring-lime-500">
-                  <label for="ai-2" class="text-sm text-gray-300 cursor-pointer">2 AI</label>
+                  <label for="ai-2" class="text-sm text-gray-300 cursor-pointer">${t('2 AI')}</label>
                 </div>
                 <div class="flex items-center space-x-2">
                   <input type="radio" id="ai-3" name="aiPlayers" value="3" class="w-4 h-4 text-lime-500 focus:ring-lime-500">
-                  <label for="ai-3" class="text-sm text-gray-300 cursor-pointer">3 AI</label>
+                  <label for="ai-3" class="text-sm text-gray-300 cursor-pointer">${t('3 AI')}</label>
                 </div>
               </div>
             </div>
 
             <div class="bg-gray-700 rounded-lg p-4">
               <p class="text-sm text-gray-400">
-                <span class="text-lime-500">ℹ️ Note:</span> AI difficulty will be controlled from game settings
+                <span class="text-lime-500">ℹ️ ${t('Note:')}</span> ${t('AI difficulty will be controlled from game settings')}
               </p>
             </div>
           </div>
@@ -195,25 +203,25 @@ export class GameModal extends BaseModal {
         return `
           <div class="space-y-4">
             <div class="text-center mb-4">
-              <p class="text-gray-300">Play with friends on the same device</p>
+              <p class="text-gray-300">${t('Play with friends on the same device')}</p>
             </div>
 
             <div class="bg-gray-700 rounded-lg p-4">
-              <label class="block text-sm font-medium text-gray-300 mb-3">Number of Players:</label>
+              <label class="block text-sm font-medium text-gray-300 mb-3">${t('Number of Players:')}</label>
               <div class="grid grid-cols-2 gap-4">
                 <div class="border-2 border-gray-600 rounded-lg p-3 cursor-pointer transition-all duration-300 hover:border-lime-500" onclick="selectLocalPlayers(2)">
                   <div class="text-center">
                     <input type="radio" id="local-2" name="localPlayers" value="2" class="w-4 h-4 text-lime-500 focus:ring-lime-500 mb-2" checked>
-                    <div class="font-bold text-white">👥 2 Players</div>
-                    <div class="text-sm text-gray-400">Classic 1v1</div>
+                    <div class="font-bold text-white">${t('👥 2 Players')}</div>
+                    <div class="text-sm text-gray-400">${t('Classic 1v1')}</div>
                   </div>
                 </div>
 
                 <div class="border-2 border-gray-600 rounded-lg p-3 cursor-pointer transition-all duration-300 hover:border-lime-500" onclick="selectLocalPlayers(4)">
                   <div class="text-center">
                     <input type="radio" id="local-4" name="localPlayers" value="4" class="w-4 h-4 text-lime-500 focus:ring-lime-500 mb-2">
-                    <div class="font-bold text-white">👥👥 4 Players</div>
-                    <div class="text-sm text-gray-400">Tournament style</div>
+                    <div class="font-bold text-white">${t('👥👥 4 Players')}</div>
+                    <div class="text-sm text-gray-400">${t('Tournament style')}</div>
                   </div>
                 </div>
               </div>
@@ -225,22 +233,22 @@ export class GameModal extends BaseModal {
         return `
           <div class="space-y-4">
             <div class="text-center mb-4">
-              <p class="text-gray-300">Invite friends to play online</p>
+              <p class="text-gray-300">${t('Invite friends to play online')}</p>
             </div>
 
             <div class="bg-gray-700 rounded-lg p-4">
-              <h4 class="text-sm font-medium text-gray-300 mb-3">Online Friends:</h4>
+              <h4 class="text-sm font-medium text-gray-300 mb-3">${t('Online Friends:')}</h4>
               <div class="space-y-2 max-h-40 overflow-y-auto">
                 <div class="flex items-center justify-between bg-gray-600 p-2 rounded">
                   <div class="flex items-center space-x-2">
                     <div class="w-8 h-8 bg-lime-500 rounded-full flex items-center justify-center text-white font-bold text-sm">JD</div>
                     <div>
                       <p class="text-sm font-medium text-white">John Doe</p>
-                      <p class="text-xs text-green-400">● Online</p>
+                      <p class="text-xs text-green-400">● ${t('Online')}</p>
                     </div>
                   </div>
                   <button type="button" class="bg-lime-500 hover:bg-lime-600 text-white text-xs px-3 py-1 rounded transition-all duration-300" onclick="inviteFriend('john-doe')">
-                    Invite
+                    ${t('Invite')}
                   </button>
                 </div>
 
@@ -249,11 +257,11 @@ export class GameModal extends BaseModal {
                     <div class="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold text-sm">AS</div>
                     <div>
                       <p class="text-sm font-medium text-white">Alice Smith</p>
-                      <p class="text-xs text-green-400">● Online</p>
+                      <p class="text-xs text-green-400">● ${t('Online')}</p>
                     </div>
                   </div>
                   <button type="button" class="bg-lime-500 hover:bg-lime-600 text-white text-xs px-3 py-1 rounded transition-all duration-300" onclick="inviteFriend('alice-smith')">
-                    Invite
+                    ${t('Invite')}
                   </button>
                 </div>
 
@@ -262,17 +270,17 @@ export class GameModal extends BaseModal {
                     <div class="w-8 h-8 bg-purple-500 rounded-full flex items-center justify-center text-white font-bold text-sm">MB</div>
                     <div>
                       <p class="text-sm font-medium text-white">Mike Brown</p>
-                      <p class="text-xs text-green-400">● Online</p>
+                      <p class="text-xs text-green-400">● ${t('Online')}</p>
                     </div>
                   </div>
                   <button type="button" class="bg-lime-500 hover:bg-lime-600 text-white text-xs px-3 py-1 rounded transition-all duration-300" onclick="inviteFriend('mike-brown')">
-                    Invite
+                    ${t('Invite')}
                   </button>
                 </div>
               </div>
 
               <div id="invited-players" class="mt-4 hidden">
-                <p class="text-sm text-lime-400 mb-2">Invited Players:</p>
+                <p class="text-sm text-lime-400 mb-2">${t('Invited Players:')}</p>
                 <div id="invited-list" class="space-y-1"></div>
               </div>
             </div>
@@ -283,25 +291,25 @@ export class GameModal extends BaseModal {
         return `
           <div class="space-y-4">
             <div class="text-center mb-4">
-              <p class="text-gray-300">Tournament bracket play</p>
+              <p class="text-gray-300">${t('Tournament bracket play')}</p>
             </div>
 
             <div class="bg-gray-700 rounded-lg p-4">
-              <label class="block text-sm font-medium text-gray-300 mb-3">Tournament Size:</label>
+              <label class="block text-sm font-medium text-gray-300 mb-3">${t('Tournament Size:')}</label>
               <div class="grid grid-cols-2 gap-4">
                 <div class="border-2 border-gray-600 rounded-lg p-3 cursor-pointer transition-all duration-300 hover:border-lime-500" onclick="selectTournamentSize(4)">
                   <div class="text-center">
                     <input type="radio" id="tournament-4" name="tournamentSize" value="4" class="w-4 h-4 text-lime-500 focus:ring-lime-500 mb-2" checked>
-                    <div class="font-bold text-white">🏆 4 Players</div>
-                    <div class="text-sm text-gray-400">Semi + Final</div>
+                    <div class="font-bold text-white">${t('🏆 4 Players')}</div>
+                    <div class="text-sm text-gray-400">${t('Semi + Final')}</div>
                   </div>
                 </div>
 
                 <div class="border-2 border-gray-600 rounded-lg p-3 cursor-pointer transition-all duration-300 hover:border-lime-500" onclick="selectTournamentSize(8)">
                   <div class="text-center">
                     <input type="radio" id="tournament-8" name="tournamentSize" value="8" class="w-4 h-4 text-lime-500 focus:ring-lime-500 mb-2">
-                    <div class="font-bold text-white">🏆 8 Players</div>
-                    <div class="text-sm text-gray-400">Quarter + Semi + Final</div>
+                    <div class="font-bold text-white">${t('🏆 8 Players')}</div>
+                    <div class="text-sm text-gray-400">${t('Quarter + Semi + Final')}</div>
                   </div>
                 </div>
               </div>
@@ -309,27 +317,23 @@ export class GameModal extends BaseModal {
 
             <div class="bg-gray-700 rounded-lg p-4">
               <p class="text-sm text-gray-400">
-                <span class="text-lime-500">ℹ️ Note:</span> Tournament settings will be configured later
+                <span class="text-lime-500">ℹ️ ${t('Note:')}</span> ${t('Tournament settings will be configured later')}
               </p>
             </div>
           </div>
         `;
 
       default:
-        return '<div class="text-center text-gray-400">Invalid mode</div>';
+        return `<div class="text-center text-gray-400">${t('Invalid mode')}</div>`;
     }
   }
 
-  /**
-   * Setup mode-specific event handlers
-   */
   private setupModeSpecificHandlers(mode: string): void {
-    if (mode === 'online') {
-      // Global functions for online mode
+    if (mode === 'online')
+    {
       (window as any).inviteFriend = (friendId: string) => {
         console.log('📧 Inviting friend:', friendId);
 
-        // Simulate invitation acceptance (since no socket yet)
         setTimeout(() => {
           const invitedSection = findElement('#invited-players');
           const invitedList = findElement('#invited-list');
@@ -340,18 +344,18 @@ export class GameModal extends BaseModal {
             const friendName = friendId.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase());
             const invitedDiv = createElement('div', {
               className: 'text-sm text-white bg-green-600 px-2 py-1 rounded',
-              textContent: `✅ ${friendName} accepted`
+              textContent: `✅ ${friendName} ${t('accepted')}`
             });
 
             invitedList.appendChild(invitedDiv);
           }
 
-          this.showToast('success', 'Invitation Accepted!', `${friendId.replace('-', ' ')} joined the game`);
+          this.showToast('success', t('Invitation Accepted!'), t('{name} joined the game', { name: friendId.replace('-', ' ') }));
         }, 1000);
       };
     }
 
-    // Global functions for local mode
+
     (window as any).selectLocalPlayers = (count: number) => {
       const radios = document.querySelectorAll('[name="localPlayers"]');
       radios.forEach(radio => {
@@ -373,7 +377,6 @@ export class GameModal extends BaseModal {
       }
     };
 
-    // Global functions for tournament mode
     (window as any).selectTournamentSize = (size: number) => {
       const radios = document.querySelectorAll('[name="tournamentSize"]');
       radios.forEach(radio => {
@@ -396,9 +399,6 @@ export class GameModal extends BaseModal {
     };
   }
 
-  /**
-   * Handle game form submission
-   */
   private handleGameSubmit(event: Event): void {
     event.preventDefault();
 
@@ -439,7 +439,7 @@ export class GameModal extends BaseModal {
         gameConfig = {
           type: 'multi',
           status: 'online',
-          numberOfPlayers: invitedCount + 1, // +1 for current player
+          numberOfPlayers: invitedCount + 1,
           difficulty: 0
         };
         break;
@@ -458,9 +458,8 @@ export class GameModal extends BaseModal {
     console.log('🎮 Game Configuration:', gameConfig);
 
     this.close();
-    this.showToast('success', 'Game Configuration Ready!', `${mode} mode configured`);
+    this.showToast('success', t('Game Configuration Ready!'), t('{mode} mode configured', { mode }));
 
-    // Dispatch game start event
     window.dispatchEvent(new CustomEvent('game-start-requested', {
       detail: {
         gameMode: mode,
@@ -470,15 +469,12 @@ export class GameModal extends BaseModal {
     }));
   }
 
-  /**
-   * Show game modal
-   */
   showModal(): void {
     // Check if user is authenticated first
     const authToken = localStorage.getItem('ft_pong_auth_token');
     if (!authToken) {
       console.log('❌ User not authenticated, cannot show game modal');
-      this.showToast('error', 'Authentication Required', 'Please login to play the game');
+      this.showToast('error', t('Authentication Required'), t('Please login to play the game'));
       return;
     }
 

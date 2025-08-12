@@ -1,6 +1,7 @@
-// InfoModal.ts - Info modal component
+// InfoModal.ts - Info modal component with i18n support
 import { BaseModal } from './BaseModal';
 import { findElement, createElement } from '../../utils/DOMHelpers';
+import { t } from '../../langs/LanguageManager';
 
 type InfoType = 'about' | 'project' | 'home';
 
@@ -9,9 +10,9 @@ export class InfoModal extends BaseModal {
 
   protected getModalTitle(): string {
     const titles = {
-      home: 'Welcome to FT_PONG',
-      about: 'About Us',
-      project: 'Project Information'
+      home: t('Welcome to FT_PONG'),
+      about: t('About Us'),
+      project: t('Project Information')
     };
     return titles[this.currentInfoType];
   }
@@ -54,10 +55,10 @@ export class InfoModal extends BaseModal {
   private getHomeContent(): string {
     return `
       <div class="mb-6 text-gray-300">
-        Welcome to FT_PONG! Get ready for some retro gaming fun!
+        ${t('Welcome to FT_PONG! Get ready for some retro gaming fun!')}
       </div>
       <button id="info-modal-close" class="w-full bg-lime-500 hover:bg-lime-600 text-white font-bold py-2 px-4 rounded transition-all duration-300">
-        Close
+        ${t('Close')}
       </button>
     `;
   }
@@ -68,33 +69,33 @@ export class InfoModal extends BaseModal {
   private getAboutContent(): string {
     return `
       <div class="text-left mb-6">
-        <p class="mb-4 text-gray-300">We are a team of five passionate 42-Beirut developers collaborating on the FT_TRANSCENDENCE project.</p>
-        <h4 class="text-lg font-bold text-lime-500 mb-3">Our Team:</h4>
+        <p class="mb-4 text-gray-300">${t('We are a team of five passionate 42-Beirut developers collaborating on the FT_TRANSCENDENCE project.')}</p>
+        <h4 class="text-lg font-bold text-lime-500 mb-3">${t('Our Team:')}</h4>
         <ul class="list-none space-y-2 text-lime-400">
           <li class="flex items-center space-x-2">
             <img src="https://img.icons8.com/ios-filled/20/ffffff/github.png" alt="GitHub" class="w-5 h-5">
-            <a href="https://github.com/Ali-Fayad" target="_blank" class="hover:underline">Ali Fayad [ Frontend ]</a>
+            <a href="https://github.com/Ali-Fayad" target="_blank" class="hover:underline">${t('Ali Fayad [ Frontend ]')}</a>
           </li>
           <li class="flex items-center space-x-2">
             <img src="https://img.icons8.com/ios-filled/20/ffffff/github.png" alt="GitHub" class="w-5 h-5">
-            <a href="https://github.com/Fouad-Dahouk" target="_blank" class="hover:underline">Fouad Dahouk [ Socket ]</a>
+            <a href="https://github.com/Fouad-Dahouk" target="_blank" class="hover:underline">${t('Fouad Dahouk [ Socket ]')}</a>
           </li>
           <li class="flex items-center space-x-2">
             <img src="https://img.icons8.com/ios-filled/20/ffffff/github.png" alt="GitHub" class="w-5 h-5">
-            <a href="https://github.com/HUSSEINKHRAYZAT" target="_blank" class="hover:underline">Hussein Khrayzat [ Game ]</a>
+            <a href="https://github.com/HUSSEINKHRAYZAT" target="_blank" class="hover:underline">${t('Hussein Khrayzat [ Game ]')}</a>
           </li>
           <li class="flex items-center space-x-2">
             <img src="https://img.icons8.com/ios-filled/20/ffffff/github.png" alt="GitHub" class="w-5 h-5">
-            <a href="https://github.com/Husseinchr" target="_blank" class="hover:underline">Hussein Chrief [ DevOps ]</a>
+            <a href="https://github.com/Husseinchr" target="_blank" class="hover:underline">${t('Hussein Chrief [ DevOps ]')}</a>
           </li>
           <li class="flex items-center space-x-2">
             <img src="https://img.icons8.com/ios-filled/20/ffffff/github.png" alt="GitHub" class="w-5 h-5">
-            <a href="https://github.com/younes285" target="_blank" class="hover:underline">Mostafa Younes [ Backend ]</a>
+            <a href="https://github.com/younes285" target="_blank" class="hover:underline">${t('Mostafa Younes [ Backend ]')}</a>
           </li>
         </ul>
       </div>
       <button id="info-modal-close" class="w-full bg-lime-500 hover:bg-lime-600 text-white font-bold py-2 px-4 rounded transition-all duration-300">
-        Close
+        ${t('Close')}
       </button>
     `;
   }
@@ -105,7 +106,7 @@ export class InfoModal extends BaseModal {
   private getProjectContent(): string {
     return `
       <div class="text-left">
-        <p class="text-gray-300 mb-6">FT_TRANSCENDENCE is a Milestone 6 project at 42 Beirut, designed as a full-stack web application centered around a modern remake of the classic Pong game.</p>
+        <p class="text-gray-300 mb-6">${t('FT_TRANSCENDENCE is a Milestone 6 project at 42 Beirut, designed as a full-stack web application centered around a modern remake of the classic Pong game.')}</p>
 
         <!-- Carousel Container -->
         <div id="module-carousel" class="relative">
@@ -140,7 +141,7 @@ export class InfoModal extends BaseModal {
         </div>
       </div>
       <button id="info-modal-close" class="w-full bg-lime-500 hover:bg-lime-600 text-white font-bold py-2 px-4 rounded transition-all duration-300 mt-6">
-        Close
+        ${t('Close')}
       </button>
     `;
   }
@@ -266,139 +267,139 @@ export class InfoModal extends BaseModal {
   private getModuleData(module: string): { title: string; content: string } | null {
     const modules: Record<string, { title: string; content: string }> = {
       web: {
-        title: '🌐 Web Module [ 2 / 3 ]',
+        title: t('🌐 Web Module [ 2 / 3 ]'),
         content: `
           <div class="text-left space-y-3">
             <div class="bg-gray-600 p-3 rounded">
-              <span class="text-orange-400 font-bold">✅ Major:</span> Use a framework to build the backend.
+              <span class="text-orange-400 font-bold">✅ ${t('Major:')}</span> ${t('Use a framework to build the backend.')}
             </div>
             <div class="bg-gray-600 p-3 rounded">
-              <span class="text-blue-400 font-bold">✅ Minor:</span> Use a framework or a toolkit to build the frontend.
+              <span class="text-blue-400 font-bold">✅ ${t('Minor:')}</span> ${t('Use a framework or a toolkit to build the frontend.')}
             </div>
             <div class="bg-gray-600 p-3 rounded">
-              <span class="text-blue-400 font-bold">✅ Minor:</span> Use a database for the backend.
+              <span class="text-blue-400 font-bold">✅ ${t('Minor:')}</span> ${t('Use a database for the backend.')}
             </div>
             <div class="bg-gray-600 p-3 rounded">
-              <span class="text-orange-400 font-bold">❎ Major:</span> Store the score of a tournament in the Blockchain.
+              <span class="text-orange-400 font-bold">❎ ${t('Major:')}</span> ${t('Store the score of a tournament in the Blockchain.')}
             </div>
           </div>
         `
       },
       user: {
-        title: '👤 User Management [ 2 / 2 ]',
+        title: t('👤 User Management [ 2 / 2 ]'),
         content: `
           <div class="text-left space-y-3">
             <div class="bg-gray-600 p-3 rounded">
-              <span class="text-orange-400 font-bold">✅ Major:</span> Standard user management, authentication, users across tournaments.
+              <span class="text-orange-400 font-bold">✅ ${t('Major:')}</span> ${t('Standard user management, authentication, users across tournaments.')}
             </div>
             <div class="bg-gray-600 p-3 rounded">
-              <span class="text-orange-400 font-bold">✅ Major:</span> Implementing a remote authentication.
+              <span class="text-orange-400 font-bold">✅ ${t('Major:')}</span> ${t('Implementing a remote authentication.')}
             </div>
           </div>
         `
       },
       gameplay: {
-        title: '🎮 Gameplay [ 3.5 / 4.5 ]',
+        title: t('🎮 Gameplay [ 3.5 / 4.5 ]'),
         content: `
           <div class="text-left space-y-3">
             <div class="bg-gray-600 p-3 rounded">
-              <span class="text-orange-400 font-bold">✅ Major:</span> Remote players can play Pong together.
+              <span class="text-orange-400 font-bold">✅ ${t('Major:')}</span> ${t('Remote players can play Pong together.')}
             </div>
             <div class="bg-gray-600 p-3 rounded">
-              <span class="text-orange-400 font-bold">✅ Major:</span> Multiple players can play Pong at the same time.
+              <span class="text-orange-400 font-bold">✅ ${t('Major:')}</span> ${t('Multiple players can play Pong at the same time.')}
             </div>
             <div class="bg-gray-600 p-3 rounded">
-              <span class="text-blue-400 font-bold">✅ Minor:</span> Add another game with the same user management.
+              <span class="text-blue-400 font-bold">✅ ${t('Minor:')}</span> ${t('Add another game with the same user management.')}
             </div>
             <div class="bg-gray-600 p-3 rounded">
-              <span class="text-blue-400 font-bold">🔄 Minor:</span> Game customization options (half done).
+              <span class="text-blue-400 font-bold">🔄 ${t('Minor:')}</span> ${t('Game customization options (half done).')}
             </div>
             <div class="bg-gray-600 p-3 rounded">
-              <span class="text-blue-400 font-bold">❎ Minor:</span> Live chat during the game.
+              <span class="text-blue-400 font-bold">❎ ${t('Minor:')}</span> ${t('Live chat during the game.')}
             </div>
           </div>
         `
       },
       ai: {
-        title: '🧠 AI-Algorithm [ 1 / 1.5 ]',
+        title: t('🧠 AI-Algorithm [ 1 / 1.5 ]'),
         content: `
           <div class="text-left space-y-3">
             <div class="bg-gray-600 p-3 rounded">
-              <span class="text-orange-400 font-bold">✅ Major:</span> Introduce an AI opponent.
+              <span class="text-orange-400 font-bold">✅ ${t('Major:')}</span> ${t('Introduce an AI opponent.')}
             </div>
             <div class="bg-gray-600 p-3 rounded">
-              <span class="text-blue-400 font-bold">❎ Minor:</span> User and AI statistics dashboard.
+              <span class="text-blue-400 font-bold">❎ ${t('Minor:')}</span> ${t('User and AI statistics dashboard.')}
             </div>
           </div>
         `
       },
       security: {
-        title: '🔒 Cybersecurity [ 1 / 2.5 ]',
+        title: t('🔒 Cybersecurity [ 1 / 2.5 ]'),
         content: `
           <div class="text-left space-y-3">
             <div class="bg-gray-600 p-3 rounded">
-              <span class="text-orange-400 font-bold">✅ Major:</span> Implement WAF/ModSecurity with Hardened Configuration.
+              <span class="text-orange-400 font-bold">✅ ${t('Major:')}</span> ${t('Implement WAF/ModSecurity with Hardened Configuration.')}
             </div>
             <div class="bg-gray-600 p-3 rounded">
-              <span class="text-orange-400 font-bold">❎ Major:</span> GDPR Compliance Options with User Anonymization.
+              <span class="text-orange-400 font-bold">❎ ${t('Major:')}</span> ${t('GDPR Compliance Options with User Anonymization.')}
             </div>
             <div class="bg-gray-600 p-3 rounded">
-              <span class="text-blue-400 font-bold">❎ Minor:</span> Implement Two-Factor Authentication (2FA).
+              <span class="text-blue-400 font-bold">❎ ${t('Minor:')}</span> ${t('Implement Two-Factor Authentication (2FA).')}
             </div>
           </div>
         `
       },
       devops: {
-        title: '⚙️ DevOps [ 1 / 2.5 ]',
+        title: t('⚙️ DevOps [ 1 / 2.5 ]'),
         content: `
           <div class="text-left space-y-3">
             <div class="bg-gray-600 p-3 rounded">
-              <span class="text-orange-400 font-bold">✅ Major:</span> Infrastructure Setup for Log Management.
+              <span class="text-orange-400 font-bold">✅ ${t('Major:')}</span> ${t('Infrastructure Setup for Log Management.')}
             </div>
             <div class="bg-gray-600 p-3 rounded">
-              <span class="text-orange-400 font-bold">❎ Major:</span> Designing the Backend as Microservices.
+              <span class="text-orange-400 font-bold">❎ ${t('Major:')}</span> ${t('Designing the Backend as Microservices.')}
             </div>
             <div class="bg-gray-600 p-3 rounded">
-              <span class="text-blue-400 font-bold">❎ Minor:</span> Set up ELK (Elasticsearch, Logstash, Kibana) for log management.
+              <span class="text-blue-400 font-bold">❎ ${t('Minor:')}</span> ${t('Set up ELK (Elasticsearch, Logstash, Kibana) for log management.')}
             </div>
           </div>
         `
       },
       graphics: {
-        title: '🎨 Graphics [ 1 / 1 ]',
+        title: t('🎨 Graphics [ 1 / 1 ]'),
         content: `
           <div class="text-left space-y-3">
             <div class="bg-gray-600 p-3 rounded">
-              <span class="text-orange-400 font-bold">✅ Major:</span> Use of advanced 3D techniques.
+              <span class="text-orange-400 font-bold">✅ ${t('Major:')}</span> ${t('Use of advanced 3D techniques.')}
             </div>
           </div>
         `
       },
       accessibility: {
-        title: '♿ Accessibility [ 1 / 2.5 ]',
+        title: t('♿ Accessibility [ 1 / 2.5 ]'),
         content: `
           <div class="text-left space-y-3">
             <div class="bg-gray-600 p-3 rounded">
-              <span class="text-orange-400 font-bold">✅ Major:</span> Support on all devices.
+              <span class="text-orange-400 font-bold">✅ ${t('Major:')}</span> ${t('Support on all devices.')}
             </div>
             <div class="bg-gray-600 p-3 rounded">
-              <span class="text-orange-400 font-bold">❎ Major:</span> Expanding Browser Compatibility.
+              <span class="text-orange-400 font-bold">❎ ${t('Major:')}</span> ${t('Expanding Browser Compatibility.')}
             </div>
             <div class="bg-gray-600 p-3 rounded">
-              <span class="text-blue-400 font-bold">❎ Minor:</span> Multiple language supports.
+              <span class="text-blue-400 font-bold">❎ ${t('Minor:')}</span> ${t('Multiple language supports.')}
             </div>
           </div>
         `
       },
       serverside: {
-        title: '🏓 Server-Side Pong [ 0 / 2 ]',
+        title: t('🏓 Server-Side Pong [ 0 / 2 ]'),
         content: `
           <div class="text-left space-y-3">
             <div class="bg-gray-600 p-3 rounded">
-              <span class="text-orange-400 font-bold">❎ Major:</span> Replace basic Pong with server-side Pong and implement an API.
+              <span class="text-orange-400 font-bold">❎ ${t('Major:')}</span> ${t('Replace basic Pong with server-side Pong and implement an API.')}
             </div>
             <div class="bg-gray-600 p-3 rounded">
-              <span class="text-orange-400 font-bold">❎ Major:</span> Enabling Pong gameplay via CLI against web users with API integration.
+              <span class="text-orange-400 font-bold">❎ ${t('Major:')}</span> ${t('Enabling Pong gameplay via CLI against web users with API integration.')}
             </div>
           </div>
         `

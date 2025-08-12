@@ -1,13 +1,15 @@
 /**
- * Friends box component for FT_PONG
+ * Friends box component for FT_PONG with i18n support
  */
+import { languageManager, t } from '../../langs/LanguageManager';
+
 export class FriendsBox {
   private container: HTMLElement | null = null;
   private isRendered: boolean = false;
+  private unsubscribeLanguageChange?: () => void;
 
   // ---- backend + storage helpers ----
   private BASE_URL = "http://localhost:3000";
-  // adjust if your backend uses another route
   private FRIENDS_LIST_PATH = (userId: number) => `/friends/list/${userId}`;
 
   private getCurrentUser() {
@@ -51,6 +53,16 @@ export class FriendsBox {
 
   constructor() {
     this.container = document.getElementById("friends-box");
+
+    // Listen for language changes to update UI
+    this.unsubscribeLanguageChange = languageManager.onLanguageChange(() => {
+      if (this.isRendered) {
+        this.updateContent();
+        this.setupEventListeners();
+        this.refreshRequestsUI().catch(() => {});
+        this.loadAndRenderFriends().catch(() => {});
+      }
+    });
   }
 
   /**
@@ -97,20 +109,21 @@ export class FriendsBox {
    */
   private getAuthenticatedContent(): string {
     return `
-      <h3 class="text-xl font-bold mb-4 text-lime-500">👥 Friends</h3>
+      <h3 class="text-xl font-bold mb-4 text-lime-500">👥 ${t('Friends')}</h3>
 
       <div id="friends-list" class="space-y-3">
         <div id="friends-empty" class="text-sm text-gray-400">
-          No friends yet.
+          ${t('No friends yet.')}
         </div>
       </div>
 
       <div class="mt-4 flex gap-2">
         <button id="add-friend" class="flex-1 bg-dark-green-600 hover:bg-dark-green-700 text-white text-sm font-bold py-2 px-3 rounded transition-all duration-300">
-          Add Friend
+          ${t('Add Friend')}
         </button>
         <button id="friend-requests" class="flex-1 bg-gray-600 hover:bg-gray-700 text-white text-sm font-bold py-2 px-3 rounded transition-all duration-300">
-          Requests <span id="req-count-badge" class="inline-block ml-1 px-2 py-0.5 rounded bg-gray-800 text-white text-xs align-middle">0</span>
+          ${t('Requests')}
+          <span id="req-count-badge" class="inline-block ml-1 px-2 py-0.5 rounded bg-gray-800 text-white text-xs align-middle">0</span>
         </button>
       </div>
 
@@ -118,11 +131,11 @@ export class FriendsBox {
       <div class="mt-2 flex gap-2">
         <button id="remove-friend"
           class="flex-1 bg-red-600 hover:bg-red-700 text-white text-sm font-bold py-2 px-3 rounded transition-all duration-300">
-          Remove Friend
+          ${t('Remove Friend')}
         </button>
         <button id="block-user"
           class="flex-1 bg-gray-800 hover:bg-black text-white text-sm font-bold py-2 px-3 rounded transition-all duration-300">
-          Block User
+          ${t('Block User')}
         </button>
       </div>
 
@@ -136,17 +149,14 @@ export class FriendsBox {
    */
   private getUnauthenticatedContent(): string {
     return `
-      <h3 class="text-xl font-bold mb-4 text-lime-500">👥 Friends</h3>
-      <p class="text-gray-400">Please log in to view friends</p>
+      <h3 class="text-xl font-bold mb-4 text-lime-500">👥 ${t('Friends')}</h3>
+      <p class="text-gray-400">${t('Please log in to view friends')}</p>
       <button id="friends-signin" class="mt-4 bg-lime-500 hover:bg-lime-600 text-white font-bold py-2 px-4 rounded transition-all duration-300">
-        Sign In
+        ${t('Sign In')}
       </button>
     `;
   }
 
-  /**
-   * Setup event listeners
-   */
   private setupEventListeners(): void {
     const signinBtn = document.getElementById("friends-signin");
     const addFriendBtn = document.getElementById("add-friend");
@@ -169,17 +179,17 @@ export class FriendsBox {
     if (removeBtn) {
       removeBtn.addEventListener("click", async () => {
         const me = this.getCurrentUser();
-        if (!me?.id) return alert("Please sign in first.");
-        const email = prompt("Enter friend's email to remove:");
+        if (!me?.id) return alert(t('Please sign in first.'));
+        const email = prompt(t('Enter friends email to remove:'));
         if (!email) return;
         try {
           const otherId = await this.findUserIdByEmail(email);
-          if (!otherId) return alert("No user found with that email.");
+          if (!otherId) return alert(t('No user found with that email.'));
           await this.removeFriend(otherId);
-          alert("🗑️ Friend removed");
+          alert(t('🗑️ Friend removed'));
           await this.loadAndRenderFriends(); // refresh list
         } catch (e: any) {
-          alert("Failed to remove: " + (e?.message || "unknown error"));
+          alert(t('Failed to remove:') + ' ' + (e?.message || t('unknown error')));
         }
       });
     }
@@ -187,17 +197,17 @@ export class FriendsBox {
     if (blockBtn) {
       blockBtn.addEventListener("click", async () => {
         const me = this.getCurrentUser();
-        if (!me?.id) return alert("Please sign in first.");
-        const email = prompt("Enter user's email to block:");
+        if (!me?.id) return alert(t('Please sign in first.'));
+        const email = prompt(t('Enter users email to block:'));
         if (!email) return;
         try {
           const otherId = await this.findUserIdByEmail(email);
-          if (!otherId) return alert("No user found with that email.");
+          if (!otherId) return alert(t('No user found with that email.'));
           await this.blockUser(otherId);
-          alert("⛔ User blocked");
+          alert(t('⛔ User blocked'));
           await this.loadAndRenderFriends(); // refresh list
         } catch (e: any) {
-          alert("Failed to block: " + (e?.message || "unknown error"));
+          alert(t('Failed to block:') + ' ' + (e?.message || t('unknown error')));
         }
       });
     }
@@ -212,7 +222,7 @@ export class FriendsBox {
       (window as any).modalService.showLoginModal();
     } else {
       console.error("❌ Modal service not available");
-      alert("Login - Modal service not loaded");
+      alert(t('Login - Modal service not loaded'));
     }
   }
 
@@ -222,41 +232,38 @@ export class FriendsBox {
   private async showAddFriendModal(): Promise<void> {
     const me = this.getCurrentUser();
     if (!me?.id) {
-      alert("Please sign in first.");
+      alert(t('Please sign in first.'));
       return;
     }
 
-    const friendEmail = prompt("Enter friend's email:");
+    const friendEmail = prompt(t('Enter friends email:'));
     if (!friendEmail) return;
 
     try {
       const toUserId = await this.findUserIdByEmail(friendEmail);
       if (!toUserId) {
-        alert("No user found with this email.");
+        alert(t('No user found with this email.'));
         return;
       }
       if (toUserId === me.id) {
-        alert("You can’t add yourself 🙂");
+        alert(t('You cant add yourself 🙂'));
         return;
       }
 
       const body = JSON.stringify({ fromUserId: me.id, toUserId });
       await this.apiFetch("/friends/request", { method: "POST", body });
-      alert("✅ Friend request sent!");
+      alert(t('✅ Friend request sent!'));
       await this.refreshRequestsUI();
     } catch (err: any) {
       console.error(err);
-      alert("❌ Could not send request: " + err.message);
+      alert(t('❌ Could not send request:') + ' ' + err.message);
     }
   }
 
-  /**
-   * Requests modal (Accept works; refreshes badge and list)
-   */
   private async openRequestsModal(): Promise<void> {
     const me = this.getCurrentUser();
     if (!me?.id) {
-      alert("Please sign in first.");
+      alert(t('Please sign in first.'));
       return;
     }
 
@@ -264,7 +271,7 @@ export class FriendsBox {
     try {
       pending = await this.apiFetch(`/friends/pending/${me.id}`);
     } catch (e: any) {
-      alert("Failed to load requests: " + (e?.message || "unknown error"));
+      alert(t('Failed to load requests:') + ' ' + (e?.message || t('unknown error')));
       return;
     }
 
@@ -273,20 +280,20 @@ export class FriendsBox {
 
     const listItems =
       pending.length === 0
-        ? `<p class="text-sm text-gray-300">No pending requests.</p>`
+        ? `<p class="text-sm text-gray-300">${t('No pending requests.')}</p>`
         : pending
             .map(
               (r) => `
           <div class="flex items-center justify-between bg-gray-700 rounded p-3">
             <div class="text-sm text-white">
-              <span class="font-semibold">Request from:</span>
+              <span class="font-semibold">${t('Request from:')}</span>
               <span>#${r.requesterId}</span>
               <span class="ml-2 text-xs text-gray-300">[${r.status}]</span>
             </div>
             <div class="flex gap-2">
               <button data-requester="${r.requesterId}"
                 class="req-accept bg-lime-600 hover:bg-lime-700 text-white text-xs font-bold px-3 py-1 rounded">
-                Accept
+                ${t('Accept')}
               </button>
             </div>
           </div>`
@@ -298,10 +305,10 @@ export class FriendsBox {
            class="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
         <div class="w-11/12 max-w-md bg-gray-800 rounded-2xl p-5 shadow-xl">
           <div class="flex items-center justify-between mb-3">
-            <h4 class="text-lg font-bold text-white">Friend Requests</h4>
+            <h4 class="text-lg font-bold text-white">${t('Friend Requests')}</h4>
             <button id="req-close"
               class="text-white bg-gray-700 hover:bg-gray-600 rounded px-3 py-1 text-sm">
-              Close
+              ${t('Close')}
             </button>
           </div>
           <div class="space-y-3 max-h-80 overflow-auto">
@@ -335,10 +342,10 @@ export class FriendsBox {
           await this.refreshRequestsUI();
           await this.loadAndRenderFriends(); // accepted -> becomes friend
           this.closeRequestsModal();
-          alert("✅ Request accepted!");
+          alert(t('✅ Request accepted!'));
         } catch (err: any) {
           console.error(err);
-          alert("❌ Could not accept: " + err.message);
+          alert(t('❌ Could not accept:') + ' ' + err.message);
         }
       }
     });
@@ -362,10 +369,6 @@ export class FriendsBox {
 
   /**
    * Load & render friends from backend
-   * Expected server shape (example):
-   * [
-   *   { id: 12, username: "alice", FirstName: "Alice", lastName: "Smith", status: "online" }
-   * ]
    */
   private async loadAndRenderFriends(): Promise<void> {
     const me = this.getCurrentUser();
@@ -375,7 +378,6 @@ export class FriendsBox {
     const emptyEl = this.container.querySelector("#friends-empty") as HTMLElement | null;
     if (!listEl) return;
 
-    // clear all friend cards (but keep empty label for now)
     listEl.querySelectorAll(".friend-card").forEach((n) => n.remove());
 
     try {
@@ -383,7 +385,10 @@ export class FriendsBox {
       const arr: any[] = Array.isArray(friends) ? friends : [];
 
       if (arr.length === 0) {
-        if (emptyEl) emptyEl.style.display = "block";
+        if (emptyEl) {
+          emptyEl.style.display = "block";
+          emptyEl.textContent = t('No friends yet.');
+        }
         return;
       }
       if (emptyEl) emptyEl.style.display = "none";
@@ -396,7 +401,7 @@ export class FriendsBox {
       console.error("Failed to load friends:", e);
       if (emptyEl) {
         emptyEl.style.display = "block";
-        emptyEl.textContent = "Could not load friends.";
+        emptyEl.textContent = t("Could not load friends.");
       }
     }
   }
@@ -422,16 +427,16 @@ export class FriendsBox {
           <div class="ml-3">
             <p class="text-sm font-medium text-white">${this.escape(displayName)}</p>
             <p class="text-xs ${isOnline ? "text-green-400" : "text-gray-400"}">
-              ● ${isOnline ? "Online" : "Offline"}
+              ● ${t(isOnline ? "Online" : "Offline")}
             </p>
           </div>
         </div>
         <button
           class="${isOnline ? "bg-lime-500 hover:bg-lime-600" : "bg-gray-600 cursor-not-allowed"} text-white text-xs px-3 py-1 rounded transition-all duration-300"
           ${isOnline ? "" : "disabled"}
-          title="${isOnline ? "Invite to play" : "User is offline"}"
+          title="${t(isOnline ? "Invite to play" : "User is offline")}"
         >
-          ${isOnline ? "Invite" : "Offline"}
+          ${t(isOnline ? "Invite" : "Offline")}
         </button>
       </div>
     `;
@@ -469,6 +474,11 @@ export class FriendsBox {
    * Cleanup component resources
    */
   destroy(): void {
+    // Unsubscribe from language changes
+    if (this.unsubscribeLanguageChange) {
+      this.unsubscribeLanguageChange();
+    }
+
     if (this.container) {
       this.container.innerHTML = "";
     }
@@ -476,13 +486,10 @@ export class FriendsBox {
     console.log("🧹 FriendsBox component destroyed");
   }
 
-  // ------------------------------
-  // Backend calls for friends ops
-  // ------------------------------
-
   private async removeFriend(otherUserId: number) {
     const me = this.getCurrentUser();
-    if (!me?.id) return alert("Please sign in first.");
+    if (!me?.id)
+      return alert(t('Please sign in first.'));
     await this.apiFetch("/friends/remove", {
       method: "POST",
       body: JSON.stringify({ userId: me.id, otherUserId }),
@@ -491,7 +498,8 @@ export class FriendsBox {
 
   private async blockUser(otherUserId: number) {
     const me = this.getCurrentUser();
-    if (!me?.id) return alert("Please sign in first.");
+    if (!me?.id)
+      return alert(t('Please sign in first.'));
     await this.apiFetch("/friends/block", {
       method: "POST",
       body: JSON.stringify({ userId: me.id, otherUserId }),

@@ -1,7 +1,8 @@
-// LoginModal.ts - Login modal component
+// LoginModal.ts - Login modal component with i18n support
 import { BaseModal } from './BaseModal';
 import { authService } from '../../services/AuthService';
 import { findElement } from '../../utils/DOMHelpers';
+import { t } from '../../langs/LanguageManager';
 
 export class LoginModal extends BaseModal {
   private onSwitchToSignup?: () => void;
@@ -12,34 +13,33 @@ export class LoginModal extends BaseModal {
   }
 
   protected getModalTitle(): string {
-    return 'Login';
+    return t('Login');
   }
 
-  protected getModalContent(): string
-  {
+  protected getModalContent(): string {
     return `
       <form id="login-form">
         <div class="mb-4">
-          <label class="block text-sm font-medium text-gray-300 mb-2">Email / Username (it will be handlet later)</label>
+          <label class="block text-sm font-medium text-gray-300 mb-2">${t('Email / Username')}</label>
           <input type="email" id="login-email" required
                  class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:border-lime-500 focus:ring-1 focus:ring-lime-500 transition-colors duration-300"
-                 placeholder="Enter your email or username">
+                 placeholder="${t('Enter your email or username')}">
         </div>
         <div class="mb-6">
-          <label class="block text-sm font-medium text-gray-300 mb-2">Password</label>
+          <label class="block text-sm font-medium text-gray-300 mb-2">${t('Password')}</label>
           <input type="password" id="login-password" required
                  class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:border-lime-500 focus:ring-1 focus:ring-lime-500 transition-colors duration-300"
-                 placeholder="Enter your password">
+                 placeholder="${t('Enter your password')}">
         </div>
         <div id="login-error" class="hidden mb-4 p-3 bg-red-900/50 border border-red-500 rounded text-red-200 text-sm"></div>
         <button type="submit" id="login-submit"
                 class="w-full bg-lime-500 hover:bg-lime-600 text-white font-bold py-2 px-4 rounded transition-all duration-300 mb-4">
-          Login
+          ${t('Login')}
         </button>
       </form>
       <div class="text-center">
-        <p class="text-gray-400">Don't have an account?
-          <button id="switch-to-signup" class="text-lime-500 hover:text-lime-400 transition-colors duration-300">Sign up</button>
+        <p class="text-gray-400">${t("Don't have an account?")}
+          <button id="switch-to-signup" class="text-lime-500 hover:text-lime-400 transition-colors duration-300">${t('Sign up')}</button>
         </p>
         <div class="mt-4 pt-4 border-t border-gray-700">
           <button id="google-login" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded transition-all duration-300 flex items-center justify-center space-x-2 mb-2">
@@ -49,7 +49,7 @@ export class LoginModal extends BaseModal {
               <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
               <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
             </svg>
-            <span>Sign in with Google</span>
+            <span>${t('Sign in with Google')}</span>
           </button>
         </div>
       </div>
@@ -95,7 +95,7 @@ export class LoginModal extends BaseModal {
     console.log('🌐 Google login clicked...');
 
     // Show temporary message
-    this.showToast('info', 'Google Authentication', 'Google OAuth will be implemented in the next version!');
+    this.showToast('info', t('Google Authentication'), t('Google OAuth will be implemented in the next version!'));
 
     // For demo purposes, create a Google user after 2 seconds
     setTimeout(() => {
@@ -111,7 +111,7 @@ export class LoginModal extends BaseModal {
       localStorage.setItem('ft_pong_user_data', JSON.stringify(googleUser));
 
       this.close();
-      this.showToast('success', 'Google Authentication', `Welcome ${googleUser.firstName}!`);
+      this.showToast('success', t('Google Authentication'), t('Welcome {name}!', { name: googleUser.firstName }));
 
       // Trigger auth state update
       this.triggerAuthUpdate(true, googleUser);
@@ -139,7 +139,7 @@ export class LoginModal extends BaseModal {
 
     // Disable form during submission
     submitBtn.disabled = true;
-    submitBtn.textContent = 'Logging in...';
+    submitBtn.textContent = t('Logging in...');
 
     try {
       // Check if authService is available, otherwise use fallback
@@ -148,11 +148,11 @@ export class LoginModal extends BaseModal {
 
         if (result.success) {
           this.close();
-          this.showToast('success', 'Welcome back!', `Hello ${result.user?.firstName}!`);
+          this.showToast('success', t('Welcome back!'), t('Hello {name}!', { name: result.user?.firstName }));
           // Trigger auth state update
           this.triggerAuthUpdate(true, result.user);
         } else {
-          this.showError('login-error', result.message || 'Login failed');
+          this.showError('login-error', result.message || t('Login failed'));
         }
       } else {
         // Fallback login logic (same as in main.ts)
@@ -168,20 +168,20 @@ export class LoginModal extends BaseModal {
           localStorage.setItem('ft_pong_user_data', JSON.stringify(userData));
 
           this.close();
-          this.showToast('success', 'Welcome back!', 'Hello Demo!');
+          this.showToast('success', t('Welcome back!'), t('Hello Demo!'));
 
           // Trigger auth state update
           this.triggerAuthUpdate(true, userData);
         } else {
-          this.showError('login-error', 'Invalid credentials. Try: demo@ftpong.com / demo123');
+          this.showError('login-error', t('Invalid credentials. Try: demo@ftpong.com / demo123'));
         }
       }
     } catch (error) {
       console.error('Login error:', error);
-      this.showError('login-error', 'An unexpected error occurred');
+      this.showError('login-error', t('An unexpected error occurred'));
     } finally {
       submitBtn.disabled = false;
-      submitBtn.textContent = 'Login';
+      submitBtn.textContent = t('Login');
     }
   }
 

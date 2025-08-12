@@ -1,6 +1,7 @@
-// MiniModal.ts - Mini modal component that extends BaseModal
+// MiniModal.ts - Mini modal component with i18n support
 import { BaseModal } from './BaseModal';
 import { findElement } from '../../utils/DOMHelpers';
+import { t } from '../../langs/LanguageManager';
 
 type MiniModalType = 'logout' | 'add' | 'confirm' | 'delete';
 
@@ -8,7 +9,7 @@ interface MiniModalConfig {
   type: MiniModalType;
   message: string;
   title?: string;
-  placeholder?: string; // For 'add' type
+  placeholder?: string;
   confirmText?: string;
   cancelText?: string;
   inputType?: 'text' | 'email' | 'password';
@@ -21,20 +22,19 @@ export class MiniModal extends BaseModal {
   private config: MiniModalConfig | null = null;
 
   protected getModalTitle(): string {
-    if (!this.config) return 'Confirm';
+    if (!this.config) return t('Confirm');
 
     const defaultTitles = {
-      logout: 'Confirm Logout',
-      add: 'Add Item',
-      confirm: 'Confirm Action',
-      delete: 'Confirm Delete'
+      logout: t('Confirm Logout'),
+      add: t('Add Item'),
+      confirm: t('Confirm Action'),
+      delete: t('Confirm Delete')
     };
 
     return this.config.title || defaultTitles[this.config.type];
   }
 
   protected getModalClasses(): string {
-    // Smaller modal for mini modals
     return 'bg-gray-800 rounded-lg shadow-2xl max-w-sm w-full mx-4 p-6 transform transition-all duration-300 scale-95 opacity-0 border border-gray-700';
   }
 
@@ -42,8 +42,6 @@ export class MiniModal extends BaseModal {
     if (!this.config) return '';
 
     const { type, message, placeholder, confirmText, cancelText, inputType, required } = this.config;
-
-    // Get icon and colors based on type
     const typeConfig = this.getTypeConfig(type);
 
     if (type === 'add') {
@@ -57,25 +55,24 @@ export class MiniModal extends BaseModal {
             <input
               type="${inputType || 'text'}"
               id="mini-modal-input"
-              placeholder="${placeholder || 'Enter value...'}"
+              placeholder="${placeholder || t('Enter value...')}"
               class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-lime-500 focus:ring-1 focus:ring-lime-500 transition-colors duration-300 mb-4"
               ${required !== false ? 'required' : ''}
             >
             <div class="flex space-x-3">
               <button type="button" id="mini-modal-cancel" class="flex-1 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors duration-300">
-                ${cancelText || 'Cancel'}
+                ${cancelText || t('Cancel')}
               </button>
               <button type="submit" id="mini-modal-confirm" class="flex-1 px-4 py-2 ${typeConfig.confirmBtn} text-white rounded-lg transition-colors duration-300">
-                ${confirmText || 'Add'}
+                ${confirmText || t('Add')}
               </button>
             </div>
           </form>
         </div>
       `;
     } else {
-      // Confirmation type modals (logout, confirm, delete)
-      const defaultConfirmText = type === 'logout' ? 'Yes, Logout' :
-                                 type === 'delete' ? 'Yes, Delete' : 'Confirm';
+      const defaultConfirmText = type === 'logout' ? t('Yes, Logout') :
+                               type === 'delete' ? t('Yes, Delete') : t('Confirm');
 
       return `
         <div class="text-center">
@@ -85,7 +82,7 @@ export class MiniModal extends BaseModal {
           <p class="text-gray-300 mb-6">${message}</p>
           <div class="flex space-x-3">
             <button id="mini-modal-cancel" class="flex-1 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors duration-300">
-              ${cancelText || 'Cancel'}
+              ${cancelText || t('Cancel')}
             </button>
             <button id="mini-modal-confirm" class="flex-1 px-4 py-2 ${typeConfig.confirmBtn} text-white rounded-lg transition-colors duration-300">
               ${confirmText || defaultConfirmText}
@@ -102,12 +99,11 @@ export class MiniModal extends BaseModal {
     const input = findElement('#mini-modal-input') as HTMLInputElement;
     const form = findElement('#mini-modal-form') as HTMLFormElement;
 
-    // Handle confirm
     const handleConfirm = () => {
       if (this.config?.type === 'add') {
         const value = input?.value.trim();
         if (this.config.required !== false && !value) {
-          this.showError('mini-modal-input', 'This field is required');
+          this.showError('mini-modal-input', t('This field is required'));
           return;
         }
         this.config.onConfirm?.(value);
@@ -117,20 +113,13 @@ export class MiniModal extends BaseModal {
       this.close();
     };
 
-    // Handle cancel
     const handleCancel = () => {
       this.config?.onCancel?.();
       this.close();
     };
 
-    // Event listeners
-    if (confirmBtn) {
-      confirmBtn.addEventListener('click', handleConfirm);
-    }
-
-    if (cancelBtn) {
-      cancelBtn.addEventListener('click', handleCancel);
-    }
+    if (confirmBtn) confirmBtn.addEventListener('click', handleConfirm);
+    if (cancelBtn) cancelBtn.addEventListener('click', handleCancel);
 
     if (form) {
       form.addEventListener('submit', (e) => {
@@ -139,28 +128,19 @@ export class MiniModal extends BaseModal {
       });
     }
 
-    // Focus input for 'add' type
     if (this.config?.type === 'add' && input) {
-      setTimeout(() => {
-        input.focus();
-      }, 100);
+      setTimeout(() => input.focus(), 100);
     }
 
-    // Clear any previous input errors on typing
     if (input) {
       input.addEventListener('input', () => {
         input.classList.remove('border-red-500');
         const errorMsg = input.parentElement?.querySelector('.error-message');
-        if (errorMsg) {
-          errorMsg.remove();
-        }
+        if (errorMsg) errorMsg.remove();
       });
     }
   }
 
-  /**
-   * Get configuration for different modal types
-   */
   private getTypeConfig(type: MiniModalType) {
     const configs = {
       logout: {
@@ -196,21 +176,13 @@ export class MiniModal extends BaseModal {
     return configs[type];
   }
 
-  /**
-   * Show error for input validation
-   */
   private showError(inputId: string, message: string): void {
     const input = findElement(`#${inputId}`) as HTMLInputElement;
     if (input) {
       input.classList.add('border-red-500');
-
-      // Remove existing error message
       const existingError = input.parentElement?.querySelector('.error-message');
-      if (existingError) {
-        existingError.remove();
-      }
+      if (existingError) existingError.remove();
 
-      // Add new error message
       const errorDiv = document.createElement('div');
       errorDiv.className = 'error-message text-red-400 text-sm mt-1';
       errorDiv.textContent = message;
@@ -218,31 +190,17 @@ export class MiniModal extends BaseModal {
     }
   }
 
-  /**
-   * Show mini modal with configuration
-   */
   showModal(config: MiniModalConfig): void {
     this.config = config;
-
-    // Make sure the title is set before calling show
-    console.log('🔍 MiniModal config:', config);
-    console.log('🔍 MiniModal title will be:', this.getModalTitle());
-
     this.show(`mini-${config.type}`);
   }
 
-  /**
-   * Static method for quick usage (similar to confirm/prompt)
-   */
   static show(config: MiniModalConfig): MiniModal {
     const miniModal = new MiniModal();
     miniModal.showModal(config);
     return miniModal;
   }
 
-  /**
-   * Override close to reset config
-   */
   close(): void {
     super.close();
     this.config = null;

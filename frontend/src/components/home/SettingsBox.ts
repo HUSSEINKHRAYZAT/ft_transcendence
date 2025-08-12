@@ -1,13 +1,21 @@
-/**
- * Settings box component for FT_PONG
- */
-export class SettingsBox {
+import { languageManager, t, SUPPORTED_LANGUAGES } from '../../langs/LanguageManager';
+
+export class SettingsBox
+{
   private container: HTMLElement | null = null;
   private isRendered: boolean = false;
+  private unsubscribeLanguageChange?: () => void;
 
   constructor() {
     this.container = document.getElementById('settings-box');
     this.applySavedLanguage();
+
+    this.unsubscribeLanguageChange = languageManager.onLanguageChange(() => {
+      if (this.isRendered) {
+        this.updateContent();
+        this.setupEventListeners();
+      }
+    });
   }
 
   async render(): Promise<void> {
@@ -45,42 +53,44 @@ export class SettingsBox {
     const settings = this.loadSettings();
 
     return `
-      <h3 class="text-xl font-bold mb-4 text-lime-500">⚙️ Settings</h3>
+      <h3 class="text-xl font-bold mb-4 text-lime-500">⚙️ ${t('Settings')}</h3>
       <div class="space-y-4">
         <div class="bg-gray-700 p-3 rounded">
           <div class="flex items-center justify-between">
-            <label class="text-sm font-medium text-gray-300">Sound Effects</label>
+            <label class="text-sm font-medium text-gray-300">${t('Sound Effects')}</label>
             <input type="checkbox" id="sound-toggle" ${settings.soundEnabled ? 'checked' : ''}
                    class="toggle-checkbox bg-gray-600 border-gray-500 rounded focus:ring-lime-500">
           </div>
         </div>
         <div class="bg-gray-700 p-3 rounded">
           <div class="flex items-center justify-between">
-            <label class="text-sm font-medium text-gray-300">Background Music</label>
+            <label class="text-sm font-medium text-gray-300">${t('Background Music')}</label>
             <input type="checkbox" id="music-toggle" ${settings.musicEnabled ? 'checked' : ''}
                    class="toggle-checkbox bg-gray-600 border-gray-500 rounded focus:ring-lime-500">
           </div>
         </div>
         <div class="bg-gray-700 p-3 rounded">
-          <label class="text-sm font-medium text-gray-300 block mb-2">Game Difficulty</label>
+          <label class="text-sm font-medium text-gray-300 block mb-2">${t('Game Difficulty')}</label>
           <select id="difficulty-select" class="w-full bg-gray-600 border border-gray-500 rounded text-white p-2 focus:border-lime-500 focus:ring-1 focus:ring-lime-500">
-            <option value="easy" ${settings.difficulty === 'easy' ? 'selected' : ''}>Easy</option>
-            <option value="medium" ${settings.difficulty === 'medium' ? 'selected' : ''}>Medium</option>
-            <option value="hard" ${settings.difficulty === 'hard' ? 'selected' : ''}>Hard</option>
-            <option value="expert" ${settings.difficulty === 'expert' ? 'selected' : ''}>Expert</option>
+            <option value="easy" ${settings.difficulty === 'easy' ? 'selected' : ''}>${t('Easy')}</option>
+            <option value="medium" ${settings.difficulty === 'medium' ? 'selected' : ''}>${t('Medium')}</option>
+            <option value="hard" ${settings.difficulty === 'hard' ? 'selected' : ''}>${t('Hard')}</option>
+            <option value="expert" ${settings.difficulty === 'expert' ? 'selected' : ''}>${t('Expert')}</option>
           </select>
         </div>
         <div class="bg-gray-700 p-3 rounded">
-          <label class="text-sm font-medium text-gray-300 block mb-2">Language</label>
+          <label class="text-sm font-medium text-gray-300 block mb-2">${t('Language')}</label>
           <select id="language-select" class="w-full bg-gray-600 border border-gray-500 rounded text-white p-2 focus:border-lime-500 focus:ring-1 focus:ring-lime-500">
-            <option value="eng" ${settings.language === 'eng' ? 'selected' : ''}>English</option>
-            <option value="fr" ${settings.language === 'fr' ? 'selected' : ''}>Français</option>
-            <option value="span" ${settings.language === 'span' ? 'selected' : ''}>Español</option>
+            ${SUPPORTED_LANGUAGES.map(lang => `
+              <option value="${lang.code}" ${settings.language === lang.code ? 'selected' : ''}>
+                ${lang.flag} ${lang.nativeName}
+              </option>
+            `).join('')}
           </select>
         </div>
         <div class="bg-gray-700 p-3 rounded">
           <div class="flex items-center justify-between">
-            <label class="text-sm font-medium text-gray-300">Animations</label>
+            <label class="text-sm font-medium text-gray-300">${t('Animations')}</label>
             <input type="checkbox" id="animations-toggle" ${settings.animationsEnabled !== false ? 'checked' : ''}
                    class="toggle-checkbox bg-gray-600 border-gray-500 rounded focus:ring-lime-500">
           </div>
@@ -88,10 +98,10 @@ export class SettingsBox {
       </div>
       <div class="mt-4 flex gap-2">
         <button id="save-settings" class="flex-1 bg-lime-500 hover:bg-lime-600 text-white font-bold py-2 px-4 rounded transition-all duration-300">
-          Save Settings
+          ${t('Save Settings')}
         </button>
         <button id="reset-settings" class="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded transition-all duration-300">
-          Reset
+          ${t('Reset')}
         </button>
       </div>
     `;
@@ -99,10 +109,10 @@ export class SettingsBox {
 
   private getUnauthenticatedContent(): string {
     return `
-      <h3 class="text-xl font-bold mb-4 text-lime-500">⚙️ Settings</h3>
-      <p class="text-gray-400">Please log in to access settings</p>
+      <h3 class="text-xl font-bold mb-4 text-lime-500">⚙️ ${t('Settings')}</h3>
+      <p class="text-gray-400">${t('Please log in to access settings')}</p>
       <button id="settings-signin" class="mt-4 bg-lime-500 hover:bg-lime-600 text-white font-bold py-2 px-4 rounded transition-all duration-300">
-        Sign In
+        ${t('Sign In')}
       </button>
     `;
   }
@@ -143,9 +153,17 @@ export class SettingsBox {
 
     if (languageSelect) {
       languageSelect.addEventListener('change', (e) => {
-        const language = (e.target as HTMLSelectElement).value;
+        const language = (e.target as HTMLSelectElement).value as any;
+        console.log(`🌍 Language selection changed to: ${language}`);
+
+        // Update setting first
         this.updateSetting('language', language);
-        console.log(`🌍 Language changed to: ${language}`);
+
+        // Then update language manager (this will trigger UI updates)
+        languageManager.setLanguage(language);
+
+        // Show notification
+        this.showLanguageChangeNotification(language);
       });
     }
 
@@ -189,8 +207,57 @@ export class SettingsBox {
 
   private applySavedLanguage(): void {
     const settings = this.loadSettings();
-    // You can use settings.language later to apply UI translations
-    console.log(`🌍 Loaded language: ${settings.language}`);
+    if (settings.language && languageManager.getCurrentLanguage() !== settings.language) {
+      languageManager.setLanguage(settings.language);
+    }
+    console.log(`🌍 Applied saved language: ${settings.language}`);
+  }
+
+  private showLanguageChangeNotification(language: string): void {
+    const langInfo = SUPPORTED_LANGUAGES.find(l => l.code === language);
+    if (!langInfo) return;
+
+    const message = `${t('Language changed to')} ${langInfo.nativeName}`;
+
+    if ((window as any).modalService?.showToast) {
+      (window as any).modalService.showToast('success', t('Language Changed'), message);
+    } else {
+      // Fallback notification
+      this.showBasicToast('success', message);
+    }
+  }
+
+  private showBasicToast(type: 'success' | 'info' | 'error', message: string): void {
+    const colors = {
+      success: 'bg-green-600',
+      info: 'bg-blue-600',
+      error: 'bg-red-600'
+    };
+
+    const icons = {
+      success: '✅',
+      info: 'ℹ️',
+      error: '❌'
+    };
+
+    const toast = document.createElement('div');
+    toast.className = `fixed top-20 right-4 z-50 ${colors[type]} text-white p-4 rounded-lg shadow-lg transform transition-all duration-300`;
+
+    toast.innerHTML = `
+      <div class="flex items-center">
+        <span class="text-xl mr-3">${icons[type]}</span>
+        <span>${message}</span>
+        <button onclick="this.parentElement.parentElement.remove()" class="ml-3 text-white hover:text-gray-200">✕</button>
+      </div>
+    `;
+
+    document.body.appendChild(toast);
+
+    setTimeout(() => {
+      if (toast.parentElement) {
+        toast.remove();
+      }
+    }, 3000);
   }
 
   private toggleAnimations(enabled: boolean): void {
@@ -202,24 +269,34 @@ export class SettingsBox {
   }
 
   private saveSettings(): void {
+    const message = t('All settings have been saved successfully!');
+
     if ((window as any).modalService?.showToast) {
-      (window as any).modalService.showToast('success', 'Settings Saved', 'All settings have been saved successfully!');
+      (window as any).modalService.showToast('success', t('Settings Saved'), message);
     } else {
-      alert('Settings saved successfully!');
+      alert(message);
     }
   }
 
   private resetSettings(): void {
-    if (confirm('Are you sure you want to reset all settings to default?')) {
+    const confirmMessage = t('Are you sure you want to reset all settings to default?');
+
+    if (confirm(confirmMessage)) {
       localStorage.removeItem('ft_pong_game_settings');
       this.toggleAnimations(true);
+
+      // Reset language to default
+      languageManager.setLanguage('eng');
+
       this.updateContent();
       this.setupEventListeners();
 
+      const message = t('All settings have been reset to default values.');
+
       if ((window as any).modalService?.showToast) {
-        (window as any).modalService.showToast('info', 'Settings Reset', 'All settings have been reset to default values.');
+        (window as any).modalService.showToast('info', t('Settings Reset'), message);
       } else {
-        alert('Settings reset to default!');
+        alert(message);
       }
     }
   }
@@ -245,11 +322,14 @@ export class SettingsBox {
   }
 
   getCurrentLanguage(): string {
-    const settings = this.loadSettings();
-    return settings.language;
+    return languageManager.getCurrentLanguage();
   }
 
   destroy(): void {
+    if (this.unsubscribeLanguageChange) {
+      this.unsubscribeLanguageChange();
+    }
+
     if (this.container) {
       this.container.innerHTML = '';
     }
