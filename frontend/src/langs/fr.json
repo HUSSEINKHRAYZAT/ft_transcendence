@@ -383,7 +383,8 @@
   "verify.errors.invalidCode": "Code de vérification invalide. Veuillez réessayer.",
   "verify.resendToast.title": "Code renvoyé",
   "verify.resendToast.message": "Un nouveau code de vérification a été envoyé à votre e-mail",
-  "verify.resendTimer": "Vous pouvez demander un nouveau code dans {seconds} secondes"
+  "verify.resendTimer": "Vous pouvez demander un nouveau code dans {seconds} secondes",
+    "Enter your email or username" : "Entrez votre email ou votre nom d'utilisateur"
 
 
 

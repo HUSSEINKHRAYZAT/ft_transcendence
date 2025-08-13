@@ -1,7 +1,8 @@
 import { languageManager, t, SUPPORTED_LANGUAGES } from '../../langs/LanguageManager';
+import simpleThemeManager from '../../utils/SimpleThemeManager';
+import backgroundThemeManager from '../../utils/BackgroundThemeManager';
 
-export class SettingsBox
-{
+export class SettingsBox {
   private container: HTMLElement | null = null;
   private isRendered: boolean = false;
   private unsubscribeLanguageChange?: () => void;
@@ -14,6 +15,20 @@ export class SettingsBox
       if (this.isRendered) {
         this.updateContent();
         this.setupEventListeners();
+      }
+    });
+
+    // Listen for accent color theme changes
+    window.addEventListener('theme-changed', () => {
+      if (this.isRendered) {
+        this.updateThemeSelector();
+      }
+    });
+
+    // Listen for background theme changes
+    window.addEventListener('background-theme-changed', () => {
+      if (this.isRendered) {
+        this.updateBackgroundThemeSelector();
       }
     });
   }
@@ -51,10 +66,41 @@ export class SettingsBox
 
   private getAuthenticatedContent(): string {
     const settings = this.loadSettings();
+    const availableThemes = simpleThemeManager.getAvailableThemes();
+    const currentTheme = simpleThemeManager.getCurrentTheme();
+    const availableBackgroundThemes = backgroundThemeManager.getAvailableThemes();
+    const currentBackgroundTheme = backgroundThemeManager.getCurrentTheme();
 
     return `
       <h3 class="text-xl font-bold mb-4 text-lime-500">⚙️ ${t('Settings')}</h3>
       <div class="space-y-4">
+        <!-- Accent Color Theme Selector -->
+        <div class="bg-gray-700 p-3 rounded">
+          <label class="text-sm font-medium text-gray-300 block mb-2">🎨 ${t('Accent Colors')}</label>
+          <select id="theme-select" class="w-full bg-gray-600 border border-gray-500 rounded text-white p-2 focus:border-lime-500 focus:ring-1 focus:ring-lime-500">
+            ${availableThemes.map(theme => `
+              <option value="${theme.name}" ${currentTheme === theme.name ? 'selected' : ''}>
+                ${theme.displayName}
+              </option>
+            `).join('')}
+          </select>
+          <p class="text-xs text-gray-400 mt-1">${t('Choose your preferred accent color scheme')}</p>
+        </div>
+
+        <!-- Background Theme Selector -->
+        <div class="bg-gray-700 p-3 rounded">
+          <label class="text-sm font-medium text-gray-300 block mb-2">🌙 ${t('Background Theme')}</label>
+          <select id="background-theme-select" class="w-full bg-gray-600 border border-gray-500 rounded text-white p-2 focus:border-lime-500 focus:ring-1 focus:ring-lime-500">
+            ${availableBackgroundThemes.map(theme => `
+              <option value="${theme.name}" ${currentBackgroundTheme === theme.name ? 'selected' : ''}>
+                ${theme.displayName}
+              </option>
+            `).join('')}
+          </select>
+          <p class="text-xs text-gray-400 mt-1">${t('Choose your preferred background color scheme')}</p>
+        </div>
+
+        <!-- Sound Settings -->
         <div class="bg-gray-700 p-3 rounded">
           <div class="flex items-center justify-between">
             <label class="text-sm font-medium text-gray-300">${t('Sound Effects')}</label>
@@ -62,6 +108,7 @@ export class SettingsBox
                    class="toggle-checkbox bg-gray-600 border-gray-500 rounded focus:ring-lime-500">
           </div>
         </div>
+
         <div class="bg-gray-700 p-3 rounded">
           <div class="flex items-center justify-between">
             <label class="text-sm font-medium text-gray-300">${t('Background Music')}</label>
@@ -69,6 +116,8 @@ export class SettingsBox
                    class="toggle-checkbox bg-gray-600 border-gray-500 rounded focus:ring-lime-500">
           </div>
         </div>
+
+        <!-- Game Difficulty -->
         <div class="bg-gray-700 p-3 rounded">
           <label class="text-sm font-medium text-gray-300 block mb-2">${t('Game Difficulty')}</label>
           <select id="difficulty-select" class="w-full bg-gray-600 border border-gray-500 rounded text-white p-2 focus:border-lime-500 focus:ring-1 focus:ring-lime-500">
@@ -78,6 +127,8 @@ export class SettingsBox
             <option value="expert" ${settings.difficulty === 'expert' ? 'selected' : ''}>${t('Expert')}</option>
           </select>
         </div>
+
+        <!-- Language Settings -->
         <div class="bg-gray-700 p-3 rounded">
           <label class="text-sm font-medium text-gray-300 block mb-2">${t('Language')}</label>
           <select id="language-select" class="w-full bg-gray-600 border border-gray-500 rounded text-white p-2 focus:border-lime-500 focus:ring-1 focus:ring-lime-500">
@@ -88,6 +139,8 @@ export class SettingsBox
             `).join('')}
           </select>
         </div>
+
+        <!-- Animations -->
         <div class="bg-gray-700 p-3 rounded">
           <div class="flex items-center justify-between">
             <label class="text-sm font-medium text-gray-300">${t('Animations')}</label>
@@ -96,6 +149,8 @@ export class SettingsBox
           </div>
         </div>
       </div>
+
+      <!-- Action Buttons -->
       <div class="mt-4 flex gap-2">
         <button id="save-settings" class="flex-1 bg-lime-500 hover:bg-lime-600 text-white font-bold py-2 px-4 rounded transition-all duration-300">
           ${t('Save Settings')}
@@ -118,7 +173,31 @@ export class SettingsBox
   }
 
   private setupEventListeners(): void {
+    // Sign in button
     const signinBtn = document.getElementById('settings-signin');
+    if (signinBtn) {
+      signinBtn.addEventListener('click', () => this.showLoginModal());
+    }
+
+    // Accent color theme selector
+    const themeSelect = document.getElementById('theme-select') as HTMLSelectElement;
+    if (themeSelect) {
+      themeSelect.addEventListener('change', (e) => {
+        const selectedTheme = (e.target as HTMLSelectElement).value;
+        this.changeTheme(selectedTheme);
+      });
+    }
+
+    // Background theme selector
+    const backgroundThemeSelect = document.getElementById('background-theme-select') as HTMLSelectElement;
+    if (backgroundThemeSelect) {
+      backgroundThemeSelect.addEventListener('change', (e) => {
+        const selectedTheme = (e.target as HTMLSelectElement).value;
+        this.changeBackgroundTheme(selectedTheme);
+      });
+    }
+
+    // Other settings...
     const soundToggle = document.getElementById('sound-toggle') as HTMLInputElement;
     const musicToggle = document.getElementById('music-toggle') as HTMLInputElement;
     const animationsToggle = document.getElementById('animations-toggle') as HTMLInputElement;
@@ -127,43 +206,34 @@ export class SettingsBox
     const saveBtn = document.getElementById('save-settings');
     const resetBtn = document.getElementById('reset-settings');
 
-    if (signinBtn) {
-      signinBtn.addEventListener('click', () => this.showLoginModal());
-    }
-
     if (soundToggle) {
-      soundToggle.addEventListener('change', () => this.updateSetting('soundEnabled', soundToggle.checked));
+      soundToggle.addEventListener('change', () => {
+        this.saveSettingValue('soundEnabled', soundToggle.checked);
+      });
     }
 
     if (musicToggle) {
-      musicToggle.addEventListener('change', () => this.updateSetting('musicEnabled', musicToggle.checked));
+      musicToggle.addEventListener('change', () => {
+        this.saveSettingValue('musicEnabled', musicToggle.checked);
+      });
     }
 
     if (animationsToggle) {
-      animationsToggle.addEventListener('change', (e) => {
-        const enabled = (e.target as HTMLInputElement).checked;
-        this.updateSetting('animationsEnabled', enabled);
-        this.toggleAnimations(enabled);
+      animationsToggle.addEventListener('change', () => {
+        this.saveSettingValue('animationsEnabled', animationsToggle.checked);
+        this.toggleAnimations(animationsToggle.checked);
       });
     }
 
     if (difficultySelect) {
-      difficultySelect.addEventListener('change', () => this.updateSetting('difficulty', difficultySelect.value));
+      difficultySelect.addEventListener('change', () => {
+        this.saveSettingValue('difficulty', difficultySelect.value);
+      });
     }
 
     if (languageSelect) {
-      languageSelect.addEventListener('change', (e) => {
-        const language = (e.target as HTMLSelectElement).value as any;
-        console.log(`🌍 Language selection changed to: ${language}`);
-
-        // Update setting first
-        this.updateSetting('language', language);
-
-        // Then update language manager (this will trigger UI updates)
-        languageManager.setLanguage(language);
-
-        // Show notification
-        this.showLanguageChangeNotification(language);
+      languageSelect.addEventListener('change', () => {
+        this.changeLanguage(languageSelect.value);
       });
     }
 
@@ -176,53 +246,121 @@ export class SettingsBox
     }
   }
 
+  private changeTheme(themeName: string): void {
+    const success = simpleThemeManager.applyTheme(themeName);
+
+    if (success) {
+      const theme = simpleThemeManager.getCurrentThemeConfig();
+      const message = `${t('Theme changed to')} ${theme?.displayName}`;
+
+      if ((window as any).modalService?.showToast) {
+        (window as any).modalService.showToast('success', t('Theme Changed'), message);
+      } else {
+        this.showBasicToast('success', message);
+      }
+
+      // Save theme preference
+      this.saveSettingValue('theme', themeName);
+    } else {
+      const errorMessage = t('Failed to change theme');
+      if ((window as any).modalService?.showToast) {
+        (window as any).modalService.showToast('error', t('Error'), errorMessage);
+      } else {
+        this.showBasicToast('error', errorMessage);
+      }
+    }
+  }
+
+  private changeBackgroundTheme(themeName: string): void {
+    const success = backgroundThemeManager.applyBackgroundTheme(themeName);
+
+    if (success) {
+      const theme = backgroundThemeManager.getCurrentThemeConfig();
+      const message = `${t('Background theme changed to')} ${theme?.displayName}`;
+
+      if ((window as any).modalService?.showToast) {
+        (window as any).modalService.showToast('success', t('Background Theme Changed'), message);
+      } else {
+        this.showBasicToast('success', message);
+      }
+
+      // Save background theme preference
+      this.saveSettingValue('backgroundTheme', themeName);
+    } else {
+      const errorMessage = t('Failed to change background theme');
+      if ((window as any).modalService?.showToast) {
+        (window as any).modalService.showToast('error', t('Error'), errorMessage);
+      } else {
+        this.showBasicToast('error', errorMessage);
+      }
+    }
+  }
+
+  private updateThemeSelector(): void {
+    const themeSelect = document.getElementById('theme-select') as HTMLSelectElement;
+    if (themeSelect) {
+      themeSelect.value = simpleThemeManager.getCurrentTheme();
+    }
+  }
+
+  private updateBackgroundThemeSelector(): void {
+    const backgroundThemeSelect = document.getElementById('background-theme-select') as HTMLSelectElement;
+    if (backgroundThemeSelect) {
+      backgroundThemeSelect.value = backgroundThemeManager.getCurrentTheme();
+    }
+  }
+
   private loadSettings(): any {
     const defaultSettings = {
       soundEnabled: true,
       musicEnabled: true,
-      animationsEnabled: true,
       difficulty: 'medium',
-      language: 'eng'
+      language: languageManager.getCurrentLanguage(),
+      animationsEnabled: true,
+      theme: simpleThemeManager.getCurrentTheme(),
+      backgroundTheme: backgroundThemeManager.getCurrentTheme()
     };
 
     try {
-      const saved = localStorage.getItem('ft_pong_game_settings');
-      if (saved) {
-        const parsedSettings = JSON.parse(saved);
-        return { ...defaultSettings, ...parsedSettings };
+      const savedSettings = localStorage.getItem('ft_pong_game_settings');
+      if (savedSettings) {
+        return { ...defaultSettings, ...JSON.parse(savedSettings) };
       }
-      return defaultSettings;
     } catch (error) {
       console.error('Error loading settings:', error);
-      return defaultSettings;
     }
+
+    return defaultSettings;
   }
 
-  private updateSetting(key: string, value: any): void {
+  private saveSettingValue(key: string, value: any): void {
     const settings = this.loadSettings();
     settings[key] = value;
-    localStorage.setItem('ft_pong_game_settings', JSON.stringify(settings));
-    console.log(`⚙️ Setting updated: ${key} = ${value}`);
+
+    try {
+      localStorage.setItem('ft_pong_game_settings', JSON.stringify(settings));
+    } catch (error) {
+      console.error('Error saving setting:', error);
+    }
   }
 
   private applySavedLanguage(): void {
     const settings = this.loadSettings();
-    if (settings.language && languageManager.getCurrentLanguage() !== settings.language) {
+    if (settings.language && settings.language !== languageManager.getCurrentLanguage()) {
       languageManager.setLanguage(settings.language);
     }
-    console.log(`🌍 Applied saved language: ${settings.language}`);
   }
 
-  private showLanguageChangeNotification(language: string): void {
-    const langInfo = SUPPORTED_LANGUAGES.find(l => l.code === language);
-    if (!langInfo) return;
+  private changeLanguage(languageCode: string): void {
+    languageManager.setLanguage(languageCode);
+    this.saveSettingValue('language', languageCode);
 
-    const message = `${t('Language changed to')} ${langInfo.nativeName}`;
+    const langInfo = SUPPORTED_LANGUAGES.find(lang => lang.code === languageCode);
+    const message = `${t('Language changed to')} ${langInfo?.nativeName}`;
 
     if ((window as any).modalService?.showToast) {
       (window as any).modalService.showToast('success', t('Language Changed'), message);
     } else {
-      // Fallback notification
       this.showBasicToast('success', message);
     }
   }
@@ -274,7 +412,7 @@ export class SettingsBox
     if ((window as any).modalService?.showToast) {
       (window as any).modalService.showToast('success', t('Settings Saved'), message);
     } else {
-      alert(message);
+      this.showBasicToast('success', message);
     }
   }
 
@@ -284,6 +422,12 @@ export class SettingsBox
     if (confirm(confirmMessage)) {
       localStorage.removeItem('ft_pong_game_settings');
       this.toggleAnimations(true);
+
+      // Reset accent color theme to default
+      simpleThemeManager.applyTheme('lime');
+
+      // Reset background theme to default
+      backgroundThemeManager.applyBackgroundTheme('dark');
 
       // Reset language to default
       languageManager.setLanguage('eng');
@@ -296,13 +440,13 @@ export class SettingsBox
       if ((window as any).modalService?.showToast) {
         (window as any).modalService.showToast('info', t('Settings Reset'), message);
       } else {
-        alert(message);
+        this.showBasicToast('info', message);
       }
     }
   }
 
   private showLoginModal(): void {
-    console.log('🔍 SettingsBox: Trying to show login modal');
+    console.log('🔑 SettingsBox: Trying to show login modal');
     if ((window as any).modalService?.showLoginModal) {
       (window as any).modalService.showLoginModal();
     } else {

@@ -107,42 +107,42 @@ export class FriendsBox {
   /**
    * Get content for authenticated users (no hardcoded users!)
    */
-  private getAuthenticatedContent(): string {
-    return `
-      <h3 class="text-xl font-bold mb-4 text-lime-500">👥 ${t('Friends')}</h3>
+private getAuthenticatedContent(): string {
+  return `
+    <h3 class="text-xl font-bold mb-4 text-lime-500">👥 ${t('Friends')}</h3>
 
-      <div id="friends-list" class="space-y-3">
-        <div id="friends-empty" class="text-sm text-gray-400">
-          ${t('No friends yet.')}
-        </div>
+    <div id="friends-list" class="space-y-3">
+      <div id="friends-empty" class="text-sm text-gray-400">
+        ${t('No friends yet.')}
       </div>
+    </div>
 
-      <div class="mt-4 flex gap-2">
-        <button id="add-friend" class="flex-1 bg-dark-green-600 hover:bg-dark-green-700 text-white text-sm font-bold py-2 px-3 rounded transition-all duration-300">
-          ${t('Add Friend')}
-        </button>
-        <button id="friend-requests" class="flex-1 bg-gray-600 hover:bg-gray-700 text-white text-sm font-bold py-2 px-3 rounded transition-all duration-300">
-          ${t('Requests')}
-          <span id="req-count-badge" class="inline-block ml-1 px-2 py-0.5 rounded bg-gray-800 text-white text-xs align-middle">0</span>
-        </button>
-      </div>
+    <div class="mt-4 flex gap-2">
+      <button id="add-friend" class="flex-1 bg-gray-700 hover:bg-gray-600 text-white text-sm font-bold py-2 px-3 rounded transition-all duration-300">
+        ${t('Add Friend')}
+      </button>
+      <button id="friend-requests" class="flex-1 bg-gray-700 hover:bg-gray-600 text-white text-sm font-bold py-2 px-3 rounded transition-all duration-300">
+        ${t('Requests')}
+        <span id="req-count-badge" class="inline-block ml-1 px-2 py-0.5 rounded bg-gray-800 text-white text-xs align-middle">0</span>
+      </button>
+    </div>
 
-      <!-- quick actions -->
-      <div class="mt-2 flex gap-2">
-        <button id="remove-friend"
-          class="flex-1 bg-red-600 hover:bg-red-700 text-white text-sm font-bold py-2 px-3 rounded transition-all duration-300">
-          ${t('Remove Friend')}
-        </button>
-        <button id="block-user"
-          class="flex-1 bg-gray-800 hover:bg-black text-white text-sm font-bold py-2 px-3 rounded transition-all duration-300">
-          ${t('Block User')}
-        </button>
-      </div>
+    <!-- quick actions -->
+    <div class="mt-2 flex gap-2">
+      <button id="remove-friend"
+        class="flex-1 bg-gray-700 hover:bg-gray-600 text-white text-sm font-bold py-2 px-3 rounded transition-all duration-300">
+        ${t('Remove Friend')}
+      </button>
+      <button id="block-user"
+        class="flex-1 bg-gray-700 hover:bg-gray-600 text-white text-sm font-bold py-2 px-3 rounded transition-all duration-300">
+        ${t('Block User')}
+      </button>
+    </div>
 
-      <!-- requests modal host -->
-      <div id="friend-req-modal-root"></div>
-    `;
-  }
+    <!-- requests modal host -->
+    <div id="friend-req-modal-root"></div>
+  `;
+}
 
   /**
    * Get content for unauthenticated users

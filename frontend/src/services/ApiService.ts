@@ -332,5 +332,4 @@ class FTPongAPI extends ApiService {
 // Export singleton instance
 export const apiService = new FTPongAPI();
 
-// Export base ApiService class for custom instances
 export { ApiService };

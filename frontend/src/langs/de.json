@@ -296,6 +296,7 @@
   "Username taken! Try these alternatives:": "Benutzername bereits vergeben! Versuchen Sie diese Alternativen:",
   "Enter your email": "Geben Sie Ihre E-Mail ein",
   "Enter your password (min 6 characters with numbers)": "Geben Sie Ihr Passwort ein (mind. 6 Zeichen mit Zahlen)",
+  "Enter your password" : "Geben Sie Ihr Passwort ein",
   "✗ At least 6 characters": "✗ Mindestens 6 Zeichen",
   "✓ At least 6 characters": "✓ Mindestens 6 Zeichen",
   "✗ Contains numbers": "✗ Enthält Zahlen",
@@ -365,8 +366,8 @@
 
   "fields.firstName": "Vorname",
   "fields.lastName": "Nachname",
-    "Sign in with Google" :"Aanmelden met Google",
-      "verify.title": "Bestätigen Sie Ihre E-Mail",
+  "Sign in with Google" :"Aanmelden met Google",
+  "verify.title": "Bestätigen Sie Ihre E-Mail",
   "verify.sentCode": "Wir haben einen 4-stelligen Bestätigungscode gesendet an:",
   "verify.enterCode": "Bitte geben Sie den Code unten ein, um fortzufahren",
   "verify.codeLabel": "Bestätigungscode",
@@ -383,8 +384,8 @@
   "verify.errors.invalidCode": "Ungültiger Bestätigungscode. Bitte versuchen Sie es erneut.",
   "verify.resendToast.title": "Code erneut gesendet",
   "verify.resendToast.message": "Ein neuer Bestätigungscode wurde an Ihre E-Mail gesendet",
-  "verify.resendTimer": "Sie können in {seconds} Sekunden einen weiteren Code anfordern"
-
+  "verify.resendTimer": "Sie können in {seconds} Sekunden einen weiteren Code anfordern",
+    "Enter your email or username" : "Geben Sie Ihre E-Mail-Adresse oder Ihren Benutzernamen ein"
 
 
 }

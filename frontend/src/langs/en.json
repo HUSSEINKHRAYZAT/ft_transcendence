@@ -298,6 +298,7 @@
   "Username taken! Try these alternatives:": "Username taken! Try these alternatives:",
   "Enter your email": "Enter your email",
   "Enter your password (min 6 characters with numbers)": "Enter your password (min 6 characters with numbers)",
+  "Enter your password" : "Enter your password",
   "✗ At least 6 characters": "✗ At least 6 characters",
   "✓ At least 6 characters": "✓ At least 6 characters",
   "✗ Contains numbers": "✗ Contains numbers",
@@ -385,7 +386,8 @@
   "verify.errors.invalidCode": "Invalid verification code. Please try again.",
   "verify.resendToast.title": "Code Resent",
   "verify.resendToast.message": "A new verification code has been sent to your email",
-  "verify.resendTimer": "You can request another code in {seconds} seconds"
+  "verify.resendTimer": "You can request another code in {seconds} seconds",
+  "Enter your email or username" : "Enter your email or username"
 }
 
 

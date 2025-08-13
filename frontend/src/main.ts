@@ -1,6 +1,8 @@
 import { waitForDOM } from './utils/DOMHelpers';
 import './styles/main.css';
 import { languageManager, t, SUPPORTED_LANGUAGES } from './langs/LanguageManager';
+import './utils/SimpleThemeManager';
+import './utils/BackgroundThemeManager';
 
 interface Component {
 	render(): Promise<void>;
@@ -1113,13 +1115,14 @@ function setupProfileDropdown(): void {
 /**
  * Add Pong-themed jumbotron with game integration
  */
+
 export function addBasicJumbotron(): void {
 	const jumbotron = document.getElementById('jumbotron');
 	if (jumbotron) {
 		jumbotron.innerHTML = `
 			<div class="min-h-screen flex items-center justify-center bg-gray-900 relative overflow-hidden">
 				<!-- Pong Board Background -->
-				<div class="pong-board absolute inset-4 border-4 border-lime-500 rounded-lg">
+				<div class="pong-board absolute inset-4 border-4 border-lime-500 rounded-lg bg-gray-800">
 					<!-- Center Line -->
 					<div class="center-line"></div>
 
@@ -1135,8 +1138,8 @@ export function addBasicJumbotron(): void {
 
 				<!-- Content -->
 				<div class="text-center max-w-600 p-8 z-10 relative">
-					<h1 class="text-6xl font-bold mb-6 bg-gradient-to-r from-lime-500 to-green-600 bg-clip-text text-transparent">FT_PONG</h1>
-					<p class="text-xl text-gray-100 mb-8">${t('Experience the classic Pong game with a fresh lime twist!')}</p>
+					<h1 class="text-6xl font-bold mb-6 text-lime-500">FT_PONG</h1>
+					<p class="text-xl text-white mb-8">${t('Experience the classic Pong game with a fresh lime twist!')}</p>
 
 					<!-- Dynamic Button Container -->
 					<div id="jumbotron-button-container">
@@ -1182,12 +1185,12 @@ function updateJumbotronButton(): void {
 
   if (isAuthenticated && user) {
     buttonContainer.innerHTML = `
-      <div class="space-y-4">
-        <button onclick="handlePlayGame()" class="bg-lime-500 hover:bg-lime-600 text-white font-bold py-4 px-8 text-xl rounded transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-lime-500/25" data-i18n="Play Game">
-          🎮 ${t('Play Game')}
-        </button>
-        <p class="text-gray-300">${t('Welcome back!')}, <span class="text-lime-400 font-bold">${user.firstName || user.username || 'Player'}</span>!</p>
-      </div>
+	<div class="space-y-4">
+	<button onclick="handlePlayGame()" class="bg-lime-500 hover:bg-lime-600 text-white font-bold py-4 px-8 text-xl rounded transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-lime-500/25" data-i18n="Play Game">
+		🎮 ${t('Play Game')}
+	</button>
+	<p class="text-gray-300">${t('Welcome back!')}, <span class="text-lime-500 font-bold">${user.firstName || user.username || 'Player'}</span>!</p>
+	</div>
     `;
   } else {
     buttonContainer.innerHTML = `
@@ -1228,10 +1231,10 @@ function addPongStyles(): void {
 	style.id = 'pong-styles';
 	style.textContent = `
 		.pong-board {
-			background: rgba(17, 24, 39, 0.8);
+			border-color: var(--lime-500, #84cc16) !important;
 			box-shadow:
-				0 0 20px rgba(132, 204, 22, 0.3),
-				inset 0 0 20px rgba(132, 204, 22, 0.1);
+				0 0 20px var(--lime-500, #84cc16)50,
+				inset 0 0 20px var(--lime-500, #84cc16)20;
 		}
 
 		.center-line {
@@ -1242,8 +1245,8 @@ function addPongStyles(): void {
 			width: 2px;
 			background: linear-gradient(to bottom,
 				transparent 0%,
-				#84cc16 10%,
-				#84cc16 90%,
+				var(--lime-500, #84cc16) 10%,
+				var(--lime-500, #84cc16) 90%,
 				transparent 100%);
 			background-size: 100% 20px;
 			background-repeat: repeat-y;
@@ -1255,11 +1258,11 @@ function addPongStyles(): void {
 			position: absolute;
 			width: 12px;
 			height: 12px;
-			background: #84cc16;
+			background: var(--lime-500, #84cc16);
 			border-radius: 50%;
 			box-shadow:
-				0 0 10px rgba(132, 204, 22, 0.8),
-				0 0 20px rgba(132, 204, 22, 0.4);
+				0 0 10px var(--lime-500, #84cc16)CC,
+				0 0 20px var(--lime-500, #84cc16)66;
 			transition: all 0.1s linear;
 			z-index: 5;
 		}
@@ -1268,9 +1271,9 @@ function addPongStyles(): void {
 			position: absolute;
 			width: 8px;
 			height: 60px;
-			background: #84cc16;
+			background: var(--lime-500, #84cc16);
 			border-radius: 4px;
-			box-shadow: 0 0 10px rgba(132, 204, 22, 0.6);
+			box-shadow: 0 0 10px var(--lime-500, #84cc16)99;
 			animation: paddleMove 3s ease-in-out infinite;
 		}
 

@@ -111,7 +111,7 @@ export function removeAttributes(element: Element, ...attributes: string[]): voi
   attributes.forEach(attr => element.removeAttribute(attr));
 }
 
-/**
+/**Replace existing classes in the DOM when theme changes
  * Clear all children from an element
  */
 export function clearElement(element: Element): void {
