@@ -1,6 +1,3 @@
-/**
- * Notification box component for FT_PONG with i18n support
- */
 import { languageManager, t } from '../../langs/LanguageManager';
 
 export class NotificationBox {
@@ -11,7 +8,9 @@ export class NotificationBox {
   constructor() {
     this.container = document.getElementById('notifications-box');
 
-    // Listen for language changes to update UI
+    // Automatically expose globally
+    (window as any).notifyBox = this;
+
     this.unsubscribeLanguageChange = languageManager.onLanguageChange(() => {
       if (this.isRendered) {
         this.updateContent();
@@ -20,9 +19,6 @@ export class NotificationBox {
     });
   }
 
-  /**
-   * Render the notification box
-   */
   async render(): Promise<void> {
     if (!this.container) {
       console.error('❌ Notification box container not found');
@@ -41,9 +37,6 @@ export class NotificationBox {
     }
   }
 
-  /**
-   * Update content based on authentication state
-   */
   private updateContent(): void {
     if (!this.container) return;
 
@@ -53,15 +46,14 @@ export class NotificationBox {
     if (authToken && userData) {
       // User is logged in - show notifications
       this.container.innerHTML = this.getAuthenticatedContent();
-    } else {
+    }
+    else
+    {
       // User is not logged in - show login prompt
       this.container.innerHTML = this.getUnauthenticatedContent();
     }
   }
 
-  /**
-   * Get content for authenticated users
-   */
   private getAuthenticatedContent(): string {
     return `
       <h3 class="text-xl font-bold mb-4 text-lime-500">📢 ${t('Notifications')}</h3>
@@ -81,9 +73,6 @@ export class NotificationBox {
     `;
   }
 
-  /**
-   * Get content for unauthenticated users
-   */
   private getUnauthenticatedContent(): string {
     return `
       <h3 class="text-xl font-bold mb-4 text-lime-500">📢 ${t('Notifications')}</h3>
@@ -94,9 +83,6 @@ export class NotificationBox {
     `;
   }
 
-  /**
-   * Setup event listeners
-   */
   private setupEventListeners(): void {
     const signinBtn = document.getElementById('notify-signin');
     const clearBtn = document.getElementById('clear-notifications');
@@ -110,9 +96,6 @@ export class NotificationBox {
     }
   }
 
-  /**
-   * Show login modal
-   */
   private showLoginModal(): void {
     console.log('🔍 NotificationBox: Trying to show login modal');
     if ((window as any).modalService && (window as any).modalService.showLoginModal) {
@@ -123,9 +106,6 @@ export class NotificationBox {
     }
   }
 
-  /**
-   * Clear notifications
-   */
   private clearNotifications(): void {
     if (this.container) {
       this.container.innerHTML = `
@@ -135,18 +115,14 @@ export class NotificationBox {
     }
   }
 
-  /**
-   * Update based on authentication state
-   */
+
   updateAuthState(isAuthenticated: boolean): void {
     if (!this.isRendered) return;
     this.updateContent();
     this.setupEventListeners();
   }
 
-  /**
-   * Add a new notification
-   */
+
   addNotification(message: string, type: 'info' | 'success' | 'warning' | 'error' = 'info'): void {
     if (!this.container || !this.isRendered) return;
 
@@ -157,7 +133,6 @@ export class NotificationBox {
       error: 'border-red-500'
     };
 
-    // Translate the message if it's a known key, otherwise use as-is
     const translatedMessage = this.translateMessage(message);
 
     const notificationHTML = `
@@ -167,36 +142,24 @@ export class NotificationBox {
       </div>
     `;
 
-    // Find the space-y-3 container and prepend the new notification
     const notificationContainer = this.container.querySelector('.space-y-3');
     if (notificationContainer) {
       notificationContainer.insertAdjacentHTML('afterbegin', notificationHTML);
     }
   }
 
-  /**
-   * Try to translate a message, return original if no translation found
-   */
-  private translateMessage(message: string): string {
-    // Check if the message is a translation key
-    if (languageManager.hasTranslation(message)) {
+  private translateMessage(message: string): string
+  {
+    if (languageManager.hasTranslation(message))
       return t(message);
-    }
-    // Return original message if no translation found
     return message;
   }
 
-  /**
-   * Add a notification with translation key
-   */
   addTranslatedNotification(messageKey: string, type: 'info' | 'success' | 'warning' | 'error' = 'info', replacements?: Record<string, string | number>): void {
     const translatedMessage = t(messageKey, replacements);
     this.addNotification(translatedMessage, type);
   }
 
-  /**
-   * Show a welcome notification for new users
-   */
   showWelcomeNotification(userName?: string): void {
     if (userName) {
       this.addTranslatedNotification('Welcome back, {name}!', 'success', { name: userName });
@@ -205,9 +168,6 @@ export class NotificationBox {
     }
   }
 
-  /**
-   * Show game-related notifications
-   */
   showGameNotification(type: 'start' | 'win' | 'lose' | 'invite', data?: any): void {
     switch (type) {
       case 'start':
@@ -229,9 +189,7 @@ export class NotificationBox {
     }
   }
 
-  /**
-   * Show system notifications
-   */
+
   showSystemNotification(type: 'maintenance' | 'update' | 'feature'): void {
     switch (type) {
       case 'maintenance':
@@ -246,11 +204,8 @@ export class NotificationBox {
     }
   }
 
-  /**
-   * Cleanup component resources
-   */
-  destroy(): void {
-    // Unsubscribe from language changes
+  destroy(): void
+  {
     if (this.unsubscribeLanguageChange) {
       this.unsubscribeLanguageChange();
     }

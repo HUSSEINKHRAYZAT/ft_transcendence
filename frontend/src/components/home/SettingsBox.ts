@@ -18,14 +18,12 @@ export class SettingsBox {
       }
     });
 
-    // Listen for accent color theme changes
     window.addEventListener('theme-changed', () => {
       if (this.isRendered) {
         this.updateThemeSelector();
       }
     });
 
-    // Listen for background theme changes
     window.addEventListener('background-theme-changed', () => {
       if (this.isRendered) {
         this.updateBackgroundThemeSelector();
@@ -49,6 +47,22 @@ export class SettingsBox {
     } catch (error) {
       console.error('❌ Error rendering SettingsBox:', error);
     }
+  }
+
+  private getLanguageSettingsHTML(settings: any): string
+  {
+    return `
+      <div class="bg-gray-700 p-3 rounded">
+        <label class="text-sm font-medium text-gray-300 block mb-2">${t('Language')}</label>
+        <select id="language-select" class="w-full bg-gray-600 border border-gray-500 rounded text-white p-2 focus:border-lime-500 focus:ring-1 focus:ring-lime-500">
+          ${SUPPORTED_LANGUAGES.map(lang => `
+            <option value="${lang.code}" ${settings.language === lang.code ? 'selected' : ''}>
+              ${lang.flag} ${lang.nativeName}
+            </option>
+          `).join('')}
+        </select>
+      </div>
+    `;
   }
 
   private updateContent(): void {
@@ -129,16 +143,7 @@ export class SettingsBox {
         </div>
 
         <!-- Language Settings -->
-        <div class="bg-gray-700 p-3 rounded">
-          <label class="text-sm font-medium text-gray-300 block mb-2">${t('Language')}</label>
-          <select id="language-select" class="w-full bg-gray-600 border border-gray-500 rounded text-white p-2 focus:border-lime-500 focus:ring-1 focus:ring-lime-500">
-            ${SUPPORTED_LANGUAGES.map(lang => `
-              <option value="${lang.code}" ${settings.language === lang.code ? 'selected' : ''}>
-                ${lang.flag} ${lang.nativeName}
-              </option>
-            `).join('')}
-          </select>
-        </div>
+            ${this.getLanguageSettingsHTML(settings)}
 
         <!-- Animations -->
         <div class="bg-gray-700 p-3 rounded">
@@ -162,15 +167,18 @@ export class SettingsBox {
     `;
   }
 
-  private getUnauthenticatedContent(): string {
-    return `
-      <h3 class="text-xl font-bold mb-4 text-lime-500">⚙️ ${t('Settings')}</h3>
-      <p class="text-gray-400">${t('Please log in to access settings')}</p>
-      <button id="settings-signin" class="mt-4 bg-lime-500 hover:bg-lime-600 text-white font-bold py-2 px-4 rounded transition-all duration-300">
-        ${t('Sign In')}
-      </button>
-    `;
-  }
+private getUnauthenticatedContent(): string
+{
+  const settings = this.loadSettings();
+  return `
+    <h3 class="text-xl font-bold mb-4 text-lime-500">⚙️ ${t('Settings')}</h3>
+    ${this.getLanguageSettingsHTML(settings)}
+    <p class="text-gray-400 mt-4">${t('Please log in to access other settings')}</p>
+    <button id="settings-signin" class="mt-4 bg-lime-500 hover:bg-lime-600 text-white font-bold py-2 px-4 rounded transition-all duration-300">
+      ${t('Sign In')}
+    </button>
+  `;
+}
 
   private setupEventListeners(): void {
     // Sign in button
@@ -419,17 +427,15 @@ export class SettingsBox {
   private resetSettings(): void {
     const confirmMessage = t('Are you sure you want to reset all settings to default?');
 
-    if (confirm(confirmMessage)) {
+    if (confirm(confirmMessage))
+    {
       localStorage.removeItem('ft_pong_game_settings');
       this.toggleAnimations(true);
 
-      // Reset accent color theme to default
       simpleThemeManager.applyTheme('lime');
 
-      // Reset background theme to default
       backgroundThemeManager.applyBackgroundTheme('dark');
 
-      // Reset language to default
       languageManager.setLanguage('eng');
 
       this.updateContent();
@@ -437,11 +443,10 @@ export class SettingsBox {
 
       const message = t('All settings have been reset to default values.');
 
-      if ((window as any).modalService?.showToast) {
+      if ((window as any).modalService?.showToast)
         (window as any).modalService.showToast('info', t('Settings Reset'), message);
-      } else {
+      else
         this.showBasicToast('info', message);
-      }
     }
   }
 

@@ -385,7 +385,19 @@
   "verify.resendToast.title": "Code erneut gesendet",
   "verify.resendToast.message": "Ein neuer Bestätigungscode wurde an Ihre E-Mail gesendet",
   "verify.resendTimer": "Sie können in {seconds} Sekunden einen weiteren Code anfordern",
-    "Enter your email or username" : "Geben Sie Ihre E-Mail-Adresse oder Ihren Benutzernamen ein"
+    "Enter your email or username" : "Geben Sie Ihre E-Mail-Adresse oder Ihren Benutzernamen ein",
+      "Accent Colors": "Akzentfarben",
+  "Choose your preferred accent color scheme": "Wählen Sie Ihr bevorzugtes Akzentfarbschema",
+  "Background Theme": "Hintergrundthema",
+  "Choose your preferred background color scheme": "Wählen Sie Ihr bevorzugtes Hintergrundfarbschema",
+  "Sound Effects": "Soundeffekte",
+  "Background Music": "Hintergrundmusik",
+  "Game Difficulty": "Spielschwierigkeit",
+  "Language": "Sprache",
+  "Animations": "Animationen",
+  "Save Settings": "Einstellungen speichern",
+  "Reset": "Zurücksetzen",
+  "Language changed to": "Sprache geändert zu"
 
 
 }

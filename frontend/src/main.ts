@@ -656,7 +656,8 @@ function showBasicToast(type: 'success' | 'error' | 'info', message: string): vo
 (window as any).closeBasicModal = closeBasicModal;
 (window as any).switchBasicAuthModal = switchBasicAuthModal;
 
-function addBasicNavbar(): void {
+function addBasicNavbar(): void
+{
   const navbar = document.getElementById('navbar');
   if (navbar) {
     const authToken = localStorage.getItem('ft_pong_auth_token');
@@ -665,23 +666,24 @@ function addBasicNavbar(): void {
 
     let user = null;
     if (userData) {
-      try {
+      try
+	  {
         user = JSON.parse(userData);
-      } catch (error) {
+      }
+	  catch (error){
         console.error('Error parsing user data:', error);
       }
     }
 
     const authSection = isAuthenticated && user ?
       `<div class="relative">
-         <button id="profile-dropdown-btn" class="flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium text-lime-500 bg-gray-700 hover:bg-gray-600 transition-colors duration-300">
-           ${user.avatar ? `<img src="${user.avatar}" alt="Profile" class="w-6 h-6 rounded-full">` : '<div class="w-6 h-6 rounded-full bg-lime-500 flex items-center justify-center text-xs font-bold text-gray-900">' + (user.firstName ? user.firstName.charAt(0).toUpperCase() : (user.username ? user.username.charAt(0).toUpperCase() : 'U')) + '</div>'}
-           <span>${user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : (user.username || user.email || 'User')}</span>
-           <svg class="w-4 h-4 transition-transform duration-200" id="dropdown-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-           </svg>
-         </button>
-
+		<button id="profile-dropdown-btn" class="flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium text-lime-500 bg-gray-700 hover:bg-gray-600 transition-colors duration-300">
+		<img src="/images/IconUser.svg" alt="Profile" class="w-6 h-6 rounded-full">
+		<span>${user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : (user.username || user.email || 'User')}</span>
+		<svg class="w-4 h-4 transition-transform duration-200" id="dropdown-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+			<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+		</svg>
+		</button>
          <div id="profile-dropdown-menu" class="absolute right-0 mt-2 w-48 bg-gray-800 rounded-md shadow-lg py-1 z-50 border border-gray-700 hidden opacity-0 transform scale-95 transition-all duration-200">
            <button onclick="handleProfile()" class="flex items-center w-full px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition-colors duration-300" data-i18n="Profile">
              <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1006,7 +1008,6 @@ function setupProfileDropdown(): void {
 
   document.body.appendChild(backdrop);
 
-  // Add event listeners
   const closeBtn = backdrop.querySelector('#test-close');
   const cancelBtn = backdrop.querySelector('#test-cancel');
   const confirmBtn = backdrop.querySelector('#test-confirm');
@@ -1035,58 +1036,6 @@ function setupProfileDropdown(): void {
 
 (window as any).handleLogout = function() {
   console.log('👋 Logout clicked...');
-//   console.log('🔍 Modal service available:', !!(window as any).modalService);
-//   console.log('🔍 showMiniModal method available:', !!((window as any).modalService && (window as any).modalService.showMiniModal));
-
-//   // Use the modal service to show mini modal
-//   if ((window as any).modalService && (window as any).modalService.showMiniModal) {
-//     console.log('✅ Using modal service for logout');
-
-//     const config = {
-//       type: 'logout' as const,
-//       title: 'Confirm Logout',
-//       message: 'Are you sure you want to logout? You will need to login again to access your account.',
-//       confirmText: 'Yes, Logout',
-//       cancelText: 'Cancel',
-//       onConfirm: () => {
-//         console.log('✅ Logout confirmed');
-
-//         // Clear authentication data
-//         localStorage.removeItem('ft_pong_auth_token');
-//         localStorage.removeItem('ft_pong_user_data');
-
-//         // Refresh navbar to show login button
-//         if (typeof (window as any).addBasicNavbar === 'function') {
-//           (window as any).addBasicNavbar();
-//         }
-
-//         // Refresh the Jumbotron
-//         if (typeof (window as any).updateJumbotronButton === 'function') {
-//           (window as any).updateJumbotronButton();
-//         }
-
-//         // Dispatch auth state change event
-//         window.dispatchEvent(new CustomEvent('auth-state-changed', {
-//           detail: { isAuthenticated: false, user: null }
-//         }));
-
-//         console.log('✅ User logged out successfully');
-
-//         // Show success message
-//         if (typeof (window as any).showBasicToast === 'function') {
-//           (window as any).showBasicToast('success', 'You have been logged out successfully!');
-//         }
-//       },
-//       onCancel: () => {
-//         console.log('📝 Logout cancelled');
-//       }
-//     };
-
-//     console.log('🔍 Logout config:', config);
-//     (window as any).modalService.showMiniModal(config);
-//   } else {
-//     console.log('❌ Modal service not available, using fallback');
-    // Fallback to basic confirm if modal service not available
     const confirmed = confirm('Are you sure you want to logout?');
     if (confirmed) {
       // Same logout logic as above

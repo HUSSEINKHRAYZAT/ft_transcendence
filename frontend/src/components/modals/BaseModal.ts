@@ -165,66 +165,24 @@ export abstract class BaseModal {
     }, 300);
   }
 
-  protected showToast(type: 'success' | 'error' | 'warning' | 'info', title: string, message: string): void {
-    // Create toast container if it doesn't exist
-    let toastContainer = findElement('#toast-container');
-    if (!toastContainer) {
-      toastContainer = createElement('div', {
-        id: 'toast-container',
-        className: 'fixed top-20 right-4 z-50 space-y-2'
-      });
-      document.body.appendChild(toastContainer);
-    }
+  protected showToast(
+    type: 'success' | 'error' | 'warning' | 'info',
+    title: string,
+    message: string
+  ): void {
+  // Make sure your NotificationBox instance is available
+  if ((window as any).notifyBox) {
+    const notifyBox = (window as any).notifyBox;
 
-    const toastId = `toast-${Date.now()}`;
-    const iconMap = {
-      success: '✅',
-      error: '❌',
-      warning: '⚠️',
-      info: 'ℹ️'
-    };
+    // Compose the full message (optional: include title)
+    const fullMessage = title ? `${title}: ${message}` : message;
 
-    const colorMap = {
-      success: 'bg-green-600',
-      error: 'bg-red-600',
-      warning: 'bg-yellow-600',
-      info: 'bg-blue-600'
-    };
-
-    const toast = createElement('div', {
-      id: toastId,
-      className: `${colorMap[type]} text-white p-4 rounded-lg shadow-lg transform transition-all duration-300 translate-x-full opacity-0`,
-      innerHTML: `
-        <div class="flex items-start">
-          <div class="text-xl mr-3">${iconMap[type]}</div>
-          <div class="flex-1">
-            <div class="font-bold">${t(title)}</div>
-            <div class="text-sm opacity-90">${t(message)}</div>
-          </div>
-          <button class="ml-3 text-white hover:text-gray-200 transition-colors duration-300" onclick="this.parentElement.parentElement.remove()">
-            ✕
-          </button>
-        </div>
-      `
-    });
-
-    toastContainer.appendChild(toast);
-
-    setTimeout(() => {
-      toast.classList.remove('translate-x-full', 'opacity-0');
-    }, 100);
-
-    setTimeout(() => {
-      if (toast.parentElement) {
-        toast.classList.add('translate-x-full', 'opacity-0');
-        setTimeout(() => {
-          if (toast.parentElement) {
-            toast.remove();
-          }
-        }, 300);
-      }
-    }, 3000);
+    // Add notification
+    notifyBox.addNotification(fullMessage, type);
+  } else {
+    console.warn('NotificationBox instance not found. Please initialize notifyBox globally.');
   }
+}
 
   protected showError(errorId: string, message: string): void {
     const errorDiv = findElement(`#${errorId}`);
