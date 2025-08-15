@@ -365,8 +365,9 @@ class Menu {
           aiDifficulty: lvl,
           winScore: 10,
           currentUser: you || null,
-          displayNames: [you?.name || "You", `AI (lvl ${lvl})`],
+          displayNames: [`AI (lvl ${lvl})`, you?.name || "You"], // <-- left AI, right You
         };
+
         root.remove();
         new Pong3D(cfg);
       }
@@ -1370,12 +1371,12 @@ class Pong3D {
       } else {
         // ---- LOCAL 2P ----
         // Left paddle (p1) = W/S
-        if (this.keys["w"]) p1.position.z -= move;
-        if (this.keys["s"]) p1.position.z += move;
+        if (this.keys["arrowup"]) p1.position.z -= move;
+        if (this.keys["arrowdown"]) p1.position.z += move;
 
         // Right paddle (p2) = Arrow Up/Down
-        if (this.keys["arrowup"]) p2.position.z -= move;
-        if (this.keys["arrowdown"]) p2.position.z += move;
+        if (this.keys["w"]) p2.position.z -= move;
+        if (this.keys["s"]) p2.position.z += move;
       }
     }
 
