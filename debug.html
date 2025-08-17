@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Socket.IO Menu</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .btn {
+            background: linear-gradient(135deg, #374151 0%, #1f2937 100%);
+            border: 1px solid rgba(132, 204, 22, 0.3);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+        .btn:hover {
+            background: linear-gradient(135deg, #4b5563 0%, #374151 100%);
+            border-color: rgba(132, 204, 22, 0.5);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(132, 204, 22, 0.15);
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #84cc16 0%, #65a30d 100%);
+            border-color: #84cc16;
+            color: black;
+            font-weight: 700;
+        }
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #a3e635 0%, #84cc16 100%);
+            border-color: #a3e635;
+            box-shadow: 0 8px 25px rgba(132, 204, 22, 0.3);
+        }
+        .btn-outline {
+            background: transparent;
+            border-color: rgba(59, 130, 246, 0.4);
+            color: #3b82f6;
+        }
+        .btn-outline:hover {
+            background: rgba(59, 130, 246, 0.1);
+            border-color: #3b82f6;
+            color: #60a5fa;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white font-sans">
+    <div class="min-h-screen flex items-center justify-center p-4">
+        <div class="bg-gradient-to-br from-gray-800 to-gray-900 p-8 rounded-3xl w-full max-w-2xl shadow-2xl border border-lime-500/20">
+            <h1 class="text-2xl font-bold text-lime-500 mb-6 text-center">Socket.IO Test Menu</h1>
+            
+            <div class="space-y-4">
+                <h2 class="text-lg font-semibold text-blue-500 mb-3">Online Play (Socket.IO)</h2>
+                <div class="grid grid-cols-2 gap-3">
+                    <button id="host2p" class="btn btn-primary">🎯 Host 2P</button>
+                    <button id="join2p" class="btn btn-outline">🔗 Join 2P</button>
+                    <button id="host4p" class="btn btn-primary">🎯 Host 4P</button>
+                    <button id="join4p" class="btn btn-outline">🔗 Join 4P</button>
+                </div>
+                
+                <div class="mt-6">
+                    <h3 class="text-lg font-semibold text-green-500 mb-3">Test Results</h3>
+                    <div id="results" class="bg-black/20 p-4 rounded-lg min-h-20 text-sm">
+                        Click buttons to test functionality...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        const results = document.getElementById('results');
+        
+        function log(message) {
+            results.innerHTML += message + '<br>';
+            results.scrollTop = results.scrollHeight;
+            console.log(message);
+        }
+        
+        // Test Socket.IO availability
+        try {
+            const response = await fetch('http://localhost:3001/health');
+            const data = await response.json();
+            log('✅ Socket.IO server is running: ' + data.status);
+        } catch (error) {
+            log('❌ Socket.IO server not accessible: ' + error.message);
+        }
+        
+        // Button event handlers
+        document.getElementById('host2p').addEventListener('click', (e) => {
+            e.preventDefault();
+            log('🎯 Host 2P button clicked!');
+            // Test button functionality
+            e.target.style.background = 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)';
+            setTimeout(() => {
+                e.target.style.background = '';
+            }, 1000);
+        });
+        
+        document.getElementById('join2p').addEventListener('click', (e) => {
+            e.preventDefault();
+            log('🔗 Join 2P button clicked!');
+            e.target.style.background = 'rgba(59, 130, 246, 0.2)';
+            setTimeout(() => {
+                e.target.style.background = '';
+            }, 1000);
+        });
+        
+        document.getElementById('host4p').addEventListener('click', (e) => {
+            e.preventDefault();
+            log('🎯 Host 4P button clicked!');
+        });
+        
+        document.getElementById('join4p').addEventListener('click', (e) => {
+            e.preventDefault();
+            log('🔗 Join 4P button clicked!');
+        });
+        
+        // Check if buttons are accessible
+        log('🔍 Testing button accessibility...');
+        const buttons = document.querySelectorAll('button');
+        buttons.forEach((btn, index) => {
+            const rect = btn.getBoundingClientRect();
+            log(`Button ${index + 1}: visible=${rect.width > 0 && rect.height > 0}, clickable=${btn.style.pointerEvents !== 'none'}`);
+        });
+    </script>
+</body>
+</html>

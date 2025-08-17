@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Socket.IO Sync</title>
+    <style>
+        body { background: #111; color: white; font-family: monospace; padding: 20px; }
+        .section { margin: 20px 0; padding: 15px; background: #222; border-radius: 8px; }
+        .log { background: #000; padding: 10px; border-radius: 4px; height: 200px; overflow-y: auto; font-size: 12px; }
+        .error { color: #ff6b6b; }
+        .success { color: #51cf66; }
+        .info { color: #74c0fc; }
+        .warning { color: #ffd43b; }
+        button { background: #4c6ef5; color: white; border: none; padding: 8px 16px; border-radius: 4px; margin: 5px; cursor: pointer; }
+        button:hover { background: #364fc7; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Socket.IO Synchronization Debug</h1>
+    
+    <div class="section">
+        <h2>Connection Status</h2>
+        <div id="connection-status"></div>
+        <button onclick="checkConnection()">Check Connection</button>
+    </div>
+    
+    <div class="section">
+        <h2>Room Operations</h2>
+        <button onclick="createTestRoom()">Create Test Room</button>
+        <button onclick="joinTestRoom()">Join Test Room</button>
+        <button onclick="startTestGame()">Start Game</button>
+        <button onclick="leaveRoom()">Leave Room</button>
+    </div>
+    
+    <div class="section">
+        <h2>Real-time Log</h2>
+        <div id="log" class="log"></div>
+        <button onclick="clearLog()">Clear Log</button>
+    </div>
+
+    <script type="module">
+        let socket = null;
+        let currentRoom = null;
+        
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type;
+            logDiv.innerHTML += `<div class="${className}">[${timestamp}] ${message}</div>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(`[${timestamp}] ${message}`);
+        }
+        
+        window.clearLog = () => {
+            document.getElementById('log').innerHTML = '';
+        };
+        
+        window.checkConnection = async () => {
+            try {
+                // Check server health
+                const response = await fetch('http://localhost:3001/health');
+                const health = await response.json();
+                log(`✅ Server Health: ${health.status}`, 'success');
+                
+                // Check Socket.IO connection
+                if (!socket) {
+                    log('🔌 Connecting to Socket.IO...', 'info');
+                    const { io } = await import('https://cdn.socket.io/4.7.5/socket.io.esm.min.js');
+                    socket = io('http://localhost:3001');
+                    
+                    socket.on('connect', () => {
+                        log(`✅ Connected: ${socket.id}`, 'success');
+                        updateConnectionStatus();
+                    });
+                    
+                    socket.on('disconnect', (reason) => {
+                        log(`❌ Disconnected: ${reason}`, 'error');
+                        updateConnectionStatus();
+                    });
+                    
+                    socket.on('room_created', (roomInfo) => {
+                        log(`🏠 Room created: ${roomInfo.roomId}`, 'success');
+                        currentRoom = roomInfo.roomId;
+                    });
+                    
+                    socket.on('room_joined', (roomInfo) => {
+                        log(`🚪 Joined room: ${roomInfo.roomId}`, 'success');
+                        currentRoom = roomInfo.roomId;
+                    });
+                    
+                    socket.on('player_joined', (player) => {
+                        log(`👤 Player joined: ${player.name}`, 'info');
+                    });
+                    
+                    socket.on('room_state', (state) => {
+                        log(`📊 Room state: ${state.playerCount}/${state.maxPlayers} players`, 'info');
+                    });
+                    
+                    socket.on('game_started', () => {
+                        log(`🎮 Game started!`, 'success');
+                    });
+                    
+                    socket.on('error', (error) => {
+                        log(`❌ Error: ${error}`, 'error');
+                    });
+                } else {
+                    log(`Socket already connected: ${socket.id}`, 'warning');
+                }
+            } catch (error) {
+                log(`❌ Connection failed: ${error.message}`, 'error');
+            }
+        };
+        
+        function updateConnectionStatus() {
+            const statusDiv = document.getElementById('connection-status');
+            if (socket && socket.connected) {
+                statusDiv.innerHTML = `<span class="success">✅ Connected (${socket.id})</span><br>Room: ${currentRoom || 'None'}`;
+            } else {
+                statusDiv.innerHTML = `<span class="error">❌ Disconnected</span>`;
+            }
+        }
+        
+        window.createTestRoom = () => {
+            if (!socket || !socket.connected) {
+                log('❌ Not connected to Socket.IO', 'error');
+                return;
+            }
+            
+            const playerName = prompt('Enter player name:', 'TestHost');
+            if (!playerName) return;
+            
+            log(`🏠 Creating room as ${playerName}...`, 'info');
+            socket.emit('register_player', { name: playerName });
+            socket.emit('create_room', { gameMode: '2p', playerName });
+        };
+        
+        window.joinTestRoom = () => {
+            if (!socket || !socket.connected) {
+                log('❌ Not connected to Socket.IO', 'error');
+                return;
+            }
+            
+            const roomId = prompt('Enter room ID:');
+            const playerName = prompt('Enter player name:', 'TestGuest');
+            if (!roomId || !playerName) return;
+            
+            log(`🚪 Joining room ${roomId} as ${playerName}...`, 'info');
+            socket.emit('register_player', { name: playerName });
+            socket.emit('join_room', { roomId: roomId.toUpperCase(), playerName });
+        };
+        
+        window.startTestGame = () => {
+            if (!currentRoom) {
+                log('❌ Not in a room', 'error');
+                return;
+            }
+            
+            log(`🎮 Starting game in room ${currentRoom}...`, 'info');
+            socket.emit('start_game', { roomId: currentRoom });
+        };
+        
+        window.leaveRoom = () => {
+            if (!currentRoom) {
+                log('❌ Not in a room', 'error');
+                return;
+            }
+            
+            log(`👋 Leaving room ${currentRoom}...`, 'info');
+            socket.emit('leave_room', { roomId: currentRoom });
+            currentRoom = null;
+        };
+        
+        // Auto-connect on load
+        log('🚀 Debug tool loaded. Click "Check Connection" to start.', 'info');
+        updateConnectionStatus();
+    </script>
+</body>
+</html>

@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Player Names</title>
+    <style>
+        body { background: #111; color: white; font-family: monospace; padding: 20px; }
+        .section { margin: 20px 0; padding: 15px; background: #222; border-radius: 8px; }
+        .error { color: #ff6b6b; }
+        .success { color: #51cf66; }
+        .info { color: #74c0fc; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Debug Player Name Issue</h1>
+    
+    <div class="section">
+        <h2>Frontend Authentication State</h2>
+        <div id="auth-state"></div>
+    </div>
+    
+    <div class="section">
+        <h2>User Object Analysis</h2>
+        <div id="user-analysis"></div>
+    </div>
+    
+    <div class="section">
+        <h2>Socket.IO Connection Test</h2>
+        <div id="socket-test"></div>
+        <button onclick="testSocket()">Test Socket Connection</button>
+    </div>
+
+    <script type="module">
+        function log(elementId, message, type = 'info') {
+            const el = document.getElementById(elementId);
+            const className = type === 'error' ? 'error' : type === 'success' ? 'success' : 'info';
+            el.innerHTML += `<div class="${className}">${message}</div>`;
+            console.log(message);
+        }
+
+        // Check frontend authentication state
+        const frontendAuthToken = localStorage.getItem('ft_pong_auth_token');
+        const frontendUserData = localStorage.getItem('ft_pong_user_data');
+        
+        log('auth-state', `Auth Token: ${frontendAuthToken ? '✅ Present' : '❌ Missing'}`);
+        log('auth-state', `User Data: ${frontendUserData ? '✅ Present' : '❌ Missing'}`);
+        
+        let you = null;
+        if (frontendAuthToken && frontendUserData) {
+            try {
+                const userData = JSON.parse(frontendUserData);
+                you = {
+                    name: userData.firstName ? `${userData.firstName} ${userData.lastName}` : userData.userName || userData.email,
+                    email: userData.email,
+                    id: userData.id
+                };
+                log('auth-state', `Parsed User: ${JSON.stringify(you)}`, 'success');
+            } catch (error) {
+                log('auth-state', `Parse Error: ${error.message}`, 'error');
+            }
+        } else {
+            log('auth-state', 'No authentication data found', 'error');
+        }
+
+        // Analyze user object
+        if (you) {
+            log('user-analysis', `you.name: "${you.name}"`, you.name ? 'success' : 'error');
+            log('user-analysis', `you.email: "${you.email}"`, you.email ? 'success' : 'error');
+            log('user-analysis', `you.id: "${you.id}"`, you.id ? 'success' : 'error');
+            
+            // Test player name derivation
+            const playerName = you?.name || you?.firstName || you?.email || 'Demo Player';
+            log('user-analysis', `Final Player Name: "${playerName}"`, 'success');
+        } else {
+            log('user-analysis', 'User object is null', 'error');
+            log('user-analysis', 'Raw localStorage data:', 'info');
+            log('user-analysis', `ft_pong_user_data: ${localStorage.getItem('ft_pong_user_data')}`, 'info');
+        }
+
+        // Socket.IO test function
+        window.testSocket = async function() {
+            try {
+                log('socket-test', 'Testing Socket.IO server...', 'info');
+                const response = await fetch('http://localhost:3001/health');
+                const data = await response.json();
+                log('socket-test', `Server Health: ${data.status}`, 'success');
+                
+                // Test Socket.IO connection
+                const { io } = await import('https://cdn.socket.io/4.7.5/socket.io.esm.min.js');
+                const socket = io('http://localhost:3001');
+                
+                socket.on('connect', () => {
+                    log('socket-test', `Connected with ID: ${socket.id}`, 'success');
+                    
+                    // Register player
+                    const playerName = you?.name || you?.firstName || you?.email || 'Test Player';
+                    socket.emit('register_player', { name: playerName });
+                    log('socket-test', `Registered as: "${playerName}"`, 'success');
+                });
+                
+                socket.on('connect_error', (error) => {
+                    log('socket-test', `Connection Error: ${error.message}`, 'error');
+                });
+                
+            } catch (error) {
+                log('socket-test', `Error: ${error.message}`, 'error');
+            }
+        };
+
+        // Auto-run tests
+        log('auth-state', '=== Analysis Complete ===', 'info');
+    </script>
+</body>
+</html>
