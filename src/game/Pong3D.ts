@@ -1,6 +1,15 @@
 import {
-  ArcRotateCamera, Color3, Color4, DirectionalLight, Engine, HemisphericLight,
-  MeshBuilder, Scene, StandardMaterial, Texture, Vector3
+  ArcRotateCamera,
+  Color3,
+  Color4,
+  DirectionalLight,
+  Engine,
+  HemisphericLight,
+  MeshBuilder,
+  Scene,
+  StandardMaterial,
+  Texture,
+  Vector3,
 } from "@babylonjs/core";
 import { Sound } from "@babylonjs/core/Audio/sound";
 import "@babylonjs/core/Audio/audioEngine";
@@ -10,8 +19,15 @@ import { markUI } from "../ui";
 import type { GameConfig, ObstacleShape } from "../types";
 import type { RemoteMsg } from "./helpers";
 import {
-  clamp, clampHorizontal, ensureMinHorizontalSpeed, flashPaddle, lerp, pickWeighted,
-  pulseObstacle, safeParse, shinyMat
+  clamp,
+  clampHorizontal,
+  ensureMinHorizontalSpeed,
+  flashPaddle,
+  lerp,
+  pickWeighted,
+  pulseObstacle,
+  safeParse,
+  shinyMat,
 } from "./helpers";
 import { SHAPES, SHAPE_WEIGHTS } from "./constants";
 import { themeBridge, type GameThemeColors } from "./ThemeBridge";
@@ -113,7 +129,7 @@ export class Pong3D {
     // Initialize theme system
     this.currentGameTheme = themeBridge.getCurrentTheme();
     this.scene.clearColor = this.currentGameTheme.background;
-    
+
     // Listen for theme changes
     this.themeUnsubscribe = themeBridge.onThemeChange((newTheme) => {
       this.updateGameTheme(newTheme);
@@ -122,8 +138,8 @@ export class Pong3D {
     this.camera = new ArcRotateCamera(
       "cam",
       this.baseAlpha, // alpha
-      Math.PI / 4.2, // beta
-      28, // radius
+      Math.PI / 5, // beta
+      20, // radius
       Vector3.Zero(),
       this.scene
     );
@@ -194,14 +210,16 @@ export class Pong3D {
 
   private createScoreUI() {
     const hud = markUI(document.createElement("div"));
-    hud.className = "absolute top-20 left-1/2 -translate-x-1/2 text-white font-bold z-10 flex gap-4 items-center px-6 py-4 rounded-3xl bg-gradient-to-br from-gray-800/95 to-gray-900/95 border border-lime-500/30 shadow-2xl backdrop-blur-xl";
+    hud.className =
+      "absolute top-20 left-1/2 -translate-x-1/2 text-white font-bold z-10 flex gap-4 items-center px-6 py-4 rounded-3xl bg-gradient-to-br from-gray-800/95 to-gray-900/95 border border-lime-500/30 shadow-2xl backdrop-blur-xl";
     hud.style.fontFamily = "'Orbitron', system-ui, sans-serif";
-    hud.style.boxShadow = "0 25px 50px rgba(0,0,0,0.4), 0 0 0 1px rgba(132, 204, 22, 0.1), inset 0 1px 0 rgba(255,255,255,0.1)";
+    hud.style.boxShadow =
+      "0 25px 50px rgba(0,0,0,0.4), 0 0 0 1px rgba(132, 204, 22, 0.1), inset 0 1px 0 rgba(255,255,255,0.1)";
 
     const slots = this.config.playerCount === 4 ? 4 : 2;
     const colors = ["lime-500", "blue-500", "purple-500", "red-500"];
     const hexColors = ["#84cc16", "#3b82f6", "#a855f7", "#ef4444"];
-    
+
     for (let i = 0; i < slots; i++) {
       const badge = document.createElement("div");
       badge.className = `flex items-center gap-2 px-4 py-2.5 rounded-xl border transition-all duration-300 min-w-20 justify-center bg-gradient-to-br from-${colors[i]}/10 to-${colors[i]}/5 border-${colors[i]}/25`;
@@ -271,7 +289,8 @@ export class Pong3D {
 
   private showWaitingOverlay(text: string) {
     const d = markUI(document.createElement("div"));
-    d.className = "fixed inset-0 grid place-items-center bg-black/65 text-white z-[9999] font-sans";
+    d.className =
+      "fixed inset-0 grid place-items-center bg-black/65 text-white z-[9999] font-sans";
     d.innerHTML = `<div class="px-5 py-4 bg-gray-900 rounded-xl shadow-2xl border border-lime-500/20">
       <div id="waitText" class="text-lg text-center">${text}</div>
     </div>`;
@@ -289,13 +308,13 @@ export class Pong3D {
   }
 
   private updateGameTheme(newTheme: GameThemeColors) {
-    console.log('🎮 Updating game colors for new theme');
-    
+    console.log("🎮 Updating game colors for new theme");
+
     this.currentGameTheme = newTheme;
-    
+
     // Update scene background
     this.scene.clearColor = newTheme.background;
-    
+
     // Update ball color
     if (this.ball && this.ball.material) {
       const ballMat = this.ball.material as StandardMaterial;
@@ -303,13 +322,13 @@ export class Pong3D {
         ballMat.emissiveColor = newTheme.ball.scale(0.3);
       }
     }
-    
+
     // Update paddle colors
     this.paddles.forEach((paddle, index) => {
       if (paddle.material) {
         const paddleMat = paddle.material as StandardMaterial;
         const newColor = themeBridge.getPaddleColor(index);
-        
+
         // Update the material colors
         if (paddleMat.diffuseColor) {
           paddleMat.diffuseColor = newColor;
@@ -319,13 +338,13 @@ export class Pong3D {
         }
       }
     });
-    
+
     // Update obstacle colors
     this.obstacles.forEach((obstacle, index) => {
       if (obstacle.material) {
         const obstacleMat = obstacle.material as StandardMaterial;
         const newColor = themeBridge.getObstacleColor(index);
-        
+
         if (obstacleMat.diffuseColor) {
           obstacleMat.diffuseColor = newColor;
         }
@@ -334,47 +353,58 @@ export class Pong3D {
         }
       }
     });
-    
-    console.log('✅ Game colors updated successfully');
+
+    console.log("✅ Game colors updated successfully");
   }
 
   private initializeChat() {
     // Get current user info from localStorage (set by frontend auth)
     let currentUser: ChatUser = {
-      id: 'player-' + Date.now(),
-      name: 'Player',
-      isConnected: true
+      id: "player-" + Date.now(),
+      name: "Player",
+      isConnected: true,
     };
 
     try {
-      const userData = localStorage.getItem('ft_pong_user_data');
+      const userData = localStorage.getItem("ft_pong_user_data");
       if (userData) {
         const user = JSON.parse(userData);
         currentUser = {
           id: user.id || currentUser.id,
-          name: user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : (user.username || user.email || 'Player'),
-          isConnected: true
+          name: user.firstName
+            ? `${user.firstName} ${user.lastName || ""}`.trim()
+            : user.username || user.email || "Player",
+          isConnected: true,
         };
       }
     } catch (error) {
-      console.warn('Could not load user data for chat:', error);
+      console.warn("Could not load user data for chat:", error);
     }
 
     // Get game container for chat
-    const gameContainer = document.querySelector('#gameContainer') || document.body;
-    
+    const gameContainer =
+      document.querySelector("#gameContainer") || document.body;
+
     // Initialize chat with WebSocket if available
-    this.gameChat = new GameChat(gameContainer as HTMLElement, currentUser, this.ws || undefined);
-    
+    this.gameChat = new GameChat(
+      gameContainer as HTMLElement,
+      currentUser,
+      this.ws || undefined
+    );
+
     // Show welcome message
-    this.gameChat.addSystemMessage(`Welcome to the game, ${currentUser.name}! 🎮`);
-    
+    this.gameChat.addSystemMessage(
+      `Welcome to the game, ${currentUser.name}! 🎮`
+    );
+
     // Add game-specific system messages
     if (this.config.playerCount > 1) {
-      this.gameChat.addSystemMessage('Chat with other players during the game!');
+      this.gameChat.addSystemMessage(
+        "Chat with other players during the game!"
+      );
     }
 
-    console.log('💬 Game chat initialized for user:', currentUser.name);
+    console.log("💬 Game chat initialized for user:", currentUser.name);
   }
 
   private getPlayerName(playerIndex: number): string {
@@ -390,13 +420,13 @@ export class Pong3D {
       this.themeUnsubscribe();
       this.themeUnsubscribe = undefined;
     }
-    
+
     // Cleanup chat
     if (this.gameChat) {
       this.gameChat.destroy();
       this.gameChat = null;
     }
-    
+
     // Dispose engine and scene
     if (this.engine) {
       this.engine.dispose();
@@ -492,23 +522,12 @@ export class Pong3D {
     wall(t, height + t, width / 2 + t / 2, 0, "wallRight", rightMat);
 
     // Corners as picture boxes
-    function pictureMat(
-      scene: Scene,
-      url: string,
-      uScale = 1,
-      vScale = 1,
-      rotateRad = 0
-    ) {
-      const mat = new StandardMaterial("cornerMat", scene);
-      const tex = new Texture(url, scene);
-      tex.wrapU = Texture.CLAMP_ADDRESSMODE;
-      tex.wrapV = Texture.CLAMP_ADDRESSMODE;
-      tex.uScale = uScale;
-      tex.vScale = vScale;
-      tex.wAng = rotateRad;
-      tex.anisotropicFilteringLevel = 8;
-      mat.diffuseTexture = tex;
-      mat.specularColor = new Color3(0, 0, 0);
+    // Simple bright material instead of picture
+    function brightMat(scene: Scene, color: Color3) {
+      const mat = new StandardMaterial("cornerBrightMat", scene);
+      mat.diffuseColor = color; // main color
+      mat.emissiveColor = color.scale(0.7); // make it glow a bit
+      mat.specularColor = new Color3(0, 0, 0); // no shiny highlights
       return mat;
     }
 
@@ -518,7 +537,9 @@ export class Pong3D {
     const cx = width / 2 - t / 2 - cS / 2;
     const cz = height / 2 - t / 2 - cS / 2;
 
-    const cornerMat = pictureMat(this.scene, "/textures/pole.jpg");
+    // Use bright yellow (you can change the color)
+    const cornerMat = brightMat(this.scene, new Color3(0.5, 0, 0));
+
     const makeCornerBox = (x: number, z: number, id: string) => {
       const box = MeshBuilder.CreateBox(
         id,
@@ -529,6 +550,7 @@ export class Pong3D {
       box.material = cornerMat;
       this.corners.push(box);
     };
+
     makeCornerBox(+cx, +cz, "cornerTR");
     makeCornerBox(+cx, -cz, "cornerBR");
     makeCornerBox(-cx, +cz, "cornerTL");
@@ -693,7 +715,14 @@ export class Pong3D {
         ? this.fixedObstacleShape
         : pickWeighted(SHAPES, SHAPE_WEIGHTS);
 
-      this.obstacleInfo.push({ x, z, radius, color: bodyArr, cap: capArr, shape });
+      this.obstacleInfo.push({
+        x,
+        z,
+        radius,
+        color: bodyArr,
+        cap: capArr,
+        shape,
+      });
       this.buildObstacleMesh(x, z, radius, bodyCol, capCol, shape);
     }
   }
@@ -821,7 +850,7 @@ export class Pong3D {
             idx: msg.idx,
             neg: msg.neg,
             pos: msg.pos,
-            sid: msg.sid
+            sid: msg.sid,
           });
           break;
         case "chat_message":
@@ -831,91 +860,94 @@ export class Pong3D {
           socketManager.startGame();
           break;
         default:
-          console.log('Unhandled Socket.IO message type:', msg.t);
+          console.log("Unhandled Socket.IO message type:", msg.t);
       }
     } else if (this.ws) {
       try {
         this.ws.send(JSON.stringify(msg));
       } catch (error) {
-        console.error('Failed to send WebSocket message:', error);
+        console.error("Failed to send WebSocket message:", error);
       }
     }
   }
 
   private initSocketIO() {
     if (!socketManager.connected) {
-      console.error('Socket.IO not connected');
+      console.error("Socket.IO not connected");
       return;
     }
 
-    console.log('Initializing Socket.IO for game...', {
+    console.log("Initializing Socket.IO for game...", {
       isHost: this.isHost,
       isGuest: this.isGuest,
       roomId: socketManager.roomId,
-      playerId: socketManager.id
+      playerId: socketManager.id,
     });
 
     // Set up Socket.IO event listeners
-    socketManager.on('game_state', (state) => {
+    socketManager.on("game_state", (state) => {
       if (this.isGuest) {
         this.handleRemoteState(state);
       }
     });
 
-    socketManager.on('player_input', (data) => {
+    socketManager.on("player_input", (data) => {
       if (this.isHost && data.playerId !== socketManager.id) {
         // Convert Socket.IO input format to our internal format
         this.guestInputs[data.input.idx] = {
           neg: data.input.neg,
-          pos: data.input.pos
+          pos: data.input.pos,
         };
       }
     });
 
-    socketManager.on('chat_message', (message) => {
+    socketManager.on("chat_message", (message) => {
       if (this.gameChat) {
         this.gameChat.addMessage(message);
       }
     });
 
-    socketManager.on('player_joined', (player) => {
-      console.log('Player joined:', player);
+    socketManager.on("player_joined", (player) => {
+      console.log("Player joined:", player);
       if (this.isHost) {
-        this.connectedGuests = Math.min(this.requiredGuests, this.connectedGuests + 1);
+        this.connectedGuests = Math.min(
+          this.requiredGuests,
+          this.connectedGuests + 1
+        );
         // Update display names
         if (this.config.displayNames && this.config.displayNames.length > 1) {
-          this.config.displayNames[1] = player.name || 'Player 2';
+          this.config.displayNames[1] = player.name || "Player 2";
         }
         this.updateScoreUI();
         this.updateWaitingUI();
       }
     });
 
-    socketManager.on('player_left', (playerId) => {
-      console.log('Player left:', playerId);
+    socketManager.on("player_left", (playerId) => {
+      console.log("Player left:", playerId);
       if (this.isHost) {
         this.connectedGuests = Math.max(0, this.connectedGuests - 1);
         // Reset display names
         if (this.config.displayNames && this.config.displayNames.length > 1) {
-          this.config.displayNames[1] = 'Waiting…';
+          this.config.displayNames[1] = "Waiting…";
         }
         this.updateScoreUI();
         this.updateWaitingUI();
       }
     });
 
-    socketManager.on('room_state', (state) => {
-      console.log('Room state received:', state);
+    socketManager.on("room_state", (state) => {
+      console.log("Room state received:", state);
       if (this.isHost) {
         // Update connected guests count based on actual room state
         this.connectedGuests = state.playerCount - 1; // Subtract 1 for the host
-        console.log('Host: Updated connected guests to', this.connectedGuests);
+        console.log("Host: Updated connected guests to", this.connectedGuests);
         this.updateWaitingUI();
       }
     });
 
-    socketManager.on('game_started', () => {
-      console.log('Game started signal received');
+    socketManager.on("game_started", () => {
+      console.log("Game started signal received");
       if (this.isGuest && !this.matchReady) {
         this.matchReady = true;
         this.hideWaitingOverlay();
@@ -927,11 +959,11 @@ export class Pong3D {
     if (this.isHost) {
       // Since we're starting the game, we know the guest is connected
       this.connectedGuests = this.requiredGuests;
-      console.log('Host: Setting connected guests to', this.connectedGuests);
+      console.log("Host: Setting connected guests to", this.connectedGuests);
       this.checkMatchReady();
     } else if (this.isGuest) {
       // Guest should wait for game_started signal
-      console.log('Guest: Waiting for game start signal');
+      console.log("Guest: Waiting for game start signal");
     }
   }
 
@@ -947,12 +979,12 @@ export class Pong3D {
   private updateWaitingUI() {
     // Update the waiting overlay if it exists
     if (this.waitUI) {
-      const statusText = this.waitUI.querySelector('.status-text');
+      const statusText = this.waitUI.querySelector(".status-text");
       if (statusText) {
         statusText.textContent = `Waiting for players… (${this.connectedGuests}/${this.requiredGuests})`;
       }
     }
-    
+
     // Check if we can start the match
     this.checkMatchReady();
   }
@@ -978,11 +1010,11 @@ export class Pong3D {
     stateMsg.paddles.forEach((pp: any, i: number) =>
       this.paddles[i]?.position.set(pp.x, pp.y, pp.z)
     );
-    
+
     for (let i = 0; i < this.scores.length && i < stateMsg.scores.length; i++)
       this.scores[i] = stateMsg.scores[i];
     this.updateScoreUI();
-    
+
     if (!this.matchReady) {
       this.matchReady = true;
       this.hideWaitingOverlay();
@@ -996,7 +1028,7 @@ export class Pong3D {
       this.initSocketIO();
       return;
     }
-    
+
     if (!this.config.wsUrl || !this.config.roomId) return;
     try {
       this.ws = new WebSocket(this.config.wsUrl);
@@ -1059,11 +1091,11 @@ export class Pong3D {
           if (this.gameChat) {
             this.gameChat.addMessage({
               id: Date.now().toString(),
-              playerId: 'system',
-              playerName: 'System',
+              playerId: "system",
+              playerName: "System",
               message: `${msg.user.name} joined the game`,
               timestamp: Date.now(),
-              type: 'join'
+              type: "join",
             });
           }
           return;
@@ -1073,11 +1105,11 @@ export class Pong3D {
           if (this.gameChat) {
             this.gameChat.addMessage({
               id: Date.now().toString(),
-              playerId: 'system',
-              playerName: 'System',
+              playerId: "system",
+              playerName: "System",
               message: `Player left the game`,
               timestamp: Date.now(),
-              type: 'leave'
+              type: "leave",
             });
           }
           return;
@@ -1407,11 +1439,15 @@ export class Pong3D {
           this.scores[this.lastHitter]++;
           this.lastScorer = this.lastHitter;
           this.updateScoreUI();
-          
+
           // Add chat notification for scoring
           if (this.gameChat) {
             const playerName = this.getPlayerName(this.lastHitter);
-            this.gameChat.addSystemMessage(`🎯 ${playerName} scores! Current score: ${this.scores[this.lastHitter]}`);
+            this.gameChat.addSystemMessage(
+              `🎯 ${playerName} scores! Current score: ${
+                this.scores[this.lastHitter]
+              }`
+            );
           }
 
           if (this.scores[this.lastHitter] >= target) {
@@ -1531,8 +1567,14 @@ export class Pong3D {
     // Add chat notification for game end
     if (this.gameChat) {
       const winnerName = this.getPlayerName(winnerIdx);
-      this.gameChat.addSystemMessage(`🏆 Game Over! ${winnerName} wins the match!`);
-      this.gameChat.addSystemMessage(`Final Score: ${this.scores.slice(0, this.config.playerCount === 4 ? 4 : 2).join(' - ')}`);
+      this.gameChat.addSystemMessage(
+        `🏆 Game Over! ${winnerName} wins the match!`
+      );
+      this.gameChat.addSystemMessage(
+        `Final Score: ${this.scores
+          .slice(0, this.config.playerCount === 4 ? 4 : 2)
+          .join(" - ")}`
+      );
     }
 
     // Play correct win/lose cue from local perspective
@@ -1571,7 +1613,8 @@ export class Pong3D {
 
   private endAndToast(text: string) {
     const t = markUI(document.createElement("div"));
-    t.className = "fixed top-5 left-1/2 -translate-x-1/2 bg-black/70 text-white px-4 py-3 rounded-xl z-[10001] font-sans shadow-2xl border border-lime-500/20";
+    t.className =
+      "fixed top-5 left-1/2 -translate-x-1/2 bg-black/70 text-white px-4 py-3 rounded-xl z-[10001] font-sans shadow-2xl border border-lime-500/20";
     t.innerHTML = `${text} &nbsp; <button id="re" class="ml-2 bg-lime-500 hover:bg-lime-600 text-black px-3 py-1 rounded-lg font-semibold transition-colors">Play again</button>`;
     document.body.appendChild(t);
     (t.querySelector("#re") as HTMLButtonElement).onclick = () =>
@@ -1637,7 +1680,8 @@ export class Pong3D {
 
   private playWin() {
     const s = this.sounds.win[0];
-    const ready = s && ((s as any).isReadyToPlay === true || (s as any).isReady?.());
+    const ready =
+      s && ((s as any).isReadyToPlay === true || (s as any).isReady?.());
     if (ready) {
       (s as any).setPlaybackRate?.(1);
       s.play();
@@ -1650,7 +1694,8 @@ export class Pong3D {
 
   private playLose() {
     const s = this.sounds.lose[0];
-    const ready = s && ((s as any).isReadyToPlay === true || (s as any).isReady?.());
+    const ready =
+      s && ((s as any).isReadyToPlay === true || (s as any).isReady?.());
     if (ready) {
       (s as any).setPlaybackRate?.(1);
       s.play();
