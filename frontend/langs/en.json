@@ -370,7 +370,7 @@
   "fields.firstName": "First Name",
   "fields.lastName": "Last Name",
     "verify.title": "Verify Your Email",
-  "verify.sentCode": "We've sent a 4-digit verification code to:",
+  "verify.sentCode": "We've sent a 6-digit verification code to:",
   "verify.enterCode": "Please enter the code below to continue",
   "verify.codeLabel": "Verification Code",
   "verify.submitButton": "Verify Email",
@@ -399,7 +399,14 @@
   "Animations": "Animations",
   "Save Settings": "Save Settings",
   "Reset": "Reset",
-  "Language changed to": "Language changed to"
+  "Language changed to": "Language changed to",
+  "Please log in to access other settings": "Please log in to access other settings",
+  "Email / Username": "Email / Username",
+  "Sign up": "Sign up",
+  "Logging in...": "Logging in...",
+  "Hello {name}!": "Hello {name}!",
+  "Background theme changed to": "Background theme changed to",
+  "Theme changed to": "Theme changed to"
 }
 
 

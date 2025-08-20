@@ -12,16 +12,15 @@ import {
 } from "../utils/Constants";
 import { globalEventManager, AppEvent } from "../utils/EventManager";
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE ?? "http://localhost:3000";
+const API_BASE_URL = "http://localhost:8080";
 
 // Check if backend is available
 let isBackendAvailable = true;
 const checkBackendAvailability = async (): Promise<boolean> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/health`, { 
+    const response = await fetch(`${API_BASE_URL}/health`, {
       method: 'GET',
-      signal: AbortSignal.timeout(2000) // 2 second timeout
+      signal: AbortSignal.timeout(2000)
     });
     return response.ok;
   } catch {
@@ -29,10 +28,7 @@ const checkBackendAvailability = async (): Promise<boolean> => {
   }
 };
 
-/**
- * Shape we expect back from the backend (raw DB casing).
- * Adjust here if your backend changes.
- */
+
 type BackendUser = {
   id: number | string;
   FirstName: string;
@@ -40,8 +36,8 @@ type BackendUser = {
   username: string;
   email: string;
   profilepath?: string;
-  createdAt: string; // ISO string from DB
-  updatedAt: string; // ISO string from DB
+  createdAt: string;
+  updatedAt: string;
   // Optional flags the backend might include:
   isVerified?: number | boolean;
   status?: string;
@@ -49,7 +45,7 @@ type BackendUser = {
   enable2fa?: number | boolean;
 };
 
-/** Normalize backend user → frontend User type */
+
 function mapBackendUserToUser(raw: any): User {
   const u = raw as Partial<BackendUser> | undefined;
   if (!u) {
@@ -59,14 +55,12 @@ function mapBackendUserToUser(raw: any): User {
   return {
     id: String(u.id ?? ""),
     email: String(u.email ?? ""),
-    firstName: String(u.FirstName ?? ""),
+    firstName: String(u.firstName ?? ""),
     lastName: String(u.lastName ?? ""),
-    username: String((u as any).username ?? ""), // your User type includes username in some places
+    username: String(u.username ?? ""),
     avatar: u.profilepath ? String(u.profilepath) : undefined,
     createdAt: u.createdAt ? new Date(u.createdAt) : new Date(),
     updatedAt: u.updatedAt ? new Date(u.updatedAt) : new Date(),
-
-    // If you don’t want these in User, remove them from your User type
     gameStats: undefined,
   };
 }
@@ -150,37 +144,93 @@ export class AuthService {
     }
   }
 
-  /** Signup */
-  async signup(credentials: SignupCredentials): Promise<AuthResponse> {
-    this.setLoading(true);
-    try {
-      const validation = this.validateSignupCredentials(credentials);
-      if (!validation.isValid) {
-        return { success: false, message: validation.message };
-      }
+async signup(credentials: SignupCredentials): Promise<AuthResponse> {
+  this.setLoading(true);
+  try {
+    const validation = this.validateSignupCredentials(credentials);
+    if (!validation.isValid) {
+      return { success: false, message: validation.message };
+    }
 
-      const response = await this.signupAPI(credentials);
-      if (response.success && response.token && response.user) {
-        this.setAuthState(response.token, response.user);
-        globalEventManager.emit(AppEvent.AUTH_SIGNUP, response.user);
-        return {
-          success: true,
-          message: SUCCESS_MESSAGES.SIGNUP_SUCCESS,
-          token: response.token,
-          user: response.user,
-        };
+    const response = await this.signupAPI(credentials);
+
+    if (response.success && response.user) {
+      // if backend starts sending tokens, handle here
+      this.state = {
+        isAuthenticated: true,
+        isLoading: false,
+        token: response.token ?? null,
+        user: response.user,
+      };
+      localStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(response.user));
+      if (response.token) {
+        localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, response.token);
       }
+      globalEventManager.emit(AppEvent.AUTH_SIGNUP, response.user);
+    }
+
+    return response;
+  } catch (error) {
+    console.error("Signup error:", error);
+    return { success: false, message: ERROR_MESSAGES.NETWORK_ERROR };
+  } finally {
+    this.setLoading(false);
+  }
+}
+
+  /** Signup */
+private async signupAPI(credentials: SignupCredentials): Promise<AuthResponse> {
+  try {
+    const res = await fetch("http://localhost:8080/users", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify(credentials),
+    });
+
+    // Handle conflicts (email/username already exists)
+    if (res.status === 409) {
+      const payload = await res.json().catch(() => ({}));
       return {
         success: false,
-        message: response.message || ERROR_MESSAGES.SIGNUP_FAILED,
+        message: payload?.error || "Conflict",
+        conflict: payload?.conflict,             // 'email' | 'username'
+        suggestions: payload?.suggestions || [], // backend can send alternatives
+        statusCode: 409,
       };
-    } catch (error) {
-      console.error("Signup error:", error);
-      return { success: false, message: ERROR_MESSAGES.NETWORK_ERROR };
-    } finally {
-      this.setLoading(false);
     }
+
+    // Handle other errors
+    if (!res.ok) {
+      const errorPayload = await res.json().catch(() => ({}));
+      return {
+        success: false,
+        message: errorPayload?.message || "Signup failed",
+        statusCode: res.status,
+      };
+    }
+
+    // ✅ Success response
+    const data = await res.json();
+
+    // If backend sends { user } inside data
+    const user = mapBackendUserToUser(data.user ?? data);
+
+    return {
+      success: true,
+      token: data.token ?? null, // optional (backend may add later)
+      user,
+      statusCode: res.status,
+    };
+  } catch (err) {
+    console.error("signupAPI error:", err);
+    return { success: false, message: ERROR_MESSAGES.NETWORK_ERROR };
   }
+}
+
+
 
   /** Logout */
   async logout(): Promise<void> {
@@ -287,16 +337,19 @@ export class AuthService {
   }
 
   private isValidEmail(email: string): boolean {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
+    // const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    // return emailRegex.test(email);
+    return (true);
   }
 
   /** ---- API calls ---- */
 
-private async signupAPI(
-  credentials: SignupCredentials
+
+
+private async loginAPI(
+  credentials: LoginCredentials
 ): Promise<AuthResponse> {
-  const endpoint = `${API_BASE_URL}/users`;
+  const endpoint = `${API_BASE_URL}/auth/login`;
   try {
     const res = await fetch(endpoint, {
       method: "POST",
@@ -304,72 +357,38 @@ private async signupAPI(
         "Content-Type": "application/json",
         Accept: "application/json",
       },
-      body: JSON.stringify(credentials),
+      body: JSON.stringify({
+        username: credentials.email, // Using email as username
+        password: credentials.password
+      }),
     });
-
-    // Handle conflicts (email/username)
-    if (res.status === 409) {
-      let payload: any = {};
-      try { payload = await res.json(); } catch {}
-      return {
-        success: false,
-        message: payload?.error || "Conflict",
-        conflict: payload?.conflict,             // 'email' | 'username'
-        suggestions: payload?.suggestions || [], // array if username conflict
-        statusCode: 409,
-      };
-    }
 
     if (!res.ok) {
       const rawErr = await res.text().catch(() => "");
-      let errMsg = ERROR_MESSAGES.SIGNUP_FAILED;
-      try { errMsg = JSON.parse(rawErr).error ?? errMsg; } catch {}
-      return { success: false, message: errMsg, statusCode: res.status };
+      let errMsg = ERROR_MESSAGES.INVALID_CREDENTIALS;
+      try {
+        const errorData = JSON.parse(rawErr);
+        errMsg = errorData.error || errorData.message || errMsg;
+      } catch {}
+      return { success: false, message: errMsg };
     }
 
     const data = await res.json();
+
+    // Assuming backend returns: { token: "...", user: { ... } }
+    if (!data.token) {
+      return { success: false, message: "No token received from server" };
+    }
+
     const user = mapBackendUserToUser(data.user);
-    return { success: true, token: data.token, user, statusCode: 201 };
+    return { success: true, token: data.token, user };
   } catch (err) {
-    console.error("signupAPI error:", err);
-    return { success: false, message: ERROR_MESSAGES.NETWORK_ERROR };
+    console.error("Backend not available, using offline demo auth:", err);
+
+    // Fallback to demo authentication for offline mode
+    return this.offlineDemoLogin(credentials);
   }
 }
-
-
-  private async loginAPI(
-    credentials: LoginCredentials
-  ): Promise<AuthResponse> {
-    const endpoint = `${API_BASE_URL}/login`;
-    try {
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify(credentials),
-      });
-
-      if (!res.ok) {
-        const rawErr = await res.text().catch(() => "");
-        let errMsg = ERROR_MESSAGES.INVALID_CREDENTIALS;
-        try {
-          errMsg = JSON.parse(rawErr).error ?? errMsg;
-        } catch {}
-        return { success: false, message: errMsg };
-      }
-
-      const data = await res.json();
-      const user = mapBackendUserToUser(data.user);
-      return { success: true, token: data.token, user };
-    } catch (err) {
-      console.error("Backend not available, using offline demo auth:", err);
-      
-      // Fallback to demo authentication for offline mode
-      return this.offlineDemoLogin(credentials);
-    }
-  }
 
   /**
    * Offline demo login for when backend is not available
@@ -384,15 +403,15 @@ private async signupAPI(
       { email: 'david@ftpong.com', password: 'david123', firstName: 'David', lastName: 'Wilson', username: 'david_wilson' }
     ];
 
-    const matchedUser = validCredentials.find(cred => 
-      cred.email.toLowerCase() === credentials.email.toLowerCase() && 
+    const matchedUser = validCredentials.find(cred =>
+      cred.email.toLowerCase() === credentials.email.toLowerCase() &&
       cred.password === credentials.password
     );
 
     if (!matchedUser) {
-      return { 
-        success: false, 
-        message: 'Invalid demo credentials. Available accounts:\n• alice@ftpong.com / alice123\n• bob@ftpong.com / bob123\n• carol@ftpong.com / carol123\n• david@ftpong.com / david123\n• demo@ftpong.com / demo123' 
+      return {
+        success: false,
+        message: 'Invalid demo credentials. Available accounts:\n• alice@ftpong.com / alice123\n• bob@ftpong.com / bob123\n• carol@ftpong.com / carol123\n• david@ftpong.com / david123\n• demo@ftpong.com / demo123'
       };
     }
 

@@ -67,7 +67,7 @@ async function loadSafeComponents(): Promise<void> {
 	console.log('📦 Loading safe components (no API calls)...');
 
 	try {
-		// Load all components but handle failures gracefully  
+		// Load all components but handle failures gracefully
 		const safeComponents = [
 			{ path: './components/home/SettingsBox', name: 'SettingsBox' },
 			{ path: './components/home/NotificationBox', name: 'NotificationBox' },
@@ -75,7 +75,7 @@ async function loadSafeComponents(): Promise<void> {
 			{ path: './components/modals/ModalService', name: 'ModalService' }
 		];
 
-		const componentPromises = safeComponents.map(comp => 
+		const componentPromises = safeComponents.map(comp =>
 			loadComponent(comp.path, comp.name)
 		);
 
@@ -942,7 +942,7 @@ function setupProfileDropdown(): void {
   }
 
   console.log('✅ User is authenticated, starting 3D Pong game...');
-  
+
   // Start the 3D Pong game directly
   await start3DPongGame();
 };
@@ -1686,10 +1686,10 @@ async function start3DPongGame() {
 		// Clear any existing UI and get game configuration
 		clearPongUI();
 		const gameConfig = await Menu.render();
-		
+
 		// Start the 3D Pong game and store reference
 		currentGameInstance = new Pong3D(gameConfig);
-		
+
 		console.log('✅ 3D Pong game started successfully');
 
 	} catch (error) {
@@ -1704,28 +1704,28 @@ async function start3DPongGame() {
 async function cleanupGame() {
 	if (currentGameInstance) {
 		console.log('🧹 Cleaning up game instance...');
-		
+
 		try {
 			// Call the game's dispose method which handles theme cleanup and engine disposal
 			if (currentGameInstance && typeof currentGameInstance.dispose === 'function') {
 				currentGameInstance.dispose();
 			}
-			
+
 			// Clear any game UI elements
 			const { clearPongUI } = await import('../src/ui');
 			clearPongUI();
-			
+
 			// Remove canvas if it exists
 			const canvas = document.getElementById('gameCanvas');
 			if (canvas) {
 				canvas.remove();
 			}
-			
+
 			console.log('✅ Game cleaned up successfully');
 		} catch (error) {
 			console.error('❌ Error during game cleanup:', error);
 		}
-		
+
 		currentGameInstance = null;
 	}
 }
@@ -1763,7 +1763,7 @@ window.addEventListener('storage', (e) => {
 // Backend status check
 async function checkBackendStatus() {
   try {
-    const response = await fetch('http://localhost:3000/health', {
+    const response = await fetch('http://localhost:8080/health', {
       method: 'GET',
       signal: AbortSignal.timeout(3000)
     });
@@ -1790,7 +1790,7 @@ function showOfflineMode() {
     </div>
   `;
   document.body.appendChild(notification);
-  
+
   // Auto-hide after 8 seconds
   setTimeout(() => {
     if (notification.parentElement) {

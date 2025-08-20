@@ -503,23 +503,17 @@ export class SignupModal extends BaseModal {
         if (result.success) {
           this.close();
 
-          const verifyModal = new VerifyModal(
-            email,
-            () => {
-              this.showToast(
-                "success",
-                t("toast.accountCreated"),
-                t("toast.welcomeUser", { name: firstName })
-              );
-              this.triggerAuthUpdate(true, result.user);
-            },
-            () => {
-              console.log("🔁 Resend requested.");
-            }
-          );
+      const verifyModal = new VerifyModal(
+        email,
+        () => { /* success callback */ },
+        () => { /* resend callback */ },
+        result.token 
+      );
 
           verifyModal.showModal();
-        } else {
+        }
+        else
+        {
           if (result.conflict === "username" && result.suggestions?.length) {
             this.showUsernameSuggestions(result.suggestions);
           } else {
@@ -565,7 +559,7 @@ export class SignupModal extends BaseModal {
       submitBtn.disabled = false;
       submitBtn.textContent = t("signup.submitButton");
     }
-  }
+}
 
   private showUsernameSuggestions(suggestions: string[]): void {
     const suggestionsDiv = findElement("#username-suggestions");

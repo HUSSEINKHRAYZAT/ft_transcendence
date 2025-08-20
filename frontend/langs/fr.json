@@ -367,7 +367,7 @@
   "fields.lastName": "Nom",
   "Sign in with Google": "Connectez-vous avec Google",
     "verify.title": "Vérifiez votre e-mail",
-  "verify.sentCode": "Nous avons envoyé un code de vérification à 4 chiffres à :",
+  "verify.sentCode": "Nous avons envoyé un code de vérification à 6 chiffres à :",
   "verify.enterCode": "Veuillez entrer le code ci-dessous pour continuer",
   "verify.codeLabel": "Code de vérification",
   "verify.submitButton": "Vérifier l'e-mail",
@@ -384,8 +384,8 @@
   "verify.resendToast.title": "Code renvoyé",
   "verify.resendToast.message": "Un nouveau code de vérification a été envoyé à votre e-mail",
   "verify.resendTimer": "Vous pouvez demander un nouveau code dans {seconds} secondes",
-    "Enter your email or username" : "Entrez votre email ou votre nom d'utilisateur",
-      "Accent Colors": "Couleurs d'accent",
+  "Enter your email or username" : "Entrez votre email ou votre nom d'utilisateur",
+  "Accent Colors": "Couleurs d'accent",
   "Choose your preferred accent color scheme": "Choisissez votre schéma de couleur d'accent préféré",
   "Background Theme": "Thème d'arrière-plan",
   "Choose your preferred background color scheme": "Choisissez votre schéma de couleur d'arrière-plan préféré",
@@ -396,7 +396,14 @@
   "Animations": "Animations",
   "Save Settings": "Enregistrer les paramètres",
   "Reset": "Réinitialiser",
-  "Language changed to": "Langue changée en"
+  "Language changed to": "Langue changée en",
+    "Please log in to access other settings": "Veuillez vous connecter pour accéder aux autres paramètres",
+  "Email / Username": "Email / Nom d'utilisateur",
+  "Sign up": "S'inscrire",
+  "Logging in...": "Connexion...",
+  "Hello {name}!": "Bonjour {name} !",
+  "Background theme changed to": "Thème d'arrière-plan changé en",
+  "Theme changed to": "Thème changé en"
 
 
 

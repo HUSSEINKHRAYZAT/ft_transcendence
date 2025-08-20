@@ -9,7 +9,7 @@ export class FriendsBox {
   private unsubscribeLanguageChange?: () => void;
 
   // ---- backend + storage helpers ----
-  private BASE_URL = "http://localhost:3000";
+  private BASE_URL = "http://localhost:8080";
   private FRIENDS_LIST_PATH = (userId: number) => `/friends/list/${userId}`;
 
   private getCurrentUser() {
@@ -418,13 +418,13 @@ private getAuthenticatedContent(): string {
     } catch (e) {
       console.log('API not available, using demo friends data');
     }
-    
+
     // Demo friends data
     return [
       {
         friendId: 1,
         FirstName: 'Alice',
-        lastName: 'Johnson', 
+        lastName: 'Johnson',
         username: 'alice.j',
         status: 'online'
       },
@@ -556,7 +556,7 @@ private getAuthenticatedContent(): string {
         // Demo: show 1 pending request for logged in users
         pending = [{ requesterId: 99, status: 'pending' }];
       }
-      
+
       const count = Array.isArray(pending) ? pending.length : 0;
       badge.textContent = String(count);
       (badge as HTMLElement).style.display = count > 0 ? "inline-block" : "none";

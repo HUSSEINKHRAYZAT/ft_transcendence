@@ -337,11 +337,9 @@
   "signup.googleConnecting": "Verbinden mit Google...",
   "signup.creatingAccount": "Konto wird erstellt...",
   "signup.failed": "Registrierung fehlgeschlagen",
-
   "validation.fixErrors": "Bitte beheben Sie die oben genannten Fehler",
   "validation.name.lettersOnly": "{{fieldName}} darf nur Buchstaben enthalten",
   "validation.name.minLength": "{{fieldName}} muss mindestens 2 Zeichen lang sein",
-
   "validation.password.length": "Das Passwort muss mindestens 6 Zeichen lang sein",
   "validation.password.lengthValid": "Passwortlänge ist gültig",
   "validation.password.number": "Das Passwort muss mindestens eine Zahl enthalten",
@@ -350,25 +348,20 @@
   "validation.password.uppercaseValid": "Das Passwort enthält einen Großbuchstaben",
   "validation.password.specialChar": "Das Passwort muss ein Sonderzeichen enthalten",
   "validation.password.specialCharValid": "Das Passwort enthält ein Sonderzeichen",
-
   "validation.username.allowedChars": "Der Benutzername darf nur Buchstaben, Zahlen und Unterstriche enthalten",
   "validation.username.letterRequired": "Der Benutzername muss mindestens einen Buchstaben enthalten",
   "validation.username.numberRequired": "Der Benutzername muss mindestens eine Zahl enthalten",
-
   "validation.email.invalid": "Bitte geben Sie eine gültige E-Mail-Adresse ein",
-
   "toast.googleAuthTitle": "Google-Authentifizierung",
   "toast.welcomeMessage": "Willkommen, {{name}}!",
   "toast.accountCreated": "Konto erstellt!",
   "toast.welcomeUser": "Willkommen bei FT Pong, {{name}}!",
-
   "errors.unexpected": "Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.",
-
   "fields.firstName": "Vorname",
   "fields.lastName": "Nachname",
   "Sign in with Google" :"Aanmelden met Google",
   "verify.title": "Bestätigen Sie Ihre E-Mail",
-  "verify.sentCode": "Wir haben einen 4-stelligen Bestätigungscode gesendet an:",
+  "verify.sentCode": "Wir haben einen 6-stelligen Bestätigungscode gesendet an:",
   "verify.enterCode": "Bitte geben Sie den Code unten ein, um fortzufahren",
   "verify.codeLabel": "Bestätigungscode",
   "verify.submitButton": "E-Mail bestätigen",
@@ -385,8 +378,8 @@
   "verify.resendToast.title": "Code erneut gesendet",
   "verify.resendToast.message": "Ein neuer Bestätigungscode wurde an Ihre E-Mail gesendet",
   "verify.resendTimer": "Sie können in {seconds} Sekunden einen weiteren Code anfordern",
-    "Enter your email or username" : "Geben Sie Ihre E-Mail-Adresse oder Ihren Benutzernamen ein",
-      "Accent Colors": "Akzentfarben",
+  "Enter your email or username" : "Geben Sie Ihre E-Mail-Adresse oder Ihren Benutzernamen ein",
+  "Accent Colors": "Akzentfarben",
   "Choose your preferred accent color scheme": "Wählen Sie Ihr bevorzugtes Akzentfarbschema",
   "Background Theme": "Hintergrundthema",
   "Choose your preferred background color scheme": "Wählen Sie Ihr bevorzugtes Hintergrundfarbschema",
@@ -397,7 +390,13 @@
   "Animations": "Animationen",
   "Save Settings": "Einstellungen speichern",
   "Reset": "Zurücksetzen",
-  "Language changed to": "Sprache geändert zu"
-
+  "Language changed to": "Sprache geändert zu",
+  "Please log in to access other settings": "Bitte melden Sie sich an, um auf andere Einstellungen zuzugreifen",
+  "Email / Username": "E-Mail / Benutzername",
+  "Sign up": "Registrieren",
+  "Logging in...": "Einloggen...",
+  "Hello {name}!": "Hallo {name}!",
+  "Background theme changed to": "Hintergrundthema geändert zu",
+  "Theme changed to": "Thema geändert zu"
 
 }

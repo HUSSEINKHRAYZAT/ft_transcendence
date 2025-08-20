@@ -40,6 +40,7 @@ export interface LoginCredentials {
 export interface SignupCredentials {
   firstName: string;
   lastName: string;
+  username: string;
   email: string;
   password: string;
 }

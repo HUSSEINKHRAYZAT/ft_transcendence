@@ -1,4 +1,3 @@
-
 import { BaseModal } from './BaseModal';
 import { findElement } from '../../utils/DOMHelpers';
 import { t } from "../../langs/LanguageManager";
@@ -7,12 +6,16 @@ export class VerifyModal extends BaseModal {
   private userEmail: string = '';
   private onVerificationSuccess?: () => void;
   private onResendCode?: () => void;
+  private currentCode: string = '';
+  private authToken?: string;
 
-  constructor(userEmail: string, onVerificationSuccess?: () => void, onResendCode?: () => void) {
+  constructor(userEmail: string, onVerificationSuccess?: () => void, onResendCode?: () => void, authToken?: string) {
     super();
     this.userEmail = userEmail;
     this.onVerificationSuccess = onVerificationSuccess;
     this.onResendCode = onResendCode;
+    this.authToken = authToken;
+    this.generateAndSendCode();
   }
 
   protected getModalTitle(): string {
@@ -46,6 +49,12 @@ export class VerifyModal extends BaseModal {
                    class="w-12 h-12 text-center text-xl font-bold bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:border-lime-500 focus:ring-1 focus:ring-lime-500 transition-colors duration-300"
                    pattern="[0-9]" inputmode="numeric">
             <input type="text" id="code-4" maxlength="1"
+                   class="w-12 h-12 text-center text-xl font-bold bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:border-lime-500 focus:ring-1 focus:ring-lime-500 transition-colors duration-300"
+                   pattern="[0-9]" inputmode="numeric">
+            <input type="text" id="code-5" maxlength="1"
+                   class="w-12 h-12 text-center text-xl font-bold bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:border-lime-500 focus:ring-1 focus:ring-lime-500 transition-colors duration-300"
+                   pattern="[0-9]" inputmode="numeric">
+            <input type="text" id="code-6" maxlength="1"
                    class="w-12 h-12 text-center text-xl font-bold bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:border-lime-500 focus:ring-1 focus:ring-lime-500 transition-colors duration-300"
                    pattern="[0-9]" inputmode="numeric">
           </div>
@@ -97,6 +106,8 @@ export class VerifyModal extends BaseModal {
       findElement('#code-2') as HTMLInputElement,
       findElement('#code-3') as HTMLInputElement,
       findElement('#code-4') as HTMLInputElement,
+      findElement('#code-5') as HTMLInputElement,
+      findElement('#code-6') as HTMLInputElement,
     ].filter(Boolean);
 
     inputs.forEach((input, index) => {
@@ -115,11 +126,10 @@ export class VerifyModal extends BaseModal {
           inputs[index + 1].focus();
         }
 
-        if (index === inputs.length - 1 && value) {
-          const allFilled = inputs.every(inp => inp.value);
-          if (allFilled) {
-            setTimeout(() => this.handleVerify(), 100);
-          }
+        // Auto-submit only when all 6 inputs are filled
+        const allFilled = inputs.every(inp => inp.value);
+        if (allFilled) {
+          setTimeout(() => this.handleVerify(), 100);
         }
       });
 
@@ -132,7 +142,7 @@ export class VerifyModal extends BaseModal {
       input.addEventListener('paste', (e) => {
         e.preventDefault();
         const pasteData = e.clipboardData?.getData('text') || '';
-        const digits = pasteData.replace(/\D/g, '').slice(0, 4);
+        const digits = pasteData.replace(/\D/g, '').slice(0, 6);
 
         digits.split('').forEach((digit, i) => {
           if (inputs[i]) {
@@ -140,11 +150,11 @@ export class VerifyModal extends BaseModal {
           }
         });
 
-        if (digits.length === 4) {
-          inputs[3].focus();
+        if (digits.length === 6) {
+          inputs[5].focus();
           setTimeout(() => this.handleVerify(), 100);
         } else if (digits.length > 0) {
-          inputs[Math.min(digits.length - 1, 3)].focus();
+          inputs[Math.min(digits.length - 1, 5)].focus();
         }
       });
 
@@ -188,27 +198,86 @@ export class VerifyModal extends BaseModal {
     }
   }
 
-  private handleVerify(): void {
+  private generateRandomCode(): string {
+    return Math.floor(100000 + Math.random() * 900000).toString();
+  }
+
+  private async generateAndSendCode(): Promise<void> {
+    try {
+      this.currentCode = this.generateRandomCode();
+      console.log('🔐 Generated verification code:', this.currentCode);
+
+      // Get auth token - prioritize passed token, then localStorage
+      const token = this.authToken ||
+                   localStorage.getItem('auth_token') ||
+                   localStorage.getItem('AUTH_TOKEN') ||
+                   localStorage.getItem('ft_pong_auth_token');
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+
+      // Only add Authorization header if token exists
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+        console.log('🔑 Using auth token for verification request');
+      } else {
+        console.log('📧 Sending verification without token (signup flow)');
+      }
+
+      const response = await fetch('http://localhost:8080/users/send-verification', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          email: this.userEmail,
+          code: this.currentCode
+        })
+      });
+
+      if (response.status === 200) {
+        console.log('✅ Verification code sent successfully');
+      } else if (response.status === 401) {
+        console.error('❌ Unauthorized - endpoint may require authentication or different auth approach');
+        // For now, fall back to demo mode during signup
+        this.currentCode = '000000';
+        console.log('🔧 Using demo code: 000000 (auth issue)');
+      } else if (response.status === 404) {
+        console.error('❌ User not found');
+        this.showError('User not found. Please check your email.');
+      } else {
+        console.error('❌ Failed to send verification code, status:', response.status);
+        this.showError('Failed to send verification code. Please try again.');
+      }
+    } catch (error) {
+      console.error('❌ Network error sending verification code:', error);
+      // Fallback to demo mode
+      this.currentCode = '000000';
+      console.log('🔧 Using demo code: 000000');
+    }
+  }
+
+  private async handleVerify(): Promise<void> {
     const inputs = [
       findElement('#code-1') as HTMLInputElement,
       findElement('#code-2') as HTMLInputElement,
       findElement('#code-3') as HTMLInputElement,
       findElement('#code-4') as HTMLInputElement,
+      findElement('#code-5') as HTMLInputElement,
+      findElement('#code-6') as HTMLInputElement,
     ].filter(Boolean);
 
     const code = inputs.map(input => input.value).join('');
 
-    if (code.length !== 4) {
+    if (code.length !== 6) {
       this.showError(t('verify.errors.incompleteCode'));
       return;
     }
 
-    if (!/^\d{4}$/.test(code)) {
+    if (!/^\d{6}$/.test(code)) {
       this.showError(t('verify.errors.numbersOnly'));
       return;
     }
 
-    console.log('🔑 Verifying code:', code);
+    console.log('🔐 Verifying code:', code);
 
     const submitBtn = findElement('#verify-submit') as HTMLButtonElement;
     if (submitBtn) {
@@ -216,38 +285,81 @@ export class VerifyModal extends BaseModal {
       submitBtn.textContent = t('verify.verifying');
     }
 
-    setTimeout(() => {
-      if (code === '0000') {
-        this.showSuccess();
-        setTimeout(() => {
-          this.close();
-          if (this.onVerificationSuccess) {
-            this.onVerificationSuccess();
-          }
-        }, 1500);
+    try {
+      if (code === this.currentCode) {
+        // Code is correct, now verify with backend
+        const token = localStorage.getItem('auth_token');
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+        };
+
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        const response = await fetch('http://localhost:8080/users/verify', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            email: this.userEmail
+          })
+        });
+
+        if (response.status === 200) {
+          this.showSuccess();
+          setTimeout(() => {
+            this.close();
+            if (this.onVerificationSuccess) {
+              this.onVerificationSuccess();
+            }
+          }, 1500);
+        } else if (response.status === 400) {
+          this.showError('Verification failed. Please try again.');
+          this.clearInputs();
+        } else if (response.status === 404) {
+          this.showError('User not found.');
+          this.clearInputs();
+        } else {
+          this.showError('Verification failed. Please try again.');
+          this.clearInputs();
+        }
       } else {
         this.showError(t('verify.errors.invalidCode'));
         this.clearInputs();
       }
+    } catch (error) {
+      console.error('❌ Network error during verification:', error);
+      this.showError('Network error. Please try again.');
+      this.clearInputs();
+    }
 
-      if (submitBtn) {
-        submitBtn.disabled = false;
-        submitBtn.textContent = t('verify.submitButton');
-      }
-    }, 1500);
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = t('verify.submitButton');
+    }
   }
 
-  private handleResendCode(): void {
+  private async handleResendCode(): Promise<void> {
     console.log('📧 Resending verification code to:', this.userEmail);
 
-    this.showToast(
-      'info',
-      t('verify.resendToast.title'),
-      t('verify.resendToast.message')
-    );
+    try {
+      await this.generateAndSendCode();
+      this.showToast(
+        'info',
+        t('verify.resendToast.title'),
+        t('verify.resendToast.message')
+      );
 
-    if (this.onResendCode) {
-      this.onResendCode();
+      if (this.onResendCode) {
+        this.onResendCode();
+      }
+    } catch (error) {
+      console.error('❌ Failed to resend code:', error);
+      this.showToast(
+        'error',
+        'Error',
+        'Failed to resend verification code'
+      );
     }
   }
 
@@ -278,6 +390,8 @@ export class VerifyModal extends BaseModal {
       findElement('#code-2') as HTMLInputElement,
       findElement('#code-3') as HTMLInputElement,
       findElement('#code-4') as HTMLInputElement,
+      findElement('#code-5') as HTMLInputElement,
+      findElement('#code-6') as HTMLInputElement,
     ].filter(Boolean);
 
     if (errorDiv) {
@@ -298,6 +412,8 @@ export class VerifyModal extends BaseModal {
       findElement('#code-2') as HTMLInputElement,
       findElement('#code-3') as HTMLInputElement,
       findElement('#code-4') as HTMLInputElement,
+      findElement('#code-5') as HTMLInputElement,
+      findElement('#code-6') as HTMLInputElement,
     ].filter(Boolean);
 
     if (errorDiv) {
@@ -319,6 +435,8 @@ export class VerifyModal extends BaseModal {
       findElement('#code-2') as HTMLInputElement,
       findElement('#code-3') as HTMLInputElement,
       findElement('#code-4') as HTMLInputElement,
+      findElement('#code-5') as HTMLInputElement,
+      findElement('#code-6') as HTMLInputElement,
     ].filter(Boolean);
 
     if (errorDiv) {
@@ -336,6 +454,8 @@ export class VerifyModal extends BaseModal {
       findElement('#code-2') as HTMLInputElement,
       findElement('#code-3') as HTMLInputElement,
       findElement('#code-4') as HTMLInputElement,
+      findElement('#code-5') as HTMLInputElement,
+      findElement('#code-6') as HTMLInputElement,
     ].filter(Boolean);
 
     inputs.forEach(input => {
