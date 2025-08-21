@@ -14,7 +14,7 @@ import { globalEventManager, AppEvent } from "../utils/EventManager";
 
 const API_BASE_URL = "http://localhost:8080";
 
-// Check if backend is available
+
 let isBackendAvailable = true;
 const checkBackendAvailability = async (): Promise<boolean> => {
   try {
@@ -358,7 +358,7 @@ private async loginAPI(
         Accept: "application/json",
       },
       body: JSON.stringify({
-        username: credentials.email, // Using email as username
+        username: credentials.email,
         password: credentials.password
       }),
     });
@@ -375,7 +375,6 @@ private async loginAPI(
 
     const data = await res.json();
 
-    // Assuming backend returns: { token: "...", user: { ... } }
     if (!data.token) {
       return { success: false, message: "No token received from server" };
     }

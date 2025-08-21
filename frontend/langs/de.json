@@ -397,6 +397,12 @@
   "Logging in...": "Einloggen...",
   "Hello {name}!": "Hallo {name}!",
   "Background theme changed to": "Hintergrundthema geändert zu",
-  "Theme changed to": "Thema geändert zu"
+  "Theme changed to": "Thema geändert zu",
+    "Music Player": "Musik-Player",
+  "Volume": "Lautstärke",
+  "Failed to play music": "Musik konnte nicht abgespielt werden",
+  "Music paused": "Musik pausiert",
+  "Music stopped": "Musik gestoppt",
+  "Playing music": "Musik wird abgespielt"
 
 }

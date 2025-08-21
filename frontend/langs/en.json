@@ -406,7 +406,13 @@
   "Logging in...": "Logging in...",
   "Hello {name}!": "Hello {name}!",
   "Background theme changed to": "Background theme changed to",
-  "Theme changed to": "Theme changed to"
+  "Theme changed to": "Theme changed to",
+    "Music Player": "Music Player",
+  "Volume": "Volume",
+  "Failed to play music": "Failed to play music",
+  "Music paused": "Music paused",
+  "Music stopped": "Music stopped",
+  "Playing music": "Playing music"
 }
 
 

@@ -10,14 +10,8 @@ export abstract class BaseModal {
 
   constructor() {
     this.modalContainer = document.body;
-
-    // Listen for language changes
-    this.unsubscribeLanguageChange = languageManager.onLanguageChange(() => {
-      if (this.isOpen()) {
-        this.updateContent();
-        this.setupEventListeners();
-      }
-    });
+    // Note: Language listener will be setup in show() method
+    // to avoid conflicts between multiple modal instances
   }
 
   protected abstract getModalContent(): string;
@@ -35,22 +29,26 @@ export abstract class BaseModal {
   protected updateContent(): void {
     if (!this.activeModal || !this.backdropElement) return;
 
-    // Update the modal content with new translations
+    // Update the modal content with new translations (no X button)
     const modalContent = this.backdropElement.querySelector('.transform');
     if (modalContent) {
       modalContent.innerHTML = `
-        <div class="flex justify-between items-center mb-6">
+        <div class="mb-6">
           <h2 class="text-2xl font-bold text-lime-500">${this.getModalTitle()}</h2>
-          <button id="modal-close" class="text-gray-400 hover:text-white text-2xl transition-colors duration-300">&times;</button>
         </div>
         ${this.getModalContent()}
       `;
     }
   }
 
-  show(modalId: string): void {
-    console.log(`🔍 Opening ${modalId} modal...`);
-    this.close();
+  async show(modalId: string): Promise<void> {
+    console.log(`🔐 Opening ${modalId} modal...`);
+
+    // Wait for any existing modal to close completely
+    await this.close();
+
+    // Small delay to ensure DOM is ready
+    await new Promise(resolve => setTimeout(resolve, 50));
 
     if (!this.modalContainer) {
       console.error('❌ Modal container not found');
@@ -58,14 +56,29 @@ export abstract class BaseModal {
     }
 
     this.activeModal = modalId;
+
+    // Re-setup language listener for the new modal
+    if (this.unsubscribeLanguageChange) {
+      this.unsubscribeLanguageChange();
+    }
+
+    this.unsubscribeLanguageChange = languageManager.onLanguageChange(() => {
+      console.log('🌐 Language changed for modal:', this.activeModal);
+      if (this.isOpen()) {
+        this.updateContent();
+        // IMPORTANT: Reattach base event listeners after content update
+        this.setupBaseEventListeners();
+        this.setupEventListeners();
+      }
+    });
+
     this.createBackdrop();
 
     const modalContent = createElement('div', {
       className: this.getModalClasses(),
       innerHTML: `
-        <div class="flex justify-between items-center mb-6">
+        <div class="mb-6">
           <h2 class="text-2xl font-bold text-lime-500">${this.getModalTitle()}</h2>
-          <button id="modal-close" class="text-gray-400 hover:text-white text-2xl transition-colors duration-300">&times;</button>
         </div>
         ${this.getModalContent()}
       `
@@ -78,12 +91,101 @@ export abstract class BaseModal {
     this.setupBaseEventListeners();
     this.setupEventListeners();
     this.animateIn();
+
+    console.log('✅ Modal opened:', modalId);
   }
 
-  close(): void {
+  // Synchronous version for backward compatibility
+  showSync(modalId: string): void {
+    console.log(`🔐 Opening ${modalId} modal (sync)...`);
+
+    this.closeSync();
+
+    if (!this.modalContainer) {
+      console.error('❌ Modal container not found');
+      return;
+    }
+
+    // Small delay to let close animation finish
+    setTimeout(() => {
+      this.activeModal = modalId;
+
+      // Re-setup language listener for the new modal
+      if (this.unsubscribeLanguageChange) {
+        this.unsubscribeLanguageChange();
+      }
+
+      this.unsubscribeLanguageChange = languageManager.onLanguageChange(() => {
+        if (this.isOpen()) {
+          this.updateContent();
+          this.setupBaseEventListeners();
+          this.setupEventListeners();
+        }
+      });
+
+      this.createBackdrop();
+
+      const modalContent = createElement('div', {
+        className: this.getModalClasses(),
+        innerHTML: `
+          <div class="mb-6">
+            <h2 class="text-2xl font-bold text-lime-500">${this.getModalTitle()}</h2>
+          </div>
+          ${this.getModalContent()}
+        `
+      });
+
+      if (this.backdropElement) {
+        this.backdropElement.appendChild(modalContent);
+      }
+
+      this.setupBaseEventListeners();
+      this.setupEventListeners();
+      this.animateIn();
+    }, 100);
+  }
+
+  close(): Promise<void> {
+    return new Promise((resolve) => {
+      if (!this.activeModal || !this.modalContainer) {
+        resolve();
+        return;
+      }
+
+      console.log('❌ Closing modal:', this.activeModal);
+
+      // Clean up language listener IMMEDIATELY when closing
+      if (this.unsubscribeLanguageChange) {
+        this.unsubscribeLanguageChange();
+        this.unsubscribeLanguageChange = undefined;
+        console.log('🧹 Language listener cleaned up for:', this.activeModal);
+      }
+
+      this.animateOut(() => {
+        if (this.backdropElement && this.modalContainer) {
+          this.modalContainer.removeChild(this.backdropElement);
+          this.backdropElement = null;
+        }
+        this.activeModal = null;
+        console.log('✅ Modal fully closed and cleaned up');
+        resolve();
+      });
+
+      globalEventManager.emit(AppEvent.MODAL_CLOSE);
+    });
+  }
+
+  // Synchronous version for backward compatibility
+  closeSync(): void {
     if (!this.activeModal || !this.modalContainer) return;
 
-    console.log('❌ Closing modal:', this.activeModal);
+    console.log('❌ Closing modal (sync):', this.activeModal);
+
+    // Clean up language listener IMMEDIATELY when closing
+    if (this.unsubscribeLanguageChange) {
+      this.unsubscribeLanguageChange();
+      this.unsubscribeLanguageChange = undefined;
+    }
 
     this.animateOut(() => {
       if (this.backdropElement && this.modalContainer) {
@@ -121,10 +223,9 @@ export abstract class BaseModal {
   };
 
   protected setupBaseEventListeners(): void {
-    const closeBtn = findElement('#modal-close');
-    if (closeBtn) {
-      closeBtn.addEventListener('click', () => this.close());
-    }
+    // No X button to set up listeners for anymore
+    // Click outside to close is handled by backdrop click in createBackdrop()
+    console.log('✅ Base modal listeners setup (click outside to close)');
   }
 
   protected animateIn(): void {
@@ -170,19 +271,19 @@ export abstract class BaseModal {
     title: string,
     message: string
   ): void {
-  // Make sure your NotificationBox instance is available
-  if ((window as any).notifyBox) {
-    const notifyBox = (window as any).notifyBox;
+    // Make sure your NotificationBox instance is available
+    if ((window as any).notifyBox) {
+      const notifyBox = (window as any).notifyBox;
 
-    // Compose the full message (optional: include title)
-    const fullMessage = title ? `${title}: ${message}` : message;
+      // Compose the full message (optional: include title)
+      const fullMessage = title ? `${title}: ${message}` : message;
 
-    // Add notification
-    notifyBox.addNotification(fullMessage, type);
-  } else {
-    console.warn('NotificationBox instance not found. Please initialize notifyBox globally.');
+      // Add notification
+      notifyBox.addNotification(fullMessage, type);
+    } else {
+      console.warn('NotificationBox instance not found. Please initialize notifyBox globally.');
+    }
   }
-}
 
   protected showError(errorId: string, message: string): void {
     const errorDiv = findElement(`#${errorId}`);
@@ -214,8 +315,26 @@ export abstract class BaseModal {
     }
   }
 
+  /**
+   * Show modal - sync version for backward compatibility
+   */
+  showModal(): void {
+    this.showSync('base');
+  }
+
+  /**
+   * Show modal - async version for new code
+   */
+  async showModalAsync(): Promise<void> {
+    await this.show('base');
+  }
+
   isOpen(): boolean {
     return this.activeModal !== null;
+  }
+
+  getActiveModalId(): string | null {
+    return this.activeModal;
   }
 
   getActiveModalId(): string | null {

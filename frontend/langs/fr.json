@@ -403,7 +403,13 @@
   "Logging in...": "Connexion...",
   "Hello {name}!": "Bonjour {name} !",
   "Background theme changed to": "Thème d'arrière-plan changé en",
-  "Theme changed to": "Thème changé en"
+  "Theme changed to": "Thème changé en",
+    "Music Player": "Lecteur de musique",
+  "Volume": "Volume",
+  "Failed to play music": "Échec de la lecture de la musique",
+  "Music paused": "Musique en pause",
+  "Music stopped": "Musique arrêtée",
+  "Playing music": "Lecture de la musique"
 
 
 
