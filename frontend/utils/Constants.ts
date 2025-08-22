@@ -140,6 +140,7 @@ export const SUCCESS_MESSAGES = {
   LOGIN_SUCCESS: 'Successfully logged in!',
   SIGNUP_SUCCESS: 'Account created successfully!',
   LOGOUT_SUCCESS: 'Successfully logged out!',
+  PROFILE_UPDATE_SUCCESS: "Profile updated successfully",
 } as const;
 
 // Modal Content

@@ -134,7 +134,7 @@
   "Error": "Fehler",
   "Warning": "Warnung",
   "Info": "Info",
-  "Welcome back!": "Willkommen zurück!",
+  "Welcome back !": "Willkommen zurück !",
   "Logged out successfully": "Erfolgreich abgemeldet",
   "Profile updated": "Profil aktualisiert",
   "Game started": "Spiel gestartet",
@@ -403,6 +403,15 @@
   "Failed to play music": "Musik konnte nicht abgespielt werden",
   "Music paused": "Musik pausiert",
   "Music stopped": "Musik gestoppt",
-  "Playing music": "Musik wird abgespielt"
-
+  "Playing music": "Musik wird abgespielt",
+  "Statistics": "Statistiken",
+    "Win Rate": "Gewinnrate",
+    "Record": "Rekord",
+    "Performance": "Leistung",
+    "Member Since": "Mitglied seit",
+    "Status": "Status",
+    "Active": "Aktiv",
+    "Ready to start your Pong journey?": "Bereit, deine Pong-Reise zu beginnen?",
+    "Play your first game to see statistics here!": "Spiel dein erstes Spiel, um hier Statistiken zu sehen!",
+    "Start Playing": "Jetzt spielen"
 }

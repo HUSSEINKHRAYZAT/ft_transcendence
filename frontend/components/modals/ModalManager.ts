@@ -159,11 +159,11 @@ export class ModalManager {
 
       <div class="text-center mb-6">
         <div class="w-20 h-20 rounded-full bg-lime-500 flex items-center justify-center text-2xl font-bold text-gray-900 mx-auto mb-3">
-          ${(user.firstName || user.username || 'U').charAt(0).toUpperCase()}
+          ${(user.firstName || user.userName || 'U').charAt(0).toUpperCase()}
         </div>
         <h3 class="text-xl font-bold text-white">${user.firstName || ''} ${user.lastName || ''}</h3>
         <p class="text-gray-400">${user.email || 'No email'}</p>
-        ${user.username ? `<p class="text-lime-400">@${user.username}</p>` : ''}
+        ${user.userName ? `<p class="text-lime-400">@${user.userName}</p>` : ''}
       </div>
 
       <div class="space-y-3 mb-6">

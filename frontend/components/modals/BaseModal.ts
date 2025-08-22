@@ -337,10 +337,6 @@ export abstract class BaseModal {
     return this.activeModal;
   }
 
-  getActiveModalId(): string | null {
-    return this.activeModal;
-  }
-
   destroy(): void {
     if (this.unsubscribeLanguageChange) {
       this.unsubscribeLanguageChange();

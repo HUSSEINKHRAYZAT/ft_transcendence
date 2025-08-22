@@ -14,6 +14,7 @@ export interface User {
   lastName: string;
   userName : string;
   avatar?: string;
+  profilePath?: string;
   createdAt: Date;
   updatedAt: Date;
   gameStats?: GameStats;
@@ -106,4 +107,12 @@ export interface UserSettings {
     paddleSpeed: number;
     ballSpeed: number;
   };
+}
+
+export interface UpdateProfileData {
+  firstName: string;
+  lastName: string;
+  userName: string;
+  email: string;
+  profilePath: string | null;
 }

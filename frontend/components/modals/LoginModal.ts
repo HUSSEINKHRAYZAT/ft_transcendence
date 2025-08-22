@@ -1,4 +1,4 @@
-// LoginModal.ts - Login modal component with i18n support
+// LoginModal.ts - Login modal component with i18n support and proper JWT handling
 import { BaseModal } from './BaseModal';
 import { authService } from '../../services/AuthService';
 import { findElement } from '../../utils/DOMHelpers';
@@ -42,7 +42,13 @@ export class LoginModal extends BaseModal {
 					<button id="switch-to-signup" class="text-lime-500 hover:text-lime-400 transition-colors duration-300">${t('Sign up')}</button>
 				</p>
 				<div class="mt-4 pt-4 border-t border-gray-700">
-					<button id="google-login" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded transition-all duration-300 flex items-center justify-center space-x-2 mb-2">
+					<p class="text-xs text-gray-500 mb-3">${t('Demo Accounts Available')}:</p>
+					<div class="text-xs text-gray-400 space-y-1 mb-3">
+						<div>• alice@ftpong.com / alice123</div>
+						<div>• bob@ftpong.com / bob123</div>
+						<div>• demo@ftpong.com / demo123</div>
+					</div>
+					<button id="google-login" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded transition-all duration-300 flex items-center justify-center space-x-2">
 						<svg class="w-5 h-5" viewBox="0 0 24 24">
 							<path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
 							<path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
@@ -104,11 +110,15 @@ export class LoginModal extends BaseModal {
 				firstName: 'Google',
 				lastName: 'User',
 				email: 'google.user@gmail.com',
-				avatar: 'https://lh3.googleusercontent.com/a/default-user=s96-c'
+				username: 'google_user',
+				avatar: 'https://lh3.googleusercontent.com/a/default-user=s96-c',
+				createdAt: new Date().toISOString(),
+				updatedAt: new Date().toISOString()
 			};
 
-			localStorage.setItem('ft_pong_auth_token', 'google-token-' + Date.now());
-			localStorage.setItem('ft_pong_user_data', JSON.stringify(googleUser));
+			// Use AuthService to properly store the Google user and token
+			const googleToken = 'google-token-' + Date.now();
+			authService['setAuthState'](googleToken, googleUser);
 
 			this.close();
 			this.showToast('success', t('Google Authentication'), t('Welcome {name}!', { name: googleUser.firstName }));
@@ -125,69 +135,81 @@ export class LoginModal extends BaseModal {
 		const submitBtn = findElement('#login-submit') as HTMLButtonElement;
 		const errorDiv = findElement('#login-error') as HTMLElement;
 
-		if (!emailInput || !passwordInput || !submitBtn)
+		if (!emailInput || !passwordInput || !submitBtn) {
+			console.error('❌ Required form elements not found');
 			return;
+		}
 
 		const email = emailInput.value.trim();
 		const password = passwordInput.value;
 
+		// Hide any previous errors
 		errorDiv?.classList.add('hidden');
+
+		if (!email || !password) {
+			this.showError('login-error', t('Please fill in all fields'));
+			return;
+		}
 
 		// Disable form during submission
 		submitBtn.disabled = true;
 		submitBtn.textContent = t('Logging in...');
 
-		try
-		{
-			// Check if authService is available, otherwise use fallback
-			if (typeof authService !== 'undefined')
-			{
-				const result = await authService.login({ email, password });
+		try {
+			console.log('🔐 Attempting login with AuthService...');
 
-				if (result.success)
-				{
-					this.close();
-					this.showToast('success', t('Welcome back!'), t('Hello {name}!', { name: result.user?.firstName }));
-					// Trigger auth state update
-					this.triggerAuthUpdate(true, result.user);
-				}
-				else
-				{
-					this.showError('login-error', result.message || t('Login failed'));
-				}
+			// Use AuthService for proper JWT token handling
+			const result = await authService.login({
+				email: email,
+				password: password
+			});
+
+			console.log('🔐 Login result:', result);
+
+			if (result.success && result.user && result.token) {
+				console.log('✅ Login successful!');
+				console.log('🎫 JWT Token stored:', result.token.substring(0, 20) + '...');
+				console.log('👤 User data:', result.user);
+
+				this.close();
+				this.showToast('success', t('Welcome back!'), t('Hello {name}!', { name: result.user.firstName }));
+
+				// Trigger auth state update for UI components
+				this.triggerAuthUpdate(true, result.user);
 			} else {
-				// Fallback login logic (same as in main.ts)
-				if (email === 'demo@ftpong.com' && password === 'demo123') {
-					const userData = {
-						id: '1',
-						firstName: 'Demo',
-						lastName: 'User',
-						email: email
-					};
-
-					localStorage.setItem('ft_pong_auth_token', 'demo-token-' + Date.now());
-					localStorage.setItem('ft_pong_user_data', JSON.stringify(userData));
-
-					this.close();
-					this.showToast('success', t('Welcome back!'), t('Hello Demo!'));
-
-					// Trigger auth state update
-					this.triggerAuthUpdate(true, userData);
-				} else {
-					this.showError('login-error', t('Invalid credentials. Try: demo@ftpong.com / demo123'));
-				}
+				console.error('❌ Login failed:', result.message);
+				this.showError('login-error', result.message || t('Login failed'));
 			}
-		}
-		catch (error)
-		{
-			console.error('Login error:', error);
+		} catch (error) {
+			console.error('❌ Login error:', error);
 			this.showError('login-error', t('An unexpected error occurred'));
-		}
-		finally
-		{
+		} finally {
+			// Re-enable form
 			submitBtn.disabled = false;
 			submitBtn.textContent = t('Login');
 		}
+	}
+
+	/**
+	 * Override triggerAuthUpdate to work with AuthService state
+	 */
+	protected triggerAuthUpdate(isAuthenticated: boolean, user?: any): void {
+		console.log('🔄 Triggering auth update:', { isAuthenticated, user: user?.email });
+
+		// Dispatch the auth state change event
+		window.dispatchEvent(new CustomEvent('auth-state-changed', {
+			detail: { isAuthenticated, user }
+		}));
+
+		// Update the UI components
+		setTimeout(() => {
+			if (typeof (window as any).addBasicNavbar === 'function') {
+				(window as any).addBasicNavbar();
+			}
+			if (typeof (window as any).updateJumbotronButton === 'function') {
+				(window as any).updateJumbotronButton();
+			}
+		}, 100);
 	}
 
 	/**
@@ -196,4 +218,18 @@ export class LoginModal extends BaseModal {
 	showModal(): void {
 		this.show('login');
 	}
+
+	/**
+	 * Add a render method for compatibility with component initialization
+	 */
+	async render(): Promise<void> {
+		// This method exists for compatibility but doesn't actually render
+		// The modal is shown using showModal() or when needed
+		console.log('🔐 LoginModal render() called - use showModal() to display modal');
+	}
 }
+
+// Make LoginModal globally available
+(window as any).LoginModal = LoginModal;
+
+export default LoginModal;

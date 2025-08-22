@@ -373,7 +373,7 @@ export class Pong3D {
           id: user.id || currentUser.id,
           name: user.firstName
             ? `${user.firstName} ${user.lastName || ""}`.trim()
-            : user.username || user.email || "Player",
+            : user.userName || user.email || "Player",
           isConnected: true,
         };
       }

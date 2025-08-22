@@ -344,6 +344,9 @@ export enum AppEvent {
   MODAL_OPEN = 'modal:open',
   MODAL_CLOSE = 'modal:close',
 
+  // Profile
+  AUTH_PROFILE_UPDATE = 'auth:profile-update',
+
   // Game events
   GAME_START = 'game:start',
   GAME_PAUSE = 'game:pause',

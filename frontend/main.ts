@@ -3,6 +3,7 @@ import '@/styles/main.css';
 import { languageManager, t, SUPPORTED_LANGUAGES } from '@/langs/LanguageManager';
 import simpleThemeManager from '@/utils/SimpleThemeManager';
 import backgroundThemeManager from '@/utils/BackgroundThemeManager';
+import { authService } from '@/services/AuthService';
 
 interface Component {
 	render(): Promise<void>;
@@ -72,7 +73,10 @@ async function loadSafeComponents(): Promise<void> {
 			{ path: './components/home/SettingsBox', name: 'SettingsBox' },
 			{ path: './components/home/NotificationBox', name: 'NotificationBox' },
 			{ path: './components/home/FriendsBox', name: 'FriendsBox' },
-			{ path: './components/modals/ModalService', name: 'ModalService' }
+			{ path: './components/modals/ModalService', name: 'ModalService' },
+			{ path: './components/modals/StatisticsModal', name: 'StatisticsModal' },
+			{ path: './components/modals/ProfileModal', name: 'ProfileModal' },      // ← Add this
+			{ path: './components/modals/LoginModal', name: 'LoginModal' }           // ← Add this
 		];
 
 		const componentPromises = safeComponents.map(comp =>
@@ -89,44 +93,6 @@ async function loadSafeComponents(): Promise<void> {
 
 	} catch (error) {
 		console.error('❌ Safe component loading failed:', error);
-		await initializeBasicContent();
-	}
-}
-
-async function loadComponents(): Promise<void>
-{
-	console.log('📦 Attempting to load components...');
-
-	try
-	{
-		const componentPromises = [
-			loadComponent('./components/navbar/Navbar', 'Navbar'),
-			loadComponent('./components/home/NotificationBox', 'NotificationBox'),
-			loadComponent('./components/home/FriendsBox', 'FriendsBox'),
-			loadComponent('./components/home/SettingsBox', 'SettingsBox'),
-			loadComponent('./components/modals/ModalService', 'ModalService')
-		];
-
-		const results = await Promise.allSettled(componentPromises);
-		const successful = results.filter(result => result.status === 'fulfilled').length;
-		const failed = results.filter(result => result.status === 'rejected').length;
-
-		console.log(`📊 Component loading results: ${successful} successful, ${failed} failed`);
-
-		if (successful >= 1)
-			{
-			console.log('✅ Some components loaded, initializing with available components...');
-			await initializeWithComponents(results);
-			isComponentsLoaded = true;
-		}
-		else
-			throw new Error('All components failed to load');
-
-	}
-	catch (error)
-	{
-		console.error('❌ Component loading failed:', error);
-		console.log('🔄 Falling back to basic content...');
 		await initializeBasicContent();
 	}
 }
@@ -181,9 +147,41 @@ async function initializeWithSafeComponents(results: PromiseSettledResult<any>[]
 			if (component.name !== 'ModalService') {
 				try {
 					console.log(`🧩 Initializing ${component.name}...`);
+
+					// Handle StatisticsModal specially - it's a static utility
+					if (component.name === 'StatisticsModal') {
+						(window as any).StatisticsModal = component.constructor;
+						console.log(`✅ ${component.name} made globally available`);
+						continue;
+					}
+
+					// Handle ProfileModal specially - it's a static utility
+					if (component.name === 'ProfileModal') {
+						(window as any).ProfileModal = component.constructor;
+						console.log(`✅ ${component.name} made globally available`);
+						continue;
+					}
+
+					// Handle LoginModal specially - it's a modal that takes parameters
+					if (component.name === 'LoginModal') {
+						(window as any).LoginModal = component.constructor;
+						console.log(`✅ ${component.name} made globally available`);
+						continue;
+					}
+
+					// For other components, try to create instance
 					const instance = new component.constructor() as Component;
 					instancesCreated.push(instance);
-					await instance.render();
+
+					// Check if it has render method before calling
+					if (instance.render && typeof instance.render === 'function') {
+						await instance.render();
+					} else if (instance.showModal && typeof instance.showModal === 'function') {
+						// Don't call showModal automatically - just make it available
+						console.log(`✅ ${component.name} instance created (modal type)`);
+					} else {
+						console.log(`⚠️ ${component.name} has no render method, skipping render call`);
+					}
 				} catch (error) {
 					console.error(`❌ Failed to initialize ${component.name}:`, error);
 				}
@@ -202,71 +200,6 @@ async function initializeWithSafeComponents(results: PromiseSettledResult<any>[]
 	} catch (error) {
 		console.error('❌ Failed to initialize with safe components:', error);
 		await initializeBasicContent();
-	}
-}
-
-async function initializeWithComponents(results: PromiseSettledResult<any>[]): Promise<void>
-{
-	console.log('🧩 Initializing with loaded components...');
-
-	const components = results
-		.filter((result): result is PromiseFulfilledResult<any> => result.status === 'fulfilled')
-		.map(result => result.value);
-
-	try
-	{
-		const modalServiceComponent = components.find(c => c.name === 'ModalService');
-		if (modalServiceComponent)
-		{
-			const modalService = new modalServiceComponent.constructor();
-			(window as any).modalService = modalService;
-			console.log('🔑 Modal service initialized');
-		}
-		else
-			createBasicModalService();
-
-		addBasicJumbotron();
-
-		const componentPromises: Promise<void>[] = [];
-		const instancesCreated: Component[] = [];
-
-		for (const component of components)
-		{
-			if (component.name !== 'ModalService')
-			{
-				try
-				{
-					console.log(`🧩 Initializing ${component.name}...`);
-					const instance = new component.constructor() as Component;
-					instancesCreated.push(instance);
-					componentPromises.push(instance.render());
-				}
-				catch (error)
-				{
-					console.error(`❌ Failed to initialize ${component.name}:`, error);
-				}
-			}
-		}
-
-		const renderResults = await Promise.allSettled(componentPromises);
-		const successfulRenders = renderResults.filter(result => result.status === 'fulfilled').length;
-
-		console.log(`✅ ${successfulRenders}/${componentPromises.length} components rendered successfully!`);
-
-		componentInstances = instancesCreated;
-
-		setupAuthListeners(instancesCreated);
-		updateAuthState(instancesCreated);
-
-		addFallbackContent();
-
-		console.log('🎮 FT_PONG Application initialized successfully with TypeScript components!');
-
-	}
-	catch (error)
-	{
-		console.error('❌ Failed to initialize with components:', error);
-		throw error;
 	}
 }
 
@@ -606,7 +539,7 @@ function showBasicProfileModal(): void
 
 			<div class="text-center mb-6">
 				<div class="w-20 h-20 rounded-full bg-lime-500 flex items-center justify-center text-2xl font-bold text-gray-900 mx-auto mb-3">
-					${(user.firstName || user.username || 'U').charAt(0).toUpperCase()}
+					${(user.firstName || user.userName || 'U').charAt(0).toUpperCase()}
 				</div>
 				<h3 class="text-xl font-bold text-white">${user.firstName || ''} ${user.lastName || ''}</h3>
 				<p class="text-gray-400">${user.email || 'No email'}</p>
@@ -615,7 +548,7 @@ function showBasicProfileModal(): void
 			<div class="space-y-3 mb-6">
 				<div class="bg-gray-700 p-3 rounded">
 					<span class="text-gray-400">Username:</span>
-					<span class="text-white ml-2">${user.username || 'Not set'}</span>
+					<span class="text-white ml-2">${user.userName || 'Not set'}</span>
 				</div>
 				<div class="bg-gray-700 p-3 rounded">
 					<span class="text-gray-400">Games Played:</span>
@@ -745,32 +678,33 @@ function showBasicToast(type: 'success' | 'error' | 'info', message: string): vo
 (window as any).closeBasicModal = closeBasicModal;
 (window as any).switchBasicAuthModal = switchBasicAuthModal;
 
-function addBasicNavbar(): void
-{
+function addBasicNavbar(): void {
   const navbar = document.getElementById('navbar');
   if (navbar) {
-    const authToken = localStorage.getItem('ft_pong_auth_token');
-    const userData = localStorage.getItem('ft_pong_user_data');
-    const isAuthenticated = !!(authToken && userData);
+    // Use AuthService instead of localStorage
+    const authState = authService.getState();
+    const isAuthenticated = authState.isAuthenticated;
+    const user = authState.user;
 
-    let user = null;
-    if (userData) {
-      try
-	  {
-        user = JSON.parse(userData);
-      }
-	  catch (error){
-        console.error('Error parsing user data:', error);
-      }
-    }
+    console.log('🔄 Updating navbar with auth state:', {
+      isAuthenticated,
+      user: user?.email,
+      avatar: user?.avatar,
+      profilePath: user?.profilePath
+    });
 
     const authSection = isAuthenticated && user ?
       `<div class="relative">
 		<button id="profile-dropdown-btn" class="flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium text-lime-500 bg-gray-700 hover:bg-gray-600 transition-colors duration-300">
-		<div class="w-6 h-6 rounded-full bg-gradient-to-br from-lime-500 to-green-600 flex items-center justify-center text-white text-xs font-bold">
-			${(user.firstName?.[0] || user.username?.[0] || user.email?.[0] || 'U').toUpperCase()}
-		</div>
-		<span>${user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : (user.username || user.email || 'User')}</span>
+		${user.avatar || user.profilePath ?
+          `<div class="w-6 h-6 rounded-full border border-lime-500 overflow-hidden">
+             <img src="/avatars/${user.avatar || user.profilePath}" alt="Avatar" class="w-full h-full object-cover">
+           </div>` :
+          `<div class="w-6 h-6 rounded-full bg-gradient-to-br from-lime-500 to-green-600 flex items-center justify-center text-white text-xs font-bold">
+             ${(user.firstName?.[0] || user.userName?.[0] || user.email?.[0] || 'U').toUpperCase()}
+           </div>`
+        }
+		<span>${user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : (user.userName || user.email || 'User')}</span>
 		<svg class="w-4 h-4 transition-transform duration-200" id="dropdown-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 			<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
 		</svg>
@@ -782,9 +716,15 @@ function addBasicNavbar(): void
              </svg>
              ${t('Profile')}
            </button>
+           <button onclick="handleStatistics()" class="flex items-center w-full px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition-colors duration-300" data-i18n="Statistics">
+             <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 00-2-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2H9z"></path>
+             </svg>
+             ${t('Statistics')}
+           </button>
            <button onclick="handleLogout()" class="flex items-center w-full px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-red-400 transition-colors duration-300" data-i18n="Logout">
              <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013 3v1"></path>
              </svg>
              ${t('Logout')}
            </button>
@@ -818,6 +758,63 @@ function addBasicNavbar(): void
     }
   }
 }
+
+// 4. Add a test function to verify avatar updates:
+(window as any).testAvatarUpdate = function() {
+  console.log('🧪 Testing Avatar Update...');
+
+  const authState = authService.getState();
+  console.log('Current user avatar:', authState.user?.avatar);
+  console.log('Current user profilePath:', authState.user?.profilePath);
+
+  // Force navbar refresh
+  addBasicNavbar();
+
+  console.log('Navbar should now show the updated avatar');
+};
+
+// Update the handleProfile function in main.ts:
+(window as any).handleProfile = function() {
+	console.log('👤 Profile clicked...');
+
+	// Close dropdown first (if open)
+	const dropdownMenu = document.getElementById('profile-dropdown-menu');
+	if (dropdownMenu && !dropdownMenu.classList.contains('hidden')) {
+		dropdownMenu.classList.add('hidden');
+	}
+
+	// Try to use ProfileModal if available
+	if ((window as any).ProfileModal) {
+		console.log('✅ Using ProfileModal.show()');
+		(window as any).ProfileModal.show();
+	} else {
+		// Try to import and use ProfileModal
+		import('./components/modals/ProfileModal').then(({ ProfileModal }) => {
+			ProfileModal.show();
+		}).catch(error => {
+			console.log('ProfileModal not available, using fallback');
+			showBasicProfileModal(); // Your existing fallback
+		});
+	}
+};
+
+// Update the existing global function to handle Statistics (was previously Profile)
+(window as any).handleStatistics = function() {
+	console.log('📊 Statistics clicked...');
+
+	// Try to use StatisticsModal if available
+	if ((window as any).StatisticsModal) {
+		(window as any).StatisticsModal.show();
+	} else {
+		// Try to import and use StatisticsModal
+		import('./components/modals/StatisticsModal').then(({ StatisticsModal }) => {
+			StatisticsModal.show();
+		}).catch(error => {
+			console.log('StatisticsModal not available, using fallback');
+			showBasicProfileModal(); // Temporary fallback
+		});
+	}
+};
 
 /**
  * Setup profile dropdown functionality
@@ -906,15 +903,6 @@ function setupProfileDropdown(): void {
 // Make the function globally available
 (window as any).addBasicNavbar = addBasicNavbar;
 
-// Global functions for navbar functionality
-(window as any).handleProfile = function() {
-	console.log('👤 Profile clicked...');
-	if ((window as any).modalService) {
-		(window as any).modalService.showProfileModal();
-	} else {
-		showBasicProfileModal();
-	}
-};
 
 (window as any).handleLogin = function() {
 	console.log('🔑 Login clicked...');
@@ -927,12 +915,16 @@ function setupProfileDropdown(): void {
 
 (window as any).handlePlayGame = async function() {
   console.log('🎮 Play Game clicked...');
+	const user = authService.getUser();
+	console.log('👤 Current User:', user);
+	console.log('🖼️ Avatar:', user?.avatar);
+	console.log('📁 ProfilePath:', user?.profilePath);
+	console.log(user?.avatar);
+  // Use AuthService to check authentication
+  const authState = authService.getState();
 
-  // Check if user is authenticated first
-  const authToken = localStorage.getItem('ft_pong_auth_token');
-  if (!authToken) {
+  if (!authState.isAuthenticated || !authState.user) {
     console.log('❌ User not authenticated, showing login modal');
-    // User not authenticated, show login modal first
     if ((window as any).modalService && (window as any).modalService.showLoginModal) {
       (window as any).modalService.showLoginModal();
     } else {
@@ -942,6 +934,7 @@ function setupProfileDropdown(): void {
   }
 
   console.log('✅ User is authenticated, starting 3D Pong game...');
+  console.log('🎫 JWT Token available:', authState.token?.substring(0, 20) + '...');
 
   // Start the 3D Pong game directly
   await start3DPongGame();
@@ -1112,14 +1105,18 @@ function setupProfileDropdown(): void {
 };
 
 
-(window as any).handleLogout = function() {
+(window as any).handleLogout = async function() {
   console.log('👋 Logout clicked...');
-    const confirmed = confirm('Are you sure you want to logout?');
-    if (confirmed) {
-      // Same logout logic as above
-      localStorage.removeItem('ft_pong_auth_token');
-      localStorage.removeItem('ft_pong_user_data');
 
+  const confirmed = confirm('Are you sure you want to logout?');
+  if (confirmed) {
+    try {
+      // Use AuthService logout which properly clears JWT tokens
+      await authService.logout();
+
+      console.log('✅ User logged out successfully via AuthService');
+
+      // Update UI
       if (typeof (window as any).addBasicNavbar === 'function') {
         (window as any).addBasicNavbar();
       }
@@ -1127,21 +1124,23 @@ function setupProfileDropdown(): void {
         (window as any).updateJumbotronButton();
       }
 
+      // Dispatch auth state change event
       window.dispatchEvent(new CustomEvent('auth-state-changed', {
         detail: { isAuthenticated: false, user: null }
       }));
 
-      console.log('✅ User logged out successfully');
-
       if (typeof (window as any).showBasicToast === 'function') {
         (window as any).showBasicToast('success', 'You have been logged out successfully!');
       }
+    } catch (error) {
+      console.error('❌ Logout error:', error);
+      if (typeof (window as any).showBasicToast === 'function') {
+        (window as any).showBasicToast('error', 'Logout failed');
+      }
     }
   }
+};
 
-/**
- * Add Pong-themed jumbotron with game integration
- */
 
 export function addBasicJumbotron(): void {
 	const jumbotron = document.getElementById('jumbotron');
@@ -1166,7 +1165,7 @@ export function addBasicJumbotron(): void {
 				<!-- Content -->
 				<div class="text-center max-w-600 p-8 z-10 relative">
 					<h1 class="text-6xl font-bold mb-6 text-lime-500">FT_PONG</h1>
-					<p class="text-xl text-white mb-8">${t('Experience the classic Pong game with a fresh lime twist!')}</p>
+					<p class="text-xl text-white mb-8">|᳂᳂᳂᳂᳂᳂᳂᳂᳂᳂᳂᳂᳂᳂᳂᳂᳂᳂᳂᳂᳂᳂᳂᳂᳂᳂᳂᳂᳂᳂᳂᳂᳂᳂᳂᳂᳂᳂᳂᳂|</p>
 
 					<!-- Dynamic Button Container -->
 					<div id="jumbotron-button-container">
@@ -1195,18 +1194,10 @@ function updateJumbotronButton(): void {
   const buttonContainer = document.getElementById('jumbotron-button-container');
   if (!buttonContainer) return;
 
-  const authToken = localStorage.getItem('ft_pong_auth_token');
-  const userData = localStorage.getItem('ft_pong_user_data');
-  const isAuthenticated = !!(authToken && userData);
-
-  let user = null;
-  if (userData) {
-    try {
-      user = JSON.parse(userData);
-    } catch (error) {
-      console.error('Error parsing user data:', error);
-    }
-  }
+  // Use AuthService instead of localStorage
+  const authState = authService.getState();
+  const isAuthenticated = authState.isAuthenticated;
+  const user = authState.user;
 
   buttonContainer.innerHTML = '';
 
@@ -1216,7 +1207,7 @@ function updateJumbotronButton(): void {
 	<button onclick="handlePlayGame()" class="btn-lime btn-lg btn-shimmer" data-i18n="Play Game">
 		🎮 ${t('Play Game')}
 	</button>
-	<p class="text-gray-300">${t('Welcome back!')}, <span class="text-lime-500 font-bold">${user.firstName || user.username || 'Player'}</span>!</p>
+	<p class="text-gray-300">${t('Welcome back !')}, <span class="text-lime-500 font-bold">${user.firstName || user.userName || 'Player'}</span> !</p>
 	</div>
     `;
   } else {
@@ -1230,15 +1221,15 @@ function updateJumbotronButton(): void {
 
 (window as any).handleGetStarted = function() {
   console.log('🚀 Get Started clicked...');
-  const authToken = localStorage.getItem('ft_pong_auth_token');
 
-  if (authToken) {
+  // Use AuthService to check authentication
+  const authState = authService.getState();
+
+  if (authState.isAuthenticated && authState.user) {
     console.log('✅ User authenticated, calling handlePlayGame...');
-    // User is authenticated, call play game function
     (window as any).handlePlayGame();
   } else {
     console.log('❌ User not authenticated, showing login modal');
-    // User not authenticated, show login modal
     if ((window as any).modalService) {
       (window as any).modalService.showLoginModal();
     } else {
@@ -1466,6 +1457,17 @@ function setupAuthListeners(components: Component[]): void {
 	window.addEventListener('auth-state-changed', ((e: CustomEvent) => {
 		console.log('🔄 Auth state changed:', e.detail);
 
+		// 🔍 DEBUG: Log what we're receiving
+		console.log('🔍 DEBUG Event detail:', JSON.stringify(e.detail, null, 2));
+		console.log('🔍 DEBUG isAuthenticated:', e.detail.isAuthenticated);
+		console.log('🔍 DEBUG user from event:', JSON.stringify(e.detail.user, null, 2));
+
+		// ✅ IMPORTANT: Update AuthService state with the event data
+		if (e.detail.isAuthenticated && e.detail.user) {
+			// Force AuthService to update its internal state with the new user data
+			authService['setAuthState'](authService.getToken() || 'temp-token', e.detail.user);
+		}
+
 		// Update navbar when auth state changes
 		addBasicNavbar();
 
@@ -1550,21 +1552,12 @@ function handleGameStartRequest(gameData: any): void {
  * Update authentication state
  */
 function updateAuthState(components: Component[]): void {
-	const authToken = localStorage.getItem('ft_pong_auth_token');
-	const userData = localStorage.getItem('ft_pong_user_data');
+	// Use AuthService instead of direct localStorage access
+	const authState = authService.getState();
+	const isAuthenticated = authState.isAuthenticated;
+	const user = authState.user;
 
-	const isAuthenticated = !!(authToken && userData);
-	let user = null;
-
-	if (userData) {
-		try {
-			user = JSON.parse(userData);
-		} catch (error) {
-			console.error('Error parsing user data:', error);
-		}
-	}
-
-	console.log('🔄 Updating auth state:', { isAuthenticated, user });
+	console.log('🔄 Updating auth state:', { isAuthenticated, user: user?.email, token: authState.token?.substring(0, 20) + '...' });
 
 	// Update navbar when auth state changes
 	addBasicNavbar();

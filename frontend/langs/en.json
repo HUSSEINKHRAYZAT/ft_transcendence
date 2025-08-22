@@ -134,7 +134,7 @@
   "Error": "Error",
   "Warning": "Warning",
   "Info": "Info",
-  "Welcome back!": "Welcome back!",
+  "Welcome back !": "Welcome back !",
   "Logged out successfully": "Logged out successfully",
   "Profile updated": "Profile updated",
   "Game started": "Game started",
@@ -412,7 +412,17 @@
   "Failed to play music": "Failed to play music",
   "Music paused": "Music paused",
   "Music stopped": "Music stopped",
-  "Playing music": "Playing music"
+  "Playing music": "Playing music",
+    "Statistics": "Statistics",
+    "Win Rate": "Win Rate",
+    "Record": "Record",
+    "Performance": "Performance",
+    "Member Since": "Member Since",
+    "Status": "Status",
+    "Active": "Active",
+    "Ready to start your Pong journey?": "Ready to start your Pong journey?",
+    "Play your first game to see statistics here!": "Play your first game to see statistics here!",
+    "Start Playing": "Start Playing"
 }
 
 
