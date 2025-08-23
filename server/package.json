@@ -1,18 +1,25 @@
 {
   "name": "ft-pong-socket-server",
   "version": "1.0.0",
-  "description": "Socket.IO server for FT_PONG real-time multiplayer",
+  "description": "Socket.IO and WebSocket servers for FT_PONG real-time multiplayer",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "websocket": "node websocket-server.js",
+    "ws": "node websocket-server.js",
+    "both": "concurrently \"npm run start\" \"npm run websocket\""
   },
   "dependencies": {
     "socket.io": "^4.7.5",
     "express": "^4.18.2",
-    "cors": "^2.8.5"
+    "cors": "^2.8.5",
+    "ws": "^8.14.2"
   },
-  "keywords": ["socketio", "multiplayer", "pong", "realtime"],
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "keywords": ["socketio", "websocket", "multiplayer", "pong", "realtime", "wss"],
   "author": "FT_PONG Team",
   "license": "MIT"
 }

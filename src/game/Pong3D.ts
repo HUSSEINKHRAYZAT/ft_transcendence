@@ -1,7 +1,6 @@
 import {
   ArcRotateCamera,
   Color3,
-  Color4,
   DirectionalLight,
   Engine,
   HemisphericLight,
@@ -33,6 +32,7 @@ import { SHAPES, SHAPE_WEIGHTS } from "./constants";
 import { themeBridge, type GameThemeColors } from "./ThemeBridge";
 import { GameChat, type ChatUser } from "../components/GameChat";
 import { socketManager } from "../network/SocketManager";
+import { GameCountdown } from "./GameCountdown";
 
 export class Pong3D {
   private engine: Engine;
@@ -54,6 +54,11 @@ export class Pong3D {
   }[] = [];
   private builtObstaclesFromNet = false;
   private corners: import("@babylonjs/core").Mesh[] = [];
+  private leftWall?: import("@babylonjs/core").Mesh;
+  private rightWall?: import("@babylonjs/core").Mesh;
+  private leftWallTiles: import("@babylonjs/core").Mesh[] = [];
+  private rightWallTiles: import("@babylonjs/core").Mesh[] = [];
+  private wallDamagePoints: Array<{x: number, z: number, wall: 'left' | 'right'}> = [];
 
   private keys: Record<string, boolean> = {};
   private control: ("human" | "ai" | "remoteGuest")[] = [];
@@ -67,6 +72,7 @@ export class Pong3D {
   private scoreElems: HTMLSpanElement[] = [];
   private nameElems: HTMLSpanElement[] = [];
   private lastScorer = -1;
+  private isPaused = false;
 
   // Theme system
   private currentGameTheme: GameThemeColors;
@@ -112,6 +118,7 @@ export class Pong3D {
     lose: Sound[];
   } = { paddle: [], obstacle: [], win: [], lose: [] };
   private toneCtx?: AudioContext;
+
 
   constructor(private config: GameConfig) {
     const canvas =
@@ -160,6 +167,14 @@ export class Pong3D {
     // Input — track arrows + W/S (and Shift if you still use it elsewhere)
     const onKey = (v: boolean) => (e: KeyboardEvent) => {
       const k = e.key.toLowerCase();
+      
+      // Handle pause toggle (only on keydown)
+      if (k === "p" && v) {
+        this.togglePause();
+        e.preventDefault();
+        return;
+      }
+      
       if (
         [
           "arrowup",
@@ -358,6 +373,12 @@ export class Pong3D {
   }
 
   private initializeChat() {
+    // Skip chat for AI mode (single player vs AI)
+    if (this.config.connection === "ai") {
+      console.log("💬 Chat disabled for AI mode");
+      return;
+    }
+
     // Get current user info from localStorage (set by frontend auth)
     let currentUser: ChatUser = {
       id: "player-" + Date.now(),
@@ -427,19 +448,42 @@ export class Pong3D {
       this.gameChat = null;
     }
 
+    // Cleanup pause overlay
+    this.hidePauseOverlay();
+
     // Dispose engine and scene
     if (this.engine) {
       this.engine.dispose();
     }
   }
 
-  private beginMatch() {
-    this.matchReady = true;
+  private async startGameWithCountdown() {
+    // Show countdown before starting the game
+    const countdown = new GameCountdown({
+      onComplete: () => {
+        this.matchReady = true;
+        this.resetBall(Math.random() < 0.5 ? 1 : -1);
+      }
+    });
+    
+    await countdown.start();
+  }
+
+  private async beginMatch() {
     this.hideWaitingOverlay();
-    this.resetBall(Math.random() < 0.5 ? 1 : -1);
-    if (this.isHost) {
-      this.sendRemoteMessage({ t: "start" } as RemoteMsg);
-    }
+    
+    // For multiplayer games, show countdown and then start
+    const countdown = new GameCountdown({
+      onComplete: () => {
+        this.matchReady = true;
+        this.resetBall(Math.random() < 0.5 ? 1 : -1);
+        if (this.isHost) {
+          this.sendRemoteMessage({ t: "start" } as RemoteMsg);
+        }
+      }
+    });
+    
+    await countdown.start();
   }
 
   /* ---------------- Scene ---------------- */
@@ -518,47 +562,56 @@ export class Pong3D {
 
     wall(width + t, t, 0, height / 2 + t / 2, "wallTop", topMat);
     wall(width + t, t, 0, -height / 2 - t / 2, "wallBottom", bottomMat);
-    wall(t, height + t, -width / 2 - t / 2, 0, "wallLeft", leftMat);
-    wall(t, height + t, width / 2 + t / 2, 0, "wallRight", rightMat);
+    this.leftWall = wall(t, height + t, -width / 2 - t / 2, 0, "wallLeft", leftMat);
+    this.rightWall = wall(t, height + t, width / 2 + t / 2, 0, "wallRight", rightMat);
+    
+    // Also create tiled walls for damage system
+    this.createTiledWalls(width, height, t, leftMat, rightMat);
 
-    // Corners as picture boxes
-    // Simple bright material instead of picture
-    function brightMat(scene: Scene, color: Color3) {
-      const mat = new StandardMaterial("cornerBrightMat", scene);
-      mat.diffuseColor = color; // main color
-      mat.emissiveColor = color.scale(0.7); // make it glow a bit
-      mat.specularColor = new Color3(0, 0, 0); // no shiny highlights
+    // Corners as picture boxes with custom texture
+    function cornerTextureMat(scene: Scene, textureUrl: string, rotationAngle: number = 0) {
+      const mat = new StandardMaterial("cornerTextureMat", scene);
+      const tex = new Texture(textureUrl, scene);
+      
+      // Rotate texture to always face upward
+      tex.wAng = rotationAngle;
+      
+      mat.diffuseTexture = tex;
+      // Optionally add some glow effect
+      mat.emissiveColor = new Color3(0.1, 0.1, 0.1); // Slight glow
+      mat.specularColor = new Color3(0, 0, 0); // No shiny highlights
       return mat;
     }
 
     this.cornerSize = t * 5;
-    const cH = 1.0,
-      cS = this.cornerSize;
+    const cS = this.cornerSize; // Use same size for all dimensions to make perfect squares
     const cx = width / 2 - t / 2 - cS / 2;
     const cz = height / 2 - t / 2 - cS / 2;
 
-    // Use bright yellow (you can change the color)
-    const cornerMat = brightMat(this.scene, new Color3(0.5, 0, 0));
-
-    const makeCornerBox = (x: number, z: number, id: string) => {
+    const makeCornerBox = (x: number, z: number, id: string, textureRotation: number = 0) => {
       const box = MeshBuilder.CreateBox(
         id,
-        { width: cS, height: cH, depth: cS },
+        { width: cS, height: cS, depth: cS }, // All dimensions equal = perfect cube
         this.scene
       );
-      box.position.set(x, cH / 2, z);
+      box.position.set(x, cS / 2, z); // Adjust Y position since height changed
+      
+      // Create material with proper texture rotation for this corner
+      const cornerMat = cornerTextureMat(this.scene, '/textures/42.png', textureRotation);
       box.material = cornerMat;
+      
       this.corners.push(box);
     };
 
-    makeCornerBox(+cx, +cz, "cornerTR");
-    makeCornerBox(+cx, -cz, "cornerBR");
-    makeCornerBox(-cx, +cz, "cornerTL");
-    makeCornerBox(-cx, -cz, "cornerBL");
+    // Create corner boxes with appropriate texture rotations to keep images upward
+    makeCornerBox(+cx, +cz, "cornerTR", 0);           // Top-Right: no rotation
+    makeCornerBox(+cx, -cz, "cornerBR", 0);           // Bottom-Right: no rotation  
+    makeCornerBox(-cx, +cz, "cornerTL", 0);           // Top-Left: no rotation
+    makeCornerBox(-cx, -cz, "cornerBL", 0);           // Bottom-Left: no rotation
 
     // Ball
     const ballMat = new StandardMaterial("ballMat", this.scene);
-    ballMat.diffuseTexture = new Texture("/textures/ball.png", this.scene);
+    ballMat.diffuseTexture = new Texture("/textures/ball.jpg", this.scene);
     ballMat.emissiveColor = this.currentGameTheme.ball.scale(0.3); // Add glow with theme color
     this.ball = MeshBuilder.CreateSphere(
       "ball",
@@ -636,14 +689,19 @@ export class Pong3D {
     // Obstacles: host/local spawns; guests build from net
     if (!this.isGuest) this.spawnObstacles(width, height);
 
-    if (this.matchReady) this.resetBall(Math.random() < 0.5 ? 1 : -1);
-    else {
+    if (this.matchReady) {
+      // For local games, show countdown before starting
+      this.startGameWithCountdown();
+    } else {
       this.ball.position.set(0, 0.3, 0);
       this.ballVelocity.set(0, 0, 0);
     }
 
     this.engine.runRenderLoop(() => {
-      this.update(width, height);
+      // Only update game logic if not paused, but always render the scene
+      if (!this.isPaused) {
+        this.update(width, height);
+      }
       this.scene.render();
     });
 
@@ -967,12 +1025,12 @@ export class Pong3D {
     }
   }
 
-  private checkMatchReady() {
+  private async checkMatchReady() {
     // Check if we have enough players to start the match
     if (this.connectedGuests >= this.requiredGuests) {
-      this.beginMatch();
+      await this.beginMatch();
     } else {
-      this.showWaitingOverlay();
+      this.showWaitingOverlay(`Waiting for players… ${this.connectedGuests}/${this.requiredGuests}`);
     }
   }
 
@@ -1053,8 +1111,9 @@ export class Pong3D {
           this.updateWaitingOverlay(
             `Waiting for players… ${this.connectedGuests}/${this.requiredGuests}`
           );
-          if (this.connectedGuests >= this.requiredGuests && !this.matchReady)
-            this.beginMatch();
+          if (this.connectedGuests >= this.requiredGuests && !this.matchReady) {
+            this.beginMatch(); // Fire and forget for WebSocket flow
+          }
           return;
         }
 
@@ -1473,6 +1532,8 @@ export class Pong3D {
           applyPenaltyIfNeeded(1);
           this.scores[1]++;
           this.lastScorer = 1;
+          // Add damage to right wall where ball hit
+          this.addWallDamage('right', this.ball.position.x, this.ball.position.z);
           this.updateScoreUI();
           if (this.scores[1] >= target) {
             this.finishAndReport(1);
@@ -1485,6 +1546,8 @@ export class Pong3D {
           applyPenaltyIfNeeded(0);
           this.scores[0]++;
           this.lastScorer = 0;
+          // Add damage to left wall where ball hit
+          this.addWallDamage('left', this.ball.position.x, this.ball.position.z);
           this.updateScoreUI();
           if (this.scores[0] >= target) {
             this.finishAndReport(0);
@@ -1496,6 +1559,159 @@ export class Pong3D {
     }
 
     if (this.isHost) this.broadcastState(now);
+  }
+
+  private addWallDamage(wall: 'left' | 'right', hitX: number, hitZ: number) {
+    // Only add damage in 2P mode
+    if (this.config.playerCount !== 2) return;
+
+    const wallMesh = wall === 'left' ? this.leftWall : this.rightWall;
+    if (!wallMesh) return;
+
+    // Store damage point
+    this.wallDamagePoints.push({
+      x: hitX,
+      z: hitZ,
+      wall: wall
+    });
+
+    // Create damage texture effect
+    this.applyDamageToWall(wallMesh, hitX, hitZ);
+  }
+
+  private createTiledWalls(width: number, height: number, thickness: number, leftMat: StandardMaterial, rightMat: StandardMaterial) {
+    // Configuration for wall tiles
+    const tilesPerWall = 10; // Number of tiles per wall (vertically)
+    const tileHeight = height / tilesPerWall;
+    
+    // Clear existing tile arrays
+    this.leftWallTiles = [];
+    this.rightWallTiles = [];
+    
+    // Create left wall tiles
+    for (let i = 0; i < tilesPerWall; i++) {
+      const tileZ = -height/2 + (i + 0.5) * tileHeight; // Center position of each tile
+      
+      const leftTile = MeshBuilder.CreateBox(
+        `leftWallTile_${i}`,
+        { width: thickness, height: tileHeight, depth: thickness },
+        this.scene
+      );
+      leftTile.position.set(-width / 2 - thickness / 2, 1 / 2, tileZ);
+      leftTile.material = leftMat.clone(`leftTileMat_${i}`);
+      
+      this.leftWallTiles.push(leftTile);
+    }
+    
+    // Create right wall tiles  
+    for (let i = 0; i < tilesPerWall; i++) {
+      const tileZ = -height/2 + (i + 0.5) * tileHeight; // Center position of each tile
+      
+      const rightTile = MeshBuilder.CreateBox(
+        `rightWallTile_${i}`,
+        { width: thickness, height: tileHeight, depth: thickness },
+        this.scene
+      );
+      rightTile.position.set(width / 2 + thickness / 2, 1 / 2, tileZ);
+      rightTile.material = rightMat.clone(`rightTileMat_${i}`);
+      
+      this.rightWallTiles.push(rightTile);
+    }
+    
+    // Note: Main wall references (this.leftWall, this.rightWall) are kept from original wall creation
+    // Tiles are used only for damage system
+    
+    console.log(`🧱 Created ${tilesPerWall} tiles per wall (${tilesPerWall * 2} total wall tiles)`);
+  }
+
+  private applyDamageToWall(wallMesh: import("@babylonjs/core").Mesh, _hitX: number, hitZ: number) {
+    // This method now needs to find which specific tile was hit and damage only that tile
+    
+    // Determine which wall was hit (left or right)
+    const isLeftWall = wallMesh === this.leftWall || this.leftWallTiles.includes(wallMesh);
+    const isRightWall = wallMesh === this.rightWall || this.rightWallTiles.includes(wallMesh);
+    
+    if (!isLeftWall && !isRightWall) {
+      console.log('❌ Wall mesh not recognized');
+      return;
+    }
+    
+    // Get the appropriate tile array
+    const wallTiles = isLeftWall ? this.leftWallTiles : this.rightWallTiles;
+    const wallName = isLeftWall ? 'left' : 'right';
+    
+    // Find which tile the ball hit based on hitZ position
+    const tileHeight = 10 / wallTiles.length; // 10 is the total height from createTiledWalls
+    const hitTileIndex = Math.floor((hitZ + 5) / tileHeight); // +5 to offset from center, 5 = height/2
+    const clampedIndex = Math.max(0, Math.min(hitTileIndex, wallTiles.length - 1));
+    
+    const targetTile = wallTiles[clampedIndex];
+    
+    if (!targetTile) {
+      console.log('❌ Could not find target tile');
+      return;
+    }
+    
+    // Check if this specific tile is already damaged
+    if ((targetTile as any)._isDamaged) {
+      console.log(`⚠️ Tile ${clampedIndex} on ${wallName} wall already damaged`);
+      return;
+    }
+    
+    // Mark this specific tile as damaged
+    (targetTile as any)._isDamaged = true;
+    
+    // Create a new damaged material using the b2 damage texture for this tile only
+    const material = targetTile.material as StandardMaterial;
+    const damagedMaterial = material.clone(`damagedTile_${wallName}_${clampedIndex}_${Date.now()}`);
+    
+    // Load the damage wall texture (b2.png)
+    const damageTexture = new Texture('/textures/b2.png', this.scene);
+    
+    // Apply the damage texture to only this specific tile
+    damagedMaterial.diffuseTexture = damageTexture;
+    targetTile.material = damagedMaterial;
+    
+    console.log(`🔥 Tile ${clampedIndex} on ${wallName} wall damaged with b2 texture at position:`, { hitZ, tileHeight });
+  }
+
+  private togglePause() {
+    this.isPaused = !this.isPaused;
+    
+    if (this.isPaused) {
+      // Show pause overlay
+      this.showPauseOverlay();
+      console.log("⏸️ Game paused");
+    } else {
+      // Hide pause overlay
+      this.hidePauseOverlay();
+      console.log("▶️ Game resumed");
+    }
+  }
+
+  private showPauseOverlay() {
+    // Remove existing pause overlay if any
+    this.hidePauseOverlay();
+    
+    const overlay = document.createElement('div');
+    overlay.id = 'pause-overlay';
+    overlay.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50';
+    overlay.innerHTML = `
+      <div class="bg-gray-800 rounded-lg p-8 text-center border-2 border-lime-500">
+        <div class="text-6xl mb-4">⏸️</div>
+        <div class="text-2xl font-bold text-lime-500 mb-2">PAUSED</div>
+        <div class="text-gray-300">Press P to resume</div>
+      </div>
+    `;
+    
+    document.body.appendChild(overlay);
+  }
+
+  private hidePauseOverlay() {
+    const overlay = document.getElementById('pause-overlay');
+    if (overlay) {
+      overlay.remove();
+    }
   }
 
   private runAI(i: number, _width: number, height: number, maxStep: number) {

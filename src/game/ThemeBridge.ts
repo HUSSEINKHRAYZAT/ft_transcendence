@@ -31,13 +31,13 @@ export class ThemeBridge {
 
   private initializeThemeListener(): void {
     // Listen to both accent and background theme changes
-    window.addEventListener('theme-changed', (e: CustomEvent) => {
+    window.addEventListener('theme-changed', (() => {
       this.updateGameTheme();
-    });
+    }) as EventListener);
 
-    window.addEventListener('background-theme-changed', (e: CustomEvent) => {
+    window.addEventListener('background-theme-changed', (() => {
       this.updateGameTheme();
-    });
+    }) as EventListener);
 
     // Initial theme load
     this.updateGameTheme();
@@ -174,6 +174,13 @@ export class ThemeBridge {
         this.themeChangeCallbacks.splice(index, 1);
       }
     };
+  }
+
+  public color3ToHex(color: Color3): string {
+    const r = Math.round(color.r * 255).toString(16).padStart(2, '0');
+    const g = Math.round(color.g * 255).toString(16).padStart(2, '0');
+    const b = Math.round(color.b * 255).toString(16).padStart(2, '0');
+    return `#${r}${g}${b}`;
   }
 
   // Utility methods for game use

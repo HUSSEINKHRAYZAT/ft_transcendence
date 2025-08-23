@@ -2,6 +2,7 @@ import type { GameConfig, PlayerCount } from "./types";
 import { ApiClient } from "./api";
 import { clearPongUI, markUI } from "./ui";
 import { socketManager } from "./network/SocketManager";
+import { themeBridge } from "./game/ThemeBridge";
 
 export class Menu {
   static async render(): Promise<GameConfig> {
@@ -34,17 +35,22 @@ export class Menu {
 
     return new Promise((resolve) => {
       const root = markUI(document.createElement("div"));
-      root.className = "fixed inset-0 grid place-items-center bg-black/85 text-white font-sans z-[10000]";
+      const theme = themeBridge.getCurrentTheme();
+      const primaryHex = themeBridge.color3ToHex(theme.primary);
+      const backgroundRgb = `${Math.round(theme.background.r * 255)}, ${Math.round(theme.background.g * 255)}, ${Math.round(theme.background.b * 255)}`;
+      
+      root.className = "fixed inset-0 grid place-items-center text-white font-sans z-[10000]";
+      root.style.background = `rgba(${backgroundRgb}, 0.95)`;
 
       root.innerHTML = `
-        <div class="bg-gradient-to-br from-gray-800 to-gray-900 p-8 rounded-3xl w-full max-w-4xl mx-4 shadow-2xl border border-lime-500/20 backdrop-blur-sm">
+        <div class="p-8 rounded-3xl w-full max-w-4xl mx-4 shadow-2xl backdrop-blur-sm" style="background: rgba(${backgroundRgb}, 0.8); border: 1px solid ${primaryHex}40;">
           <div class="flex items-center justify-between mb-6">
             <div class="flex items-center gap-3">
               <button data-action="back" class="w-10 h-10 bg-gradient-to-br from-gray-600 to-gray-700 rounded-xl flex items-center justify-center text-xl hover:from-gray-500 hover:to-gray-600 transition-all duration-200 border border-gray-500/30 hover:border-gray-400/50" title="← Back to Frontend">←</button>
-              <div class="w-10 h-10 bg-gradient-to-br from-lime-500 to-lime-600 rounded-xl flex items-center justify-center text-xl">🎮</div>
-              <h1 class="text-3xl font-bold bg-gradient-to-r from-lime-500 to-lime-400 bg-clip-text text-transparent tracking-wide">3D Pong Game Setup</h1>
+              <div class="w-10 h-10 rounded-xl flex items-center justify-center text-xl" style="background: linear-gradient(135deg, ${primaryHex} 0%, ${primaryHex}dd 100%);">🎮</div>
+              <h1 class="text-3xl font-bold tracking-wide" style="background: linear-gradient(135deg, ${primaryHex} 0%, ${primaryHex}dd 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;">3D Pong Game Setup</h1>
             </div>
-            <div class="text-sm px-4 py-2 bg-lime-500/10 border border-lime-500/30 rounded-xl text-lime-500">
+            <div class="text-sm px-4 py-2 rounded-xl" style="background: ${primaryHex}1a; border: 1px solid ${primaryHex}50; color: ${primaryHex};">
               ${you ? `👤 <span class="font-semibold">${you.name}</span>` : `<span class="opacity-80">🔒 Not signed in</span>`}
             </div>
           </div>
@@ -112,30 +118,53 @@ export class Menu {
       css.setAttribute("data-pong-ui", "1");
       css.textContent = `
         .btn {
-          @apply bg-gradient-to-br from-gray-700 to-gray-800 border border-lime-500/30 text-white px-5 py-3 rounded-xl cursor-pointer font-semibold text-sm transition-all duration-300 relative overflow-hidden;
+          background: linear-gradient(135deg, #374151 0%, #1f2937 100%);
+          border: 1px solid ${primaryHex}50;
+          color: white;
+          padding: 12px 20px;
+          border-radius: 12px;
+          cursor: pointer;
+          font-weight: 600;
+          font-size: 14px;
+          transition: all 0.3s ease;
+          position: relative;
+          overflow: hidden;
         }
         .btn:hover {
-          @apply bg-gradient-to-br from-gray-600 to-gray-700 border-lime-500/50 -translate-y-0.5;
-          box-shadow: 0 8px 25px rgba(132, 204, 22, 0.15);
+          background: linear-gradient(135deg, #4b5563 0%, #374151 100%);
+          border-color: ${primaryHex}80;
+          transform: translateY(-2px);
+          box-shadow: 0 8px 25px ${primaryHex}25;
         }
         .btn-primary {
-          @apply bg-gradient-to-br from-lime-500 to-lime-600 border-lime-500 text-black font-bold;
+          background: linear-gradient(135deg, ${primaryHex} 0%, ${primaryHex}dd 100%);
+          border-color: ${primaryHex};
+          color: black;
+          font-weight: 700;
         }
         .btn-primary:hover {
-          @apply bg-gradient-to-br from-lime-400 to-lime-500 border-lime-400;
-          box-shadow: 0 8px 25px rgba(132, 204, 22, 0.3);
+          background: linear-gradient(135deg, ${primaryHex}ee 0%, ${primaryHex} 100%);
+          border-color: ${primaryHex}ee;
+          box-shadow: 0 8px 25px ${primaryHex}50;
         }
         .btn-secondary {
-          @apply bg-gradient-to-br from-lime-500/20 to-lime-500/10 border-lime-500/40 text-lime-500;
+          background: linear-gradient(135deg, ${primaryHex}33 0%, ${primaryHex}1a 100%);
+          border-color: ${primaryHex}66;
+          color: ${primaryHex};
         }
         .btn-secondary:hover {
-          @apply bg-gradient-to-br from-lime-500/30 to-lime-500/20 text-lime-400;
+          background: linear-gradient(135deg, ${primaryHex}44 0%, ${primaryHex}33 100%);
+          color: ${primaryHex}dd;
         }
         .btn-outline {
-          @apply bg-transparent border-blue-500/40 text-blue-500;
+          background: transparent;
+          border: 1px solid #3b82f666;
+          color: #3b82f6;
         }
         .btn-outline:hover {
-          @apply bg-blue-500/10 border-blue-500 text-blue-400;
+          background: #3b82f61a;
+          border-color: #3b82f6;
+          color: #60a5fa;
         }
         .ov {
           position: fixed !important;
