@@ -41,7 +41,7 @@ type BackendUser = {
   isVerified?: number | boolean;
   status?: string;
   isLoggedIn?: number | boolean;
-  enable2fa?: number | boolean;
+  twoFactorEnabled?: number | boolean;
 };
 
 
@@ -53,12 +53,6 @@ function mapBackendUserToUser(raw: any): User {
 
   console.log('🔍 Raw backend user data:', JSON.stringify(u, null, 2));
 
-  // 🔍 DEBUG: Check all avatar-related properties
-  console.log('🔍 DEBUG u.avatar:', u.avatar);
-  console.log('🔍 DEBUG u.profilePath:', u.profilePath);
-  console.log('🔍 DEBUG u.profilepath:', u.profilepath);
-  console.log('🔍 DEBUG u.profile_path:', u.profile_path);
-  console.log('🔍 DEBUG All keys in response:', Object.keys(u));
 
   const mappedUser = {
     id: String(u.id ?? ""),
@@ -72,6 +66,7 @@ function mapBackendUserToUser(raw: any): User {
     createdAt: u.createdAt ? new Date(u.createdAt) : new Date(),
     updatedAt: u.updatedAt ? new Date(u.updatedAt) : new Date(),
     gameStats: undefined,
+     enable2fa: Boolean(u.twoFactorEnabled)
   };
 
   console.log('🔍 Mapped user data:', JSON.stringify(mappedUser, null, 2));
@@ -197,7 +192,8 @@ async signup(credentials: SignupCredentials): Promise<AuthResponse> {
   /** Signup */
 private async signupAPI(credentials: SignupCredentials): Promise<AuthResponse> {
   try {
-    const res = await fetch("http://localhost:8080/users", {
+  const endpoint = `${API_BASE_URL}/users`;
+    const res = await fetch(endpoint, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -379,6 +375,49 @@ private async loginAPI(
       }),
     });
 
+    // ✅ Handle 303 - Email Not Verified
+    if (res.status === 303) {
+      console.log('🔒 User not verified (303) - need email for verification');
+
+      try {
+        // Get the actual email address from backend
+        const emailResponse = await fetch(`${API_BASE_URL}/users/getEmail`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify({
+            username: credentials.email // Send the login input (email or username)
+          }),
+        });
+
+        if (emailResponse.ok) {
+          const emailData = await emailResponse.json();
+          const userEmail = emailData.email || emailData.userEmail;
+
+          console.log('✅ Got email for verification:', userEmail);
+
+          return {
+            success: false,
+            message: `email not verified:${userEmail}` // ✅ Include email in message
+          };
+        } else {
+          console.error('❌ Failed to get email from backend');
+          return {
+            success: false,
+            message: 'Unable to send verification email. Please contact support.'
+          };
+        }
+      } catch (emailError) {
+        console.error('❌ Error fetching user email:', emailError);
+        return {
+          success: false,
+          message: 'Unable to send verification email. Please try again.'
+        };
+      }
+    }
+
     if (!res.ok) {
       const rawErr = await res.text().catch(() => "");
       let errMsg = ERROR_MESSAGES.INVALID_CREDENTIALS;
@@ -399,7 +438,6 @@ private async loginAPI(
     return { success: true, token: data.token, user };
   } catch (err) {
     console.error("Backend not available, using offline demo auth:", err);
-
     return this.offlineDemoLogin(credentials);
   }
 }
@@ -550,11 +588,12 @@ private async updateProfileAPI(updateData: UpdateProfileData): Promise<AuthRespo
         'Authorization': `Bearer ${this.state.token}`,
       },
       body: JSON.stringify({
-        firstName: updateData.FirstName,
+        firstName: updateData.firstName,
         lastName: updateData.lastName,
-        username: updateData.userName,  // ← Fix: Send as 'username' to backend
+        username: updateData.userName,
         email: updateData.email,
         profilepath: updateData.profilePath,
+        twoFactorEnabled: updateData.enable2fa  // ✅ Send as twoFactorEnabled to match DB column
       }),
     });
 
@@ -587,12 +626,9 @@ private async updateProfileAPI(updateData: UpdateProfileData): Promise<AuthRespo
     const data = await res.json();
     console.log('✅ Profile update response:', data);
 
-    // 🔍 ADD THIS DEBUG SECTION:
     console.log('🔍 DEBUG Complete backend response:', JSON.stringify(data, null, 2));
     console.log('🔍 DEBUG data.user:', JSON.stringify(data.user, null, 2));
-    console.log('🔍 DEBUG data.profilePath:', data.profilePath);
-    console.log('🔍 DEBUG data.profilepath:', data.profilepath);
-    console.log('🔍 DEBUG data.avatar:', data.avatar);
+    console.log('🔍 DEBUG data.twoFactorEnabled:', data.twoFactorEnabled); // ✅ Updated debug log
 
     const updatedUser = mapBackendUserToUser(data.user || data);
 
@@ -650,6 +686,152 @@ private validateProfileUpdateData(data: UpdateProfileData): { isValid: boolean; 
 
   return { isValid: true };
 }
+
+// Add these methods to your AuthService class
+
+/**
+ * Initiate password reset process
+ * Generates verification code and sends it to user's email
+ */
+async initiatePasswordReset(email: string, newPassword: string): Promise<AuthResponse> {
+  this.setLoading(true);
+
+  try {
+    // Generate 6-digit verification code
+    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    console.log('🔢 Generated password reset code:', verificationCode);
+
+    // Store code and password temporarily (in real app, store in backend)
+    localStorage.setItem('password_reset_code', verificationCode);
+    localStorage.setItem('password_reset_email', email);
+    localStorage.setItem('password_reset_password', newPassword);
+
+    // Send verification code to backend
+    const response = await fetch(`${API_BASE_URL}/users/send-verification`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        email: email,
+        code: verificationCode
+      })
+    });
+
+    console.log('📥 Password reset verification response status:', response.status);
+
+    if (response.status === 404) {
+      return {
+        success: false,
+        message: 'Email address not found in our system'
+      };
+    }
+
+    if (response.status === 200 || response.status === 201) {
+      console.log('✅ Password reset verification code sent successfully');
+      return {
+        success: true,
+        message: 'Verification code sent to your email'
+      };
+    }
+
+    // Handle other errors
+    const errorData = await response.json().catch(() => ({}));
+    return {
+      success: false,
+      message: errorData.message || 'Failed to send verification code. Please try again.'
+    };
+
+  } catch (error) {
+    console.error('❌ Error initiating password reset:', error);
+    return {
+      success: false,
+      message: ERROR_MESSAGES.NETWORK_ERROR
+    };
+  } finally {
+    this.setLoading(false);
+  }
+}
+
+/**
+ * Complete password reset after code verification
+ */
+async completePasswordReset(email: string, code: string, newPassword: string): Promise<AuthResponse> {
+  this.setLoading(true);
+
+  try {
+    // Verify the code matches what we stored
+    const storedCode = localStorage.getItem('password_reset_code');
+    const storedEmail = localStorage.getItem('password_reset_email');
+    const storedPassword = localStorage.getItem('password_reset_password');
+
+    if (!storedCode || !storedEmail || !storedPassword) {
+      return {
+        success: false,
+        message: 'Password reset session expired. Please start over.'
+      };
+    }
+
+    if (storedEmail !== email || storedCode !== code || storedPassword !== newPassword) {
+      return {
+        success: false,
+        message: 'Invalid verification code'
+      };
+    }
+
+    // Send password reset to backend
+    const response = await fetch(`${API_BASE_URL}/users/reset-password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        email: email,
+        newPassword: newPassword
+      })
+    });
+
+    if (response.status === 200) {
+      // Clean up temporary storage
+      localStorage.removeItem('password_reset_code');
+      localStorage.removeItem('password_reset_email');
+      localStorage.removeItem('password_reset_password');
+
+      console.log('✅ Password reset completed successfully');
+      return {
+        success: true,
+        message: 'Password reset successful'
+      };
+    }
+
+    const errorData = await response.json().catch(() => ({}));
+    return {
+      success: false,
+      message: errorData.message || 'Failed to reset password. Please try again.'
+    };
+
+  } catch (error) {
+    console.error('❌ Error completing password reset:', error);
+    return {
+      success: false,
+      message: ERROR_MESSAGES.NETWORK_ERROR
+    };
+  } finally {
+    this.setLoading(false);
+  }
+}
+
+/**
+ * Resend password reset verification code
+ */
+async resendPasswordResetCode(email: string, newPassword: string): Promise<AuthResponse> {
+  console.log('📧 Resending password reset verification code');
+
+  // Simply call initiatePasswordReset again to generate and send a new code
+  return this.initiatePasswordReset(email, newPassword);
+}
+
+
 }
 
 export const authService = new AuthService();

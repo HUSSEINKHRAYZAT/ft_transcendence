@@ -1,4 +1,3 @@
-// User authentication state
 export interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
@@ -6,7 +5,6 @@ export interface AuthState {
   user: User | null;
 }
 
-// User profile information
 export interface User {
   id: string;
   email: string;
@@ -18,6 +16,7 @@ export interface User {
   createdAt: Date;
   updatedAt: Date;
   gameStats?: GameStats;
+  enable2fa?: number | boolean;
 }
 
 // Game statistics for user
@@ -31,13 +30,11 @@ export interface GameStats {
   averageScore: number;
 }
 
-// Login form data
 export interface LoginCredentials {
   email: string;
   password: string;
 }
 
-// Signup form data
 export interface SignupCredentials {
   firstName: string;
   lastName: string;
@@ -46,7 +43,7 @@ export interface SignupCredentials {
   password: string;
 }
 
-// API response for authentication
+
 export interface AuthResponse {
   success: boolean;
   token?: string;
@@ -55,13 +52,11 @@ export interface AuthResponse {
   errors?: ValidationError[];
 }
 
-// Form validation errors
 export interface ValidationError {
   field: string;
   message: string;
 }
 
-// Friend relationship
 export interface Friend {
   id: string;
   user: Pick<User, 'id' | 'firstName' | 'lastName' | 'avatar'>;
@@ -69,7 +64,6 @@ export interface Friend {
   createdAt: Date;
 }
 
-// Friend request status
 export enum FriendStatus {
   PENDING = 'pending',
   ACCEPTED = 'accepted',

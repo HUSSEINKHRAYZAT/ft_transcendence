@@ -309,13 +309,13 @@ export class InfoModal extends BaseModal {
               <span class="text-orange-400 font-bold">✅ ${t('Major:')}</span> ${t('Multiple players can play Pong at the same time.')}
             </div>
             <div class="bg-gray-600 p-3 rounded">
-              <span class="text-blue-400 font-bold">✅ ${t('Minor:')}</span> ${t('Add another game with the same user management.')}
+              <span class="text-orange-400 font-bold">❎ ${t('Major:')}</span>${t('Add another game with the same user management.')}
             </div>
             <div class="bg-gray-600 p-3 rounded">
-              <span class="text-blue-400 font-bold">🔄 ${t('Minor:')}</span> ${t('Game customization options (half done).')}
+              <span class="text-blue-400 font-bold">✅ ${t('Minor:')}</span> ${t('Game customization options (half done).')}
             </div>
             <div class="bg-gray-600 p-3 rounded">
-              <span class="text-blue-400 font-bold">❎ ${t('Minor:')}</span> ${t('Live chat during the game.')}
+              <span class="text-orange-400 font-bold">✅ ${t('Major:')}</span> ${t('Live chat during the game.')}
             </div>
           </div>
         `
@@ -334,30 +334,30 @@ export class InfoModal extends BaseModal {
         `
       },
       security: {
-        title: t('🔒 Cybersecurity [ 1 / 2.5 ]'),
+        title: t('🔒 Cybersecurity [ 2 / 2.5 ]'),
         content: `
           <div class="text-left space-y-3">
             <div class="bg-gray-600 p-3 rounded">
               <span class="text-orange-400 font-bold">✅ ${t('Major:')}</span> ${t('Implement WAF/ModSecurity with Hardened Configuration.')}
             </div>
             <div class="bg-gray-600 p-3 rounded">
-              <span class="text-orange-400 font-bold">❎ ${t('Major:')}</span> ${t('GDPR Compliance Options with User Anonymization.')}
+              <span class="text-blue-400 font-bold">❎ ${t('Minor:')}</span> ${t('GDPR Compliance Options with User Anonymization.')}
             </div>
             <div class="bg-gray-600 p-3 rounded">
-              <span class="text-blue-400 font-bold">❎ ${t('Minor:')}</span> ${t('Implement Two-Factor Authentication (2FA).')}
+              <span class="text-orange-400 font-bold">✅ ${t('Major:')}</span> ${t('Implement Two-Factor Authentication (2FA).')}
             </div>
           </div>
         `
       },
       devops: {
-        title: t('⚙️ DevOps [ 1 / 2.5 ]'),
+        title: t('⚙️ DevOps [ 2 / 2.5 ]'),
         content: `
           <div class="text-left space-y-3">
             <div class="bg-gray-600 p-3 rounded">
               <span class="text-orange-400 font-bold">✅ ${t('Major:')}</span> ${t('Infrastructure Setup for Log Management.')}
             </div>
             <div class="bg-gray-600 p-3 rounded">
-              <span class="text-orange-400 font-bold">❎ ${t('Major:')}</span> ${t('Designing the Backend as Microservices.')}
+              <span class="text-orange-400 font-bold">✅ ${t('Major:')}</span> ${t('Designing the Backend as Microservices.')}
             </div>
             <div class="bg-gray-600 p-3 rounded">
               <span class="text-blue-400 font-bold">❎ ${t('Minor:')}</span> ${t('Set up ELK (Elasticsearch, Logstash, Kibana) for log management.')}
@@ -380,13 +380,19 @@ export class InfoModal extends BaseModal {
         content: `
           <div class="text-left space-y-3">
             <div class="bg-gray-600 p-3 rounded">
-              <span class="text-orange-400 font-bold">✅ ${t('Major:')}</span> ${t('Support on all devices.')}
+              <span class="text-blue-400 font-bold">❎ ${t('Minor:')}</span> ${t('Support on all devices.')}
             </div>
             <div class="bg-gray-600 p-3 rounded">
-              <span class="text-orange-400 font-bold">❎ ${t('Major:')}</span> ${t('Expanding Browser Compatibility.')}
+              <span class="text-blue-400 font-bold">✅ ${t('Minor:')}</span> ${t('Expanding Browser Compatibility.')}
             </div>
             <div class="bg-gray-600 p-3 rounded">
-              <span class="text-blue-400 font-bold">❎ ${t('Minor:')}</span> ${t('Multiple language supports.')}
+              <span class="text-blue-400 font-bold">✅ ${t('Minor:')}</span> ${t('Multiple language supports.')}
+            </div>
+            <div class="bg-gray-600 p-3 rounded">
+              <span class="text-blue-400 font-bold">❎ ${t('Minor:')}</span> ${t('Add accessibility features for visually impaired users')}
+            </div>
+            <div class="bg-gray-600 p-3 rounded">
+              <span class="text-blue-400 font-bold">❎ ${t('Minor:')}</span> ${t('Server-Side Rendering (SSR) integration.')}
             </div>
           </div>
         `

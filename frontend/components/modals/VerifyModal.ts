@@ -202,58 +202,71 @@ export class VerifyModal extends BaseModal {
     return Math.floor(100000 + Math.random() * 900000).toString();
   }
 
-  private async generateAndSendCode(): Promise<void> {
-    try {
-      this.currentCode = this.generateRandomCode();
-      console.log('🔐 Generated verification code:', this.currentCode);
+private async generateAndSendCode(): Promise<void> {
+  try {
+    this.currentCode = this.generateRandomCode();
+    console.log('🔢 Generated verification code:', this.currentCode);
 
-      // Get auth token - prioritize passed token, then localStorage
-      const token = this.authToken ||
-                   localStorage.getItem('auth_token') ||
-                   localStorage.getItem('AUTH_TOKEN') ||
-                   localStorage.getItem('ft_pong_auth_token');
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-      };
-
-      // Only add Authorization header if token exists
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-        console.log('🔑 Using auth token for verification request');
-      } else {
-        console.log('📧 Sending verification without token (signup flow)');
-      }
-
-      const response = await fetch('http://localhost:8080/users/send-verification', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          email: this.userEmail,
-          code: this.currentCode
-        })
-      });
-
-      if (response.status === 200) {
-        console.log('✅ Verification code sent successfully');
-      } else if (response.status === 401) {
-        console.error('❌ Unauthorized - endpoint may require authentication or different auth approach');
-        // For now, fall back to demo mode during signup
-        this.currentCode = '000000';
-        console.log('🔧 Using demo code: 000000 (auth issue)');
-      } else if (response.status === 404) {
-        console.error('❌ User not found');
-        this.showError('User not found. Please check your email.');
-      } else {
-        console.error('❌ Failed to send verification code, status:', response.status);
-        this.showError('Failed to send verification code. Please try again.');
-      }
-    } catch (error) {
-      console.error('❌ Network error sending verification code:', error);
-      // Fallback to demo mode
-      this.currentCode = '000000';
-      console.log('🔧 Using demo code: 000000');
+    // Validate email format before sending
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(this.userEmail)) {
+      console.error('❌ Invalid email format:', this.userEmail);
+      this.showError('Please provide a valid email address for verification.');
+      return;
     }
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+
+    // Simple request body matching backend schema exactly
+    const requestBody = {
+      email: this.userEmail,
+      code: this.currentCode
+    };
+
+    console.log('📤 Sending verification request:', {
+      url: 'http://localhost:8080/users/send-verification',
+      body: requestBody
+    });
+
+    const response = await fetch('http://localhost:8080/users/send-verification', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(requestBody)
+    });
+
+    console.log('📥 Verification response status:', response.status);
+
+    if (response.status === 200 || response.status === 201) {
+      console.log('✅ Verification code sent successfully');
+      return;
+    }
+
+    // Handle errors
+    if (response.status === 400) {
+      const errorResponse = await response.json();
+      console.log('🔍 400 Bad Request details:', errorResponse);
+
+      if (errorResponse.message?.includes('email')) {
+        this.showError('Invalid email format. Please check your email address.');
+      } else {
+        this.showError('Invalid request. Please try again.');
+      }
+      return;
+    }
+
+    // Other error handling...
+    console.error(`❌ Failed to send verification code, status: ${response.status}`);
+    this.currentCode = '000000';
+    console.log('🔧 Using demo code: 000000 (API error fallback)');
+
+  } catch (error) {
+    console.error('❌ Network error sending verification code:', error);
+    this.currentCode = '000000';
+    console.log('🔧 Using demo code: 000000 (network error fallback)');
   }
+}
 
   private async handleVerify(): Promise<void> {
     const inputs = [
