@@ -3,6 +3,7 @@ import { ApiClient } from "./api";
 import { clearPongUI, markUI } from "./ui";
 import { socketManager } from "./network/SocketManager";
 import { themeBridge } from "./game/ThemeBridge";
+import { CameraConfig } from "./game/camconfig";
 
 export class Menu {
   static async render(): Promise<GameConfig> {
@@ -274,6 +275,7 @@ export class Menu {
           currentUser: you || null,
           displayNames: ["Player One", "Player Two"],
         };
+        CameraConfig.radius = 19;
         root.remove();
         resolve(cfg);
       }
@@ -288,6 +290,7 @@ export class Menu {
           currentUser: you || null,
           displayNames: [`AI (Level ${lvl})`, you?.name || "You"],
         };
+        CameraConfig.radius = 19;
         root.remove();
         resolve(cfg);
       }
