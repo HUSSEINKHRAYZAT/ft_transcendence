@@ -1,0 +1,703 @@
+/* Main CSS file for FT_PONG application */
+@import 'tailwindcss/base';
+@import 'tailwindcss/components';
+@import 'tailwindcss/utilities';
+
+/* Custom CSS Variables - will be overridden by theme managers */
+:root {
+  --lime-50: #f7ffe0;
+  --lime-500: #84cc16;
+  --lime-600: #65a30d;
+  --dark-green-600: #16a34a;
+  --dark-green-700: #15803d;
+  --gray-900: #111827;
+  --gray-800: #1f2937;
+  --gray-700: #374151;
+}
+
+/* Base Styles */
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: 'Orbitron', monospace;
+  background: var(--gray-900);
+  color: white;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--gray-800);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--lime-500);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--lime-600);
+}
+
+/* Firefox scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--lime-500) var(--gray-800);
+}
+
+/* Custom Component Styles */
+
+/* Modern Button System */
+
+/* Primary Button - Main action buttons */
+.btn-lime,
+.btn-primary {
+  @apply relative overflow-hidden font-semibold py-3 px-6 rounded-xl text-white transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-lime-500/30 active:scale-95;
+  background: linear-gradient(135deg, var(--lime-500, #84cc16) 0%, var(--lime-600, #65a30d) 100%);
+  box-shadow: 
+    0 4px 15px rgba(132, 204, 22, 0.3),
+    0 2px 8px rgba(0, 0, 0, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.btn-lime:hover,
+.btn-primary:hover {
+  background: linear-gradient(135deg, var(--lime-600, #65a30d) 0%, var(--lime-500, #84cc16) 100%);
+  box-shadow: 
+    0 6px 20px rgba(132, 204, 22, 0.4),
+    0 4px 12px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+.btn-lime:active,
+.btn-primary:active {
+  box-shadow: 
+    0 2px 8px rgba(132, 204, 22, 0.3),
+    0 1px 4px rgba(0, 0, 0, 0.2),
+    inset 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Secondary Button - Less prominent actions */
+.btn-dark-green,
+.btn-secondary {
+  @apply relative overflow-hidden font-semibold py-3 px-6 rounded-xl text-white transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-green-500/30 active:scale-95;
+  background: linear-gradient(135deg, var(--dark-green-600, #16a34a) 0%, var(--dark-green-700, #15803d) 100%);
+  box-shadow: 
+    0 4px 15px rgba(22, 163, 74, 0.3),
+    0 2px 8px rgba(0, 0, 0, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.btn-dark-green:hover,
+.btn-secondary:hover {
+  background: linear-gradient(135deg, var(--dark-green-700, #15803d) 0%, var(--dark-green-600, #16a34a) 100%);
+  box-shadow: 
+    0 6px 20px rgba(22, 163, 74, 0.4),
+    0 4px 12px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+/* Outline Button - Subtle actions */
+.btn-outline-lime,
+.btn-outline {
+  @apply relative overflow-hidden font-semibold py-3 px-6 rounded-xl transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-4 active:scale-95;
+  background: linear-gradient(135deg, rgba(132, 204, 22, 0.1) 0%, rgba(101, 163, 13, 0.1) 100%);
+  border: 2px solid var(--lime-500, #84cc16);
+  color: var(--lime-500, #84cc16);
+  box-shadow: 
+    0 2px 8px rgba(132, 204, 22, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+}
+
+.btn-outline-lime:hover,
+.btn-outline:hover {
+  background: linear-gradient(135deg, var(--lime-500, #84cc16) 0%, var(--lime-600, #65a30d) 100%);
+  color: white;
+  border-color: var(--lime-600, #65a30d);
+  box-shadow: 
+    0 6px 20px rgba(132, 204, 22, 0.4),
+    0 4px 12px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+/* Glass Button - Modern glassmorphism style */
+.btn-glass {
+  @apply relative overflow-hidden font-semibold py-3 px-6 rounded-xl text-white transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-white/20 active:scale-95;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.12),
+    0 4px 16px rgba(0, 0, 0, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.btn-glass:hover {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.1) 100%);
+  border-color: rgba(255, 255, 255, 0.3);
+  box-shadow: 
+    0 12px 40px rgba(0, 0, 0, 0.15),
+    0 6px 20px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+/* Danger Button - For destructive actions */
+.btn-danger {
+  @apply relative overflow-hidden font-semibold py-3 px-6 rounded-xl text-white transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-red-500/30 active:scale-95;
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  box-shadow: 
+    0 4px 15px rgba(239, 68, 68, 0.3),
+    0 2px 8px rgba(0, 0, 0, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.btn-danger:hover {
+  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+  box-shadow: 
+    0 6px 20px rgba(239, 68, 68, 0.4),
+    0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* Small Button Variant */
+.btn-sm {
+  @apply py-2 px-4 text-sm rounded-lg;
+}
+
+/* Large Button Variant */
+.btn-lg {
+  @apply py-4 px-8 text-lg rounded-2xl;
+}
+
+/* Icon Button */
+.btn-icon {
+  @apply relative w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-300 transform hover:scale-110 focus:outline-none focus:ring-4 active:scale-95;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 
+    0 4px 16px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.btn-icon:hover {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.1) 100%);
+  box-shadow: 
+    0 6px 24px rgba(0, 0, 0, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+/* Button Loading State */
+.btn-loading {
+  @apply pointer-events-none relative;
+}
+
+.btn-loading::after {
+  content: '';
+  @apply absolute inset-0 flex items-center justify-center;
+  background: inherit;
+  border-radius: inherit;
+}
+
+.btn-loading::before {
+  content: '';
+  @apply absolute;
+  width: 16px;
+  height: 16px;
+  border: 2px solid transparent;
+  border-top: 2px solid currentColor;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+/* Disabled Button State */
+.btn-disabled,
+button:disabled {
+  @apply opacity-50 cursor-not-allowed pointer-events-none;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* Button Groups */
+.btn-group {
+  @apply flex;
+}
+
+.btn-group > button:not(:first-child) {
+  @apply rounded-l-none border-l-0;
+}
+
+.btn-group > button:not(:last-child) {
+  @apply rounded-r-none;
+}
+
+/* Shimmer Effect for Premium Feel */
+.btn-shimmer::before {
+  content: '';
+  @apply absolute inset-0 opacity-0 transition-opacity duration-300;
+  background: linear-gradient(45deg, transparent 30%, rgba(255, 255, 255, 0.2) 50%, transparent 70%);
+  transform: translateX(-100%);
+  animation: shimmer 2s ease-in-out infinite;
+}
+
+.btn-shimmer:hover::before {
+  @apply opacity-100;
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  50% { transform: translateX(100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* Responsive Design for Buttons */
+@media (max-width: 640px) {
+  .btn-lime, .btn-primary, .btn-secondary, .btn-dark-green, .btn-outline-lime, .btn-outline, .btn-glass, .btn-danger {
+    @apply py-2 px-4 text-sm;
+  }
+  
+  .btn-lg {
+    @apply py-3 px-6 text-base;
+  }
+  
+  .btn-sm {
+    @apply py-1 px-3 text-xs;
+  }
+}
+
+/* High Contrast Mode Support */
+@media (prefers-contrast: high) {
+  .btn-lime, .btn-primary {
+    border: 2px solid var(--lime-600, #65a30d);
+  }
+  
+  .btn-secondary, .btn-dark-green {
+    border: 2px solid var(--dark-green-700, #15803d);
+  }
+  
+  .btn-glass {
+    background: rgba(255, 255, 255, 0.3) !important;
+    border: 2px solid rgba(255, 255, 255, 0.5);
+  }
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+  .btn-lime, .btn-primary, .btn-secondary, .btn-dark-green, .btn-outline-lime, .btn-outline, .btn-glass, .btn-danger, .btn-icon {
+    @apply transition-none;
+    transform: none !important;
+  }
+  
+  .btn-lime:hover, .btn-primary:hover, .btn-secondary:hover, .btn-dark-green:hover, .btn-outline-lime:hover, .btn-outline:hover, .btn-glass:hover, .btn-danger:hover, .btn-icon:hover {
+    transform: none !important;
+  }
+  
+  .btn-shimmer::before {
+    animation: none !important;
+  }
+  
+  .btn-loading::before {
+    animation: none !important;
+  }
+}
+
+/* Focus Visible for Better Accessibility */
+.btn-lime:focus-visible, .btn-primary:focus-visible, .btn-secondary:focus-visible, .btn-dark-green:focus-visible, .btn-outline-lime:focus-visible, .btn-outline:focus-visible, .btn-glass:focus-visible, .btn-danger:focus-visible, .btn-icon:focus-visible {
+  @apply ring-4;
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+}
+
+/* Modern Input Components */
+.input-lime,
+.input-modern {
+  @apply w-full px-4 py-3 rounded-xl text-white placeholder-gray-400 transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-lime-500/30 focus:scale-105;
+  background: linear-gradient(135deg, rgba(55, 65, 81, 0.8) 0%, rgba(31, 41, 55, 0.9) 100%);
+  border: 1px solid rgba(132, 204, 22, 0.3);
+  backdrop-filter: blur(10px);
+  box-shadow: 
+    0 4px 15px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.input-lime:focus,
+.input-modern:focus {
+  border-color: var(--lime-500, #84cc16);
+  box-shadow: 
+    0 6px 20px rgba(132, 204, 22, 0.2),
+    0 4px 12px rgba(0, 0, 0, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.input-lime::placeholder,
+.input-modern::placeholder {
+  color: rgba(156, 163, 175, 0.7);
+}
+
+/* Select Modern Styling */
+.select-modern {
+  @apply w-full px-4 py-3 rounded-xl text-white transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-lime-500/30 focus:scale-105 cursor-pointer;
+  background: linear-gradient(135deg, rgba(55, 65, 81, 0.8) 0%, rgba(31, 41, 55, 0.9) 100%);
+  border: 1px solid rgba(132, 204, 22, 0.3);
+  backdrop-filter: blur(10px);
+  box-shadow: 
+    0 4px 15px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.select-modern:focus {
+  border-color: var(--lime-500, #84cc16);
+  box-shadow: 
+    0 6px 20px rgba(132, 204, 22, 0.2),
+    0 4px 12px rgba(0, 0, 0, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* Checkbox Modern Styling */
+.checkbox-modern {
+  @apply relative w-5 h-5 rounded cursor-pointer transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-lime-500/30;
+  background: linear-gradient(135deg, rgba(55, 65, 81, 0.8) 0%, rgba(31, 41, 55, 0.9) 100%);
+  border: 1px solid rgba(132, 204, 22, 0.3);
+  box-shadow: 
+    0 2px 8px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.checkbox-modern:checked {
+  background: linear-gradient(135deg, var(--lime-500, #84cc16) 0%, var(--lime-600, #65a30d) 100%);
+  border-color: var(--lime-600, #65a30d);
+  box-shadow: 
+    0 4px 15px rgba(132, 204, 22, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* Card Components */
+.card {
+  @apply bg-gray-800 rounded-lg p-6 shadow-lg;
+}
+
+.card-hover {
+  @apply transition-all duration-300 hover:shadow-xl hover:scale-105;
+}
+
+/* Glow Effects */
+.glow-lime {
+  box-shadow: 0 0 20px rgba(132, 204, 22, 0.5);
+}
+
+.glow-dark-green {
+  box-shadow: 0 0 20px rgba(22, 163, 74, 0.5);
+}
+
+.glow-subtle {
+  box-shadow: 0 0 10px rgba(132, 204, 22, 0.3);
+}
+
+/* Modal Styles */
+.modal-backdrop {
+  backdrop-filter: blur(4px);
+  background-color: rgba(0, 0, 0, 0.75);
+}
+
+.modal-content {
+  @apply bg-gray-800 rounded-lg shadow-2xl max-w-md w-full mx-4 transform transition-all duration-300;
+}
+
+.modal-enter {
+  @apply opacity-0 scale-95;
+}
+
+.modal-enter-active {
+  @apply opacity-100 scale-100;
+}
+
+.modal-exit {
+  @apply opacity-100 scale-100;
+}
+
+.modal-exit-active {
+  @apply opacity-0 scale-95;
+}
+
+/* Loading Animations */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes pulse-lime {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 rgba(132, 204, 22, 0.7);
+  }
+  50% {
+    opacity: 0.8;
+    box-shadow: 0 0 0 10px rgba(132, 204, 22, 0);
+  }
+}
+
+.pulse-lime {
+  animation: pulse-lime 2s infinite;
+}
+
+/* Game-specific Styles */
+.game-canvas {
+  border: 2px solid var(--lime-500);
+  border-radius: 8px;
+  background: var(--gray-900);
+  box-shadow: 0 0 30px rgba(132, 204, 22, 0.3);
+}
+
+.game-ui {
+  @apply font-mono text-lime-500;
+}
+
+.score-display {
+  @apply text-4xl font-bold text-center;
+  text-shadow: 0 0 10px rgba(132, 204, 22, 0.5);
+}
+
+/* Navigation Styles */
+.nav-link {
+  @apply px-3 py-2 rounded-md text-sm font-medium transition-colors duration-300;
+}
+
+.nav-link:hover {
+  @apply bg-gray-700 text-lime-500;
+}
+
+.nav-link.active {
+  @apply bg-lime-500 text-white;
+}
+
+/* Jumbotron Styles */
+.jumbotron {
+  background: linear-gradient(
+    135deg,
+    rgba(17, 24, 39, 0.8),
+    rgba(31, 41, 55, 0.9)
+  ), url('/images/wallpaper.jpg');
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.jumbotron-content {
+  text-align: center;
+  max-width: 600px;
+  padding: 2rem;
+}
+
+.jumbotron h1 {
+  @apply text-6xl font-bold mb-6;
+  background: linear-gradient(45deg, var(--lime-500), var(--dark-green-600));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-shadow: 0 0 30px rgba(132, 204, 22, 0.5);
+}
+
+.jumbotron p {
+  @apply text-xl text-gray-300 mb-8;
+}
+
+/* Content Box Styles */
+.content-box {
+  @apply bg-gray-800 rounded-lg p-6 shadow-lg border border-gray-700;
+  transition: all 0.3s ease;
+  position: relative;
+  z-index: 1;
+}
+
+.content-box:hover {
+  @apply border-lime-500 shadow-xl;
+  transform: translateY(-5px);
+  z-index: 2;
+}
+
+.content-box h3 {
+  @apply text-xl font-bold mb-4 text-lime-500;
+}
+
+.content-box.disabled {
+  @apply opacity-60 cursor-not-allowed;
+}
+
+.content-box.disabled:hover {
+  transform: none;
+  @apply border-gray-700;
+}
+
+/* Toast Notification Styles */
+.toast {
+  @apply fixed top-20 right-4 z-50 max-w-sm w-full;
+}
+
+.toast-success {
+  @apply bg-green-600 border border-green-500;
+}
+
+.toast-error {
+  @apply bg-red-600 border border-red-500;
+}
+
+.toast-warning {
+  @apply bg-yellow-600 border border-yellow-500;
+}
+
+.toast-info {
+  @apply bg-blue-600 border border-blue-500;
+}
+
+/* Profile Menu Styles */
+.profile-menu {
+  @apply absolute right-0 mt-2 w-48 bg-gray-800 rounded-md shadow-lg py-1 z-50 border border-gray-700;
+}
+
+.profile-menu a,
+.profile-menu button {
+  @apply block px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white w-full text-left transition-colors duration-300;
+}
+
+/* Form Styles */
+.form-group {
+  @apply mb-4;
+}
+
+.form-label {
+  @apply block text-sm font-medium text-gray-300 mb-2;
+}
+
+.form-input {
+  @apply input-lime;
+}
+
+.form-error {
+  @apply text-red-400 text-sm mt-1;
+}
+
+.form-submit {
+  @apply btn-lime w-full;
+}
+
+/* Debug Panel Styles */
+#debug-panel {
+  @apply bg-gray-800 border border-gray-700 rounded-lg;
+}
+
+#debug-panel h4 {
+  @apply text-lime-500 font-bold;
+}
+
+#debug-panel div {
+  @apply text-gray-400;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .jumbotron h1 {
+    @apply text-4xl;
+  }
+
+  .jumbotron p {
+    @apply text-lg;
+  }
+
+  .modal-content {
+    @apply mx-2;
+  }
+
+  .content-box {
+    @apply p-4;
+  }
+}
+
+@media (max-width: 640px) {
+  .jumbotron h1 {
+    @apply text-3xl;
+  }
+
+  .score-display {
+    @apply text-2xl;
+  }
+}
+
+/* Accessibility */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Focus styles for keyboard navigation */
+.focus-lime:focus {
+  @apply outline-none ring-2 ring-lime-500 ring-offset-2 ring-offset-gray-900;
+}
+
+/* Print styles */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .glow-lime,
+  .glow-dark-green,
+  .glow-subtle {
+    box-shadow: none;
+  }
+
+  .btn-lime,
+  .btn-dark-green {
+    @apply border-2 border-current;
+  }
+}
+
+@keyframes gradientBackground {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.animated-gradient {
+  background: linear-gradient(-45deg, #111827, #047857, #84cc16, #16a34a);
+  background-size: 400% 400%;
+  animation: gradientBackground 15s ease infinite;
+}
+
