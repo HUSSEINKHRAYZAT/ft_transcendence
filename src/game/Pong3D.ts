@@ -377,7 +377,7 @@ export class Pong3D {
 
   private initializeChat() {
     // Skip chat for AI mode (single player vs AI)
-    if (this.config.connection === "ai") {
+    if (this.config.connection === "ai" || this.config.connection === "ai3" ||this.config.connection === "local") {
       console.log("💬 Chat disabled for AI mode");
       return;
     }
@@ -696,7 +696,7 @@ export class Pong3D {
     if (this.config.playerCount === 4) {
       if (this.config.connection === "ai3") {
         this.control = ["human", "ai", "ai", "ai"];
-        this.applyAIDifficulty([1, 2, 3], this.config.aiDifficulty ?? 6);
+        this.applyAIDifficulty([1, 2, 3], 10);
         this.setViewRotationForIndex(0);
       } else if (this.config.connection === "remote4Host") {
         this.control = ["human", "remoteGuest", "remoteGuest", "remoteGuest"];
@@ -757,12 +757,21 @@ export class Pong3D {
     this.viewTheta = map[idx] ?? 0;
     this.camera.alpha = this.baseAlpha + this.viewTheta;
   }
-
+// ai --------------------------------------------------------------------------------------- aiii
   private applyAIDifficulty(idxs: number[], d: number) {
+    // clamp 1..10 and normalize to 0..1
     const t = Math.min(10, Math.max(1, d));
-    const s = (t - 1) / 9; // 0..1
-    const errRange = lerp(2.2, 0.0, s);
-    const lerpAmt = lerp(0.06, 0.18, s);
+    const s = (t - 1) / 9;
+
+    // Non-linear easing for more dramatic difficulty curve
+    const sg = Math.pow(s, 0.7); // slightly steeper curve
+
+    // ⬇️ Enhanced error range: Easy=8 → Hard=0.1 (more dramatic)
+    const errRange = lerp(8.0, 0.1, sg);
+
+    // ⬇️ Improved response speed: Easy=0.008 → Hard=0.35 (much more responsive at high levels)
+    const lerpAmt = lerp(0.008, 0.35, sg);
+
     idxs.forEach((i) => {
       this.aiErrorRangePerPaddle[i] = errRange;
       this.aiLerpPerPaddle[i] = lerpAmt;
@@ -772,7 +781,7 @@ export class Pong3D {
   private spawnObstacles(width: number, height: number) {
     const count = 3; // ≤3 obstacles
     const chosen: Vector3[] = [];
-    const minGap = 1.0;
+    const minGap = 4.0;
 
     this.obstacleInfo = [];
     for (let i = 0; i < count; i++) {
@@ -1390,7 +1399,7 @@ export class Pong3D {
 
     // Physics
     this.ballVelocity.scaleInPlace(this.speedIncrement);
-    this.ballVelocity.y -= 0.006;
+    this.ballVelocity.y -= 0.008;
     this.ball.position.addInPlace(this.ballVelocity);
 
     ensureMinHorizontalSpeed(this.ballVelocity, this.minHorizontalSpeed);
@@ -1789,60 +1798,92 @@ export class Pong3D {
     }
   }
 
-  private runAI(i: number, _width: number, height: number, maxStep: number) {
+  private runAI(i: number, width: number, height: number, maxStep: number) {
     if (this.control[i] !== "ai") return;
     const lerpAmt = this.aiLerpPerPaddle[i];
     const err = this.aiError[i];
 
-    const isLR = i < 2;
-    const axisPos = isLR
-      ? this.paddles[i].position.x
-      : this.paddles[i].position.z;
+    const isLR = i < 2; // paddles 0,1 are left/right (move in Z), paddles 2,3 are bottom/top (move in X)
     const ballPos = this.ball.position.clone();
     const ballVel = this.ballVelocity.clone();
 
+    // Get the paddle's fixed position (the axis it doesn't move along)
+    const paddleFixedPos = isLR ? this.paddles[i].position.x : this.paddles[i].position.z;
+
+    // Start with current ball position as target
     let target = isLR ? ballPos.z : ballPos.x;
-    {
-      const simulate = ballPos.clone();
-      const v = ballVel.clone();
-      const limitZ = height / 2 - this.ballRadius - this.wallThickness / 2;
-      const horizon = 60;
-      for (let k = 0; k < horizon; k++) {
-        simulate.addInPlace(v);
-        if (this.config.playerCount === 2) {
-          if (simulate.z > limitZ || simulate.z < -limitZ) v.z *= -1;
+
+    // Predictive simulation to find where ball will be when it reaches this paddle
+    const simulate = ballPos.clone();
+    const v = ballVel.clone();
+    const limitZ = height / 2 - this.ballRadius - this.wallThickness / 2;
+    const horizon = 120; // increased for better prediction
+    
+    for (let k = 0; k < horizon; k++) {
+      simulate.addInPlace(v);
+      
+      // Handle wall bounces in simulation
+      if (this.config.playerCount === 2) {
+        if (simulate.z > limitZ || simulate.z < -limitZ) v.z *= -1;
+      }
+      if (this.config.playerCount === 4) {
+        // No wall bounces in 4P mode, but still consider boundaries
+      }
+
+      // Check if ball has reached this paddle's X/Z plane
+      if (isLR) {
+        // For left/right paddles (0,1): check if ball reached paddle's X position
+        const reachedPaddle = (i === 0 && simulate.x <= paddleFixedPos + 0.5) ||
+                              (i === 1 && simulate.x >= paddleFixedPos - 0.5);
+        if (reachedPaddle && 
+            ((i === 0 && v.x < 0) || (i === 1 && v.x > 0))) { // ball moving toward paddle
+          target = simulate.z;
+          break;
         }
-        if (isLR) {
-          if (
-            (i === 0 && simulate.x < axisPos) ||
-            (i === 1 && simulate.x > axisPos)
-          ) {
-            target = simulate.z;
-            break;
-          }
-        } else {
-          if (
-            (i === 2 && simulate.z > axisPos) ||
-            (i === 3 && simulate.z < axisPos)
-          ) {
-            target = simulate.x;
-            break;
-          }
+      } else {
+        // For bottom/top paddles (2,3): check if ball reached paddle's Z position  
+        const reachedPaddle = (i === 2 && simulate.z >= paddleFixedPos - 0.5) ||
+                              (i === 3 && simulate.z <= paddleFixedPos + 0.5);
+        if (reachedPaddle &&
+            ((i === 2 && v.z > 0) || (i === 3 && v.z < 0))) { // ball moving toward paddle
+          target = simulate.x;
+          break;
         }
       }
+
+      // Safety check: if simulation goes too far, break
+      if (Math.abs(simulate.x) > width || Math.abs(simulate.z) > height) {
+        break;
+      }
     }
+
+    // Apply AI error/difficulty
     target += err;
 
+    // Move paddle toward target with smooth acceleration
     const p = this.paddles[i];
     const current = isLR ? p.position.z : p.position.x;
     const delta = target - current;
-    const accel = delta * lerpAmt;
-    this.aiVel[i] = this.aiVel[i] * 0.8 + accel * 0.2;
+    
+    // Enhanced responsiveness: larger deltas get faster response
+    const urgency = Math.min(1.0, Math.abs(delta) / 2.0); // urgency factor based on distance
+    const responsiveness = lerpAmt * (1.0 + urgency * 0.5); // boost response when far from target
+    
+    const accel = delta * responsiveness;
+    this.aiVel[i] = this.aiVel[i] * 0.82 + accel * 0.18; // slightly more responsive interpolation
+    
     let step = this.aiVel[i];
+    
+    // Clamp step size
     if (step > maxStep) step = maxStep;
     if (step < -maxStep) step = -maxStep;
-    if (isLR) p.position.z += step;
-    else p.position.x += step;
+    
+    // Apply movement
+    if (isLR) {
+      p.position.z += step;
+    } else {
+      p.position.x += step;
+    }
   }
 
   private async finishAndReport(winnerIdx: number) {
