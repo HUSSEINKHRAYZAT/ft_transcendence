@@ -1,0 +1,90 @@
+services: # list of containers
+  user_management: # service name
+    build: ./user-management # build from Dockerfile in current directory
+    image: maxplushchreif/user_management:1.0.0
+    container_name: user_management
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DB_FILE=/app/data/user_management.db
+    volumes:
+      - usermgmt_data:/app/data
+    ports:
+      - "3001:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
+  mailer:
+    build: ./mailer-microservice
+    image: maxplushchreif/mailer:1.0.0
+    container_name: mailer
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - SMTP_HOST=smtp.gmail.com
+      - SMTP_PORT=465          # SSL
+      - SMTP_SECURE=true       # using 465
+      - SMTP_USER=42transcender@gmail.com
+      - SMTP_PASS=jrlrgyfofocmliou
+      - FROM_EMAIL=42transcender@gmail.com   # must match the authenticated user
+      - FROM_NAME=Transcender
+    ports:
+      - "3002:3000"  # optional: expose to host
+
+  session_microservice: # service name
+    build: ./session-microservice # build from Dockerfile in current directory
+    image: maxplushchreif/session_microservice:1.0.0
+    container_name: session_microservice
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DB_FILE=/app/data/session.db
+    volumes:
+      - usermgmt_data:/app/data
+    ports:
+      - "3003:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
+  api_gateway:
+    build: ./api-gateway
+    image: maxplushchreif/api_gateway:1.0.0
+    container_name: api_gateway
+    environment:
+      - NODE_ENV=production
+      - PORT=8080
+      - USER_SERVICE_URL=http://user_management:3000
+      - MAILER_URL=http://mailer:3000
+      - CORS_ORIGIN=*
+      - UPSTREAM_TIMEOUT_MS=15000
+      - AUTH_JWT_SECRET=dev-gateway-secret
+      - AUTH_JWT_TTL=15m
+    ports:
+      - "8080:8080"
+    depends_on:
+      - user_management
+      - mailer
+      - session_microservice
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:8080/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
+
+
+
+volumes:
+  usermgmt_data: {}
