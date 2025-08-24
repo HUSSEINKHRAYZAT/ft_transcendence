@@ -11,15 +11,23 @@
     "both": "concurrently \"npm run start\" \"npm run websocket\""
   },
   "dependencies": {
-    "socket.io": "^4.7.5",
-    "express": "^4.18.2",
     "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "fastify": "^5.5.0",
+    "socket.io": "^4.7.5",
     "ws": "^8.14.2"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
   },
-  "keywords": ["socketio", "websocket", "multiplayer", "pong", "realtime", "wss"],
+  "keywords": [
+    "socketio",
+    "websocket",
+    "multiplayer",
+    "pong",
+    "realtime",
+    "wss"
+  ],
   "author": "FT_PONG Team",
   "license": "MIT"
 }

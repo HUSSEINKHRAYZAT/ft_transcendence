@@ -31,6 +31,7 @@
   "dependencies": {
     "@babylonjs/core": "^8.23.1",
     "@babylonjs/loaders": "^8.22.0",
+    "node": "^24.6.0",
     "socket.io-client": "^4.8.1",
     "three": "^0.179.1"
   }

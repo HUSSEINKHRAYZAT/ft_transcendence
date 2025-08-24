@@ -1,6 +1,6 @@
 /**
  * Socket.IO Server for FT_PONG Real-time Multiplayer
- * Simple local server for testing remote multiplayer functionality
+ * Improved with stable player seat indices and richer payloads.
  */
 
 const express = require('express');
@@ -14,7 +14,17 @@ const server = createServer(app);
 // Configure CORS for Socket.IO
 const io = new Server(server, {
   cors: {
-    origin: ["http://localhost:5173", "http://localhost:5174", "http://localhost:5175", "http://localhost:3000"],
+    origin: [
+      "http://localhost:5173",
+      "http://localhost:5174",
+      "http://localhost:5175",
+      "http://localhost:3000",
+      // Optional if you test via 127.0.0.1
+      "http://127.0.0.1:5173",
+      "http://127.0.0.1:5174",
+      "http://127.0.0.1:5175",
+      "http://127.0.0.1:3000"
+    ],
     methods: ["GET", "POST"],
     credentials: true
   },
@@ -39,42 +49,69 @@ class GameRoom {
     this.id = id;
     this.hostId = hostId;
     this.gameMode = gameMode;
-    this.players = new Map();
+    this.players = new Map(); // socketId -> { id, name, index, isReady, joinedAt }
     this.isGameStarted = false;
     this.gameState = null;
     this.maxPlayers = gameMode === '4p' ? 4 : 2;
     this.createdAt = Date.now();
   }
 
-  addPlayer(playerId, playerData) {
-    if (this.players.size >= this.maxPlayers) {
-      return false;
+  getUsedIndices() {
+    return new Set(Array.from(this.players.values()).map(p => p.index).filter(i => i !== undefined));
+  }
+
+  getAvailableIndex(preferIndex) {
+    const used = this.getUsedIndices();
+    const cap = this.maxPlayers;
+    if (preferIndex !== undefined && preferIndex >= 0 && preferIndex < cap && !used.has(preferIndex)) {
+      return preferIndex;
     }
-    
-    this.players.set(playerId, {
+    for (let i = 0; i < cap; i++) {
+      if (!used.has(i)) return i;
+    }
+    return null;
+  }
+
+  addPlayer(playerId, playerData, preferIndex) {
+    if (this.players.size >= this.maxPlayers) {
+      return { ok: false, reason: 'full' };
+    }
+    const index = this.getAvailableIndex(preferIndex);
+    if (index === null) {
+      return { ok: false, reason: 'no-seat' };
+    }
+    const entry = {
       id: playerId,
       name: playerData.name,
+      index,
       isReady: false,
       joinedAt: Date.now()
-    });
-    
-    return true;
+    };
+    this.players.set(playerId, entry);
+    return { ok: true, index, player: entry };
   }
 
   removePlayer(playerId) {
+    const leaving = this.players.get(playerId);
     this.players.delete(playerId);
-    
     // If host leaves, assign new host
     if (playerId === this.hostId && this.players.size > 0) {
       this.hostId = this.players.keys().next().value;
     }
+    return leaving?.index;
   }
 
   getInfo() {
     return {
       roomId: this.id,
       hostId: this.hostId,
-      players: Array.from(this.players.values()),
+      players: Array.from(this.players.values()).map(p => ({
+        id: p.id,
+        name: p.name,
+        index: p.index,
+        isReady: p.isReady,
+        joinedAt: p.joinedAt
+      })),
       gameMode: this.gameMode,
       isGameStarted: this.isGameStarted,
       playerCount: this.players.size,
@@ -118,115 +155,106 @@ io.on('connection', (socket) => {
   socket.on('register_player', (data) => {
     players.set(socket.id, {
       id: socket.id,
-      name: data.name || 'Player',
+      name: data?.name || 'Player',
       currentRoom: null,
       connectedAt: Date.now()
     });
-    
-    console.log(`👤 Player registered: ${data.name} (${socket.id})`);
+    console.log(`👤 Player registered: ${data?.name || 'Player'} (${socket.id})`);
   });
 
   // Create room
   socket.on('create_room', (data) => {
     const roomId = generateRoomId();
-    const room = new GameRoom(roomId, socket.id, data.gameMode);
-    
-    // Add host to room
-    room.addPlayer(socket.id, { name: data.playerName });
+    const mode = data?.gameMode === '4p' ? '4p' : '2p';
+    const room = new GameRoom(roomId, socket.id, mode);
+
+    // Add host to room with preferred index 0
+    const added = room.addPlayer(socket.id, { name: data?.playerName || 'Host' }, 0);
+    if (!added.ok) {
+      socket.emit('error', 'Failed to seat host');
+      return;
+    }
+
     rooms.set(roomId, room);
-    
+
     // Update player's current room
     const player = players.get(socket.id);
-    if (player) {
-      player.currentRoom = roomId;
-    }
-    
+    if (player) player.currentRoom = roomId;
+
     // Join socket room
     socket.join(roomId);
-    
-    console.log(`🏠 Room created: ${roomId} by ${data.playerName}`);
+
+    console.log(`🏠 Room created: ${roomId} by ${data?.playerName || 'Host'}`);
+    // Inform creator
     socket.emit('room_created', room.getInfo());
+    socket.emit('player_assigned', { roomId, playerId: socket.id, index: added.index });
   });
 
   // Join room
   socket.on('join_room', (data) => {
-    const room = rooms.get(data.roomId);
-    
+    const room = rooms.get(data?.roomId);
     if (!room) {
       socket.emit('error', 'Room not found');
       return;
     }
-    
     if (room.isFull()) {
       socket.emit('error', 'Room is full');
       return;
     }
-    
     if (room.isGameStarted) {
       socket.emit('error', 'Game already started');
       return;
     }
-    
-    // Add player to room
-    const success = room.addPlayer(socket.id, { name: data.playerName });
-    
-    if (!success) {
+
+    const added = room.addPlayer(socket.id, { name: data?.playerName || 'Player' });
+    if (!added.ok) {
       socket.emit('error', 'Could not join room');
       return;
     }
-    
+
     // Update player's current room
     const player = players.get(socket.id);
-    if (player) {
-      player.currentRoom = data.roomId;
-    }
-    
+    if (player) player.currentRoom = data.roomId;
+
     // Join socket room
     socket.join(data.roomId);
-    
-    console.log(`🚪 ${data.playerName} joined room: ${data.roomId}`);
-    
-    // Notify player they joined
+
+    console.log(`🚪 ${data?.playerName || 'Player'} joined room: ${data.roomId}`);
+
+    // Notify the joining player
     socket.emit('room_joined', room.getInfo());
-    
+    socket.emit('player_assigned', { roomId: data.roomId, playerId: socket.id, index: added.index });
+
     // Notify other players about the new player
     broadcastToRoom(data.roomId, 'player_joined', {
       id: socket.id,
-      name: data.playerName
+      name: data?.playerName || 'Player',
+      index: added.index
     }, socket.id);
-    
+
     // Send updated room info to all players
     broadcastToRoom(data.roomId, 'room_updated', room.getInfo());
-    
-    // Send current room state to the joining player
-    socket.emit('room_state', {
-      playerCount: room.players.size,
-      maxPlayers: room.maxPlayers,
-      players: Array.from(room.players.values())
-    });
   });
 
   // Leave room
   socket.on('leave_room', (data) => {
-    const room = rooms.get(data.roomId);
+    const room = rooms.get(data?.roomId);
     if (!room) return;
-    
-    const player = room.players.get(socket.id);
-    if (player) {
-      room.removePlayer(socket.id);
+
+    const playerEntry = room.players.get(socket.id);
+    if (playerEntry) {
+      const leftIndex = room.removePlayer(socket.id);
       socket.leave(data.roomId);
-      
+
       // Update player's current room
       const playerData = players.get(socket.id);
-      if (playerData) {
-        playerData.currentRoom = null;
-      }
-      
-      console.log(`👋 ${player.name} left room: ${data.roomId}`);
-      
+      if (playerData) playerData.currentRoom = null;
+
+      console.log(`👋 ${playerEntry.name} left room: ${data.roomId}`);
+
       // Notify other players
-      broadcastToRoom(data.roomId, 'player_left', socket.id);
-      
+      broadcastToRoom(data.roomId, 'player_left', { id: socket.id, index: leftIndex });
+
       // Remove empty rooms
       if (room.isEmpty()) {
         rooms.delete(data.roomId);
@@ -238,78 +266,82 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Start game
+  // Start game (host only)
   socket.on('start_game', (data) => {
-    const room = rooms.get(data.roomId);
+    const room = rooms.get(data?.roomId);
     if (!room || room.hostId !== socket.id) {
       socket.emit('error', 'Not authorized to start game');
       return;
     }
-    
+
     room.isGameStarted = true;
     console.log(`🎮 Game started in room: ${data.roomId}`);
-    
+
     // Notify all players
     io.to(data.roomId).emit('game_started');
     io.to(data.roomId).emit('room_updated', room.getInfo());
   });
 
-  // Game state updates (host only)
+  // Game state updates (host only, broadcast to others)
   socket.on('game_state', (data) => {
-    const room = rooms.get(data.roomId);
+    const room = rooms.get(data?.roomId);
     if (!room || room.hostId !== socket.id) return;
-    
+
     room.gameState = data.state;
-    
-    // Broadcast to other players
+
+    // Broadcast to other players (not the host)
     broadcastToRoom(data.roomId, 'game_state', data.state, socket.id);
   });
 
-  // Player input
+  // Player input — now includes seat index
   socket.on('player_input', (data) => {
-    const room = rooms.get(data.roomId);
+    const room = rooms.get(data?.roomId);
     if (!room) return;
-    
-    // Broadcast to all players (including sender for confirmation)
+
+    const entry = room.players.get(socket.id);
+    if (!entry) return;
+
     io.to(data.roomId).emit('player_input', {
-      playerId: data.playerId,
-      input: data.input
+      playerId: socket.id,
+      index: entry.index,
+      input: data.input,
+      timestamp: Date.now()
     });
   });
 
   // Chat messages
   socket.on('chat_message', (data) => {
-    const room = rooms.get(data.roomId);
+    const room = rooms.get(data?.roomId);
     if (!room) return;
-    
+
+    const entry = room.players.get(socket.id);
     const message = {
       id: Date.now().toString(),
-      playerId: data.playerId,
-      playerName: data.playerName,
-      message: data.message,
-      timestamp: data.timestamp,
+      playerId: socket.id,
+      playerName: entry?.name || data?.playerName || 'Player',
+      index: entry?.index ?? null,
+      message: data?.message ?? '',
+      timestamp: Date.now(),
       type: 'message'
     };
-    
-    // Broadcast to all players in room
+
     io.to(data.roomId).emit('chat_message', message);
-    
-    console.log(`💬 [${data.roomId}] ${data.playerName}: ${data.message}`);
+    console.log(`💬 [${data.roomId}] ${message.playerName}: ${message.message}`);
   });
 
   // Handle disconnection
   socket.on('disconnect', (reason) => {
     console.log(`🔌 Player disconnected: ${socket.id} (${reason})`);
-    
+
     const player = players.get(socket.id);
     if (player && player.currentRoom) {
       const room = rooms.get(player.currentRoom);
       if (room) {
-        room.removePlayer(socket.id);
-        
+        const leftIndex = room.removePlayer(socket.id);
+
         // Notify other players
-        broadcastToRoom(player.currentRoom, 'player_left', socket.id);
-        
+        broadcastToRoom(player.currentRoom, 'player_left', { id: socket.id, index: leftIndex });
+
         // Remove empty rooms
         if (room.isEmpty()) {
           rooms.delete(player.currentRoom);
@@ -319,7 +351,7 @@ io.on('connection', (socket) => {
         }
       }
     }
-    
+
     players.delete(socket.id);
   });
 });
@@ -328,7 +360,7 @@ io.on('connection', (socket) => {
 setInterval(() => {
   const now = Date.now();
   const maxAge = 30 * 60 * 1000; // 30 minutes
-  
+
   for (const [roomId, room] of rooms.entries()) {
     if (now - room.createdAt > maxAge && room.isEmpty()) {
       rooms.delete(roomId);
@@ -341,7 +373,7 @@ setInterval(() => {
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
   console.log(`🎮 FT_PONG Socket.IO Server running on port ${PORT}`);
-  console.log(`🌐 CORS enabled for localhost:5173, 5174, 5175, 3000`);
+  console.log(`🌐 CORS enabled for localhost/127.0.0.1:5173, 5174, 5175, 3000`);
   console.log(`📊 Active rooms: ${rooms.size}, Active players: ${players.size}`);
 });
 

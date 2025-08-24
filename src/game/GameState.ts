@@ -98,20 +98,6 @@ export class GameState {
     }
   }
 
-  public applyAIDifficulty(indices: number[], difficulty: number): void {
-    const t = Math.min(10, Math.max(1, difficulty));
-    const s = (t - 1) / 9; // 0..1
-    const errRange = this.lerp(2.2, 0.0, s);
-    const lerpAmt = this.lerp(0.06, 0.18, s);
-    
-    indices.forEach((i) => {
-      if (i >= 0 && i < this._aiErrorRangePerPaddle.length) {
-        this._aiErrorRangePerPaddle[i] = errRange;
-        this._aiLerpPerPaddle[i] = lerpAmt;
-      }
-    });
-  }
-
   public isWinConditionMet(): { winner: number; hasWinner: boolean } {
     const target = this.config.winScore ?? 10;
     for (let i = 0; i < this._scores.length; i++) {
@@ -122,7 +108,4 @@ export class GameState {
     return { winner: -1, hasWinner: false };
   }
 
-  private lerp(a: number, b: number, t: number): number {
-    return a + (b - a) * t;
-  }
 }

@@ -33,6 +33,7 @@ import { themeBridge, type GameThemeColors } from "./ThemeBridge";
 import { GameChat, type ChatUser } from "../components/GameChat";
 import { socketManager } from "../network/SocketManager";
 import { GameCountdown } from "./GameCountdown";
+import { CameraConfig } from "../game/camconfig";
 
 export class Pong3D {
   private engine: Engine;
@@ -58,7 +59,11 @@ export class Pong3D {
   private rightWall?: import("@babylonjs/core").Mesh;
   private leftWallTiles: import("@babylonjs/core").Mesh[] = [];
   private rightWallTiles: import("@babylonjs/core").Mesh[] = [];
-  private wallDamagePoints: Array<{x: number, z: number, wall: 'left' | 'right'}> = [];
+  private wallDamagePoints: Array<{
+    x: number;
+    z: number;
+    wall: "left" | "right";
+  }> = [];
 
   private keys: Record<string, boolean> = {};
   private control: ("human" | "ai" | "remoteGuest")[] = [];
@@ -90,7 +95,7 @@ export class Pong3D {
   private wallThickness = 0.1;
   private cornerSize = this.wallThickness * 5;
 
-  private ws?: WebSocket;
+  private ws?: WebSocket;//--------------------------------------------------------------------------------websocket
   private usingSocketIO = false; // Track if using Socket.IO vs raw WebSocket
   private remoteIndex: 0 | 1 | 2 | 3 = 0; // your assigned index online
   private guestInputs: Record<number, { neg: boolean; pos: boolean }> = {};
@@ -118,8 +123,7 @@ export class Pong3D {
     lose: Sound[];
   } = { paddle: [], obstacle: [], win: [], lose: [] };
   private toneCtx?: AudioContext;
-
-
+  // --------------------------------------------------------------------------------------------------
   constructor(private config: GameConfig) {
     const canvas =
       (document.getElementById("gameCanvas") as HTMLCanvasElement) ||
@@ -146,7 +150,7 @@ export class Pong3D {
       "cam",
       this.baseAlpha, // alpha
       Math.PI / 5, // beta
-      20, // radius
+      CameraConfig.radius, // radius
       Vector3.Zero(),
       this.scene
     );
@@ -167,14 +171,14 @@ export class Pong3D {
     // Input — track arrows + W/S (and Shift if you still use it elsewhere)
     const onKey = (v: boolean) => (e: KeyboardEvent) => {
       const k = e.key.toLowerCase();
-      
+
       // Handle pause toggle (only on keydown)
       if (k === "p" && v) {
         this.togglePause();
         e.preventDefault();
         return;
       }
-      
+
       if (
         [
           "arrowup",
@@ -374,7 +378,11 @@ export class Pong3D {
 
   private initializeChat() {
     // Skip chat for AI mode (single player vs AI)
-    if (this.config.connection === "ai") {
+    if (
+      this.config.connection === "ai" ||
+      this.config.connection === "ai3" ||
+      this.config.connection === "local"
+    ) {
       console.log("💬 Chat disabled for AI mode");
       return;
     }
@@ -463,15 +471,15 @@ export class Pong3D {
       onComplete: () => {
         this.matchReady = true;
         this.resetBall(Math.random() < 0.5 ? 1 : -1);
-      }
+      },
     });
-    
+
     await countdown.start();
   }
 
   private async beginMatch() {
     this.hideWaitingOverlay();
-    
+
     // For multiplayer games, show countdown and then start
     const countdown = new GameCountdown({
       onComplete: () => {
@@ -480,13 +488,13 @@ export class Pong3D {
         if (this.isHost) {
           this.sendRemoteMessage({ t: "start" } as RemoteMsg);
         }
-      }
+      },
     });
-    
+
     await countdown.start();
   }
 
-  /* ---------------- Scene ---------------- */
+  /* ------------------------------------------------------- Scene ----------------------------------------------- */
 
   private init() {
     const width = 20;
@@ -530,7 +538,7 @@ export class Pong3D {
       return mat;
     }
 
-    // Walls (pictures)
+    // ----------------------------------------------------------------------- Walls (pictures)
     const t = this.wallThickness,
       h = 1;
 
@@ -562,54 +570,89 @@ export class Pong3D {
 
     wall(width + t, t, 0, height / 2 + t / 2, "wallTop", topMat);
     wall(width + t, t, 0, -height / 2 - t / 2, "wallBottom", bottomMat);
-    this.leftWall = wall(t, height + t, -width / 2 - t / 2, 0, "wallLeft", leftMat);
-    this.rightWall = wall(t, height + t, width / 2 + t / 2, 0, "wallRight", rightMat);
-    
+    this.leftWall = wall(
+      t,
+      height + t,
+      -width / 2 - t / 2,
+      0,
+      "wallLeft",
+      leftMat
+    );
+    this.rightWall = wall(
+      t,
+      height + t,
+      width / 2 + t / 2,
+      0,
+      "wallRight",
+      rightMat
+    );
+
     // Also create tiled walls for damage system
     this.createTiledWalls(width, height, t, leftMat, rightMat);
+    // -----------------------------------------------------------------corners ------------------------//
+    // Reuse materials per rotation so we don't create duplicates
+    const cornerMats = new Map<number, StandardMaterial>();
 
-    // Corners as picture boxes with custom texture
-    function cornerTextureMat(scene: Scene, textureUrl: string, rotationAngle: number = 0) {
-      const mat = new StandardMaterial("cornerTextureMat", scene);
+    function cornerTextureMat(
+      scene: Scene,
+      textureUrl: string,
+      rotationAngle: number = 0
+    ) {
+      if (cornerMats.has(rotationAngle)) return cornerMats.get(rotationAngle)!;
+
+      const mat = new StandardMaterial(
+        `cornerTextureMat_${rotationAngle}`,
+        scene
+      );
       const tex = new Texture(textureUrl, scene);
-      
-      // Rotate texture to always face upward
-      tex.wAng = rotationAngle;
-      
+      tex.wAng = rotationAngle; // keep image upright per corner
       mat.diffuseTexture = tex;
-      // Optionally add some glow effect
-      mat.emissiveColor = new Color3(0.1, 0.1, 0.1); // Slight glow
-      mat.specularColor = new Color3(0, 0, 0); // No shiny highlights
+      mat.emissiveColor = new Color3(0.1, 0.1, 0.1);
+      mat.specularColor = new Color3(0, 0, 0);
+      cornerMats.set(rotationAngle, mat);
       return mat;
     }
 
     this.cornerSize = t * 5;
-    const cS = this.cornerSize; // Use same size for all dimensions to make perfect squares
+    const cS = this.cornerSize;
     const cx = width / 2 - t / 2 - cS / 2;
     const cz = height / 2 - t / 2 - cS / 2;
 
-    const makeCornerBox = (x: number, z: number, id: string, textureRotation: number = 0) => {
-      const box = MeshBuilder.CreateBox(
-        id,
-        { width: cS, height: cS, depth: cS }, // All dimensions equal = perfect cube
-        this.scene
+    // Create N stacked boxes at a corner
+    const makeCornerStack = (
+      x: number,
+      z: number,
+      idBase: string,
+      textureRotation: number = 0,
+      count = 3,
+      gap = cS * 0.08 // small gap between cubes; set 0 for flush stack
+    ) => {
+      const mat = cornerTextureMat(
+        this.scene,
+        "/textures/42.png",
+        textureRotation
       );
-      box.position.set(x, cS / 2, z); // Adjust Y position since height changed
-      
-      // Create material with proper texture rotation for this corner
-      const cornerMat = cornerTextureMat(this.scene, '/textures/42.png', textureRotation);
-      box.material = cornerMat;
-      
-      this.corners.push(box);
+
+      for (let i = 0; i < count; i++) {
+        const box = MeshBuilder.CreateBox(
+          `${idBase}_${i}`,
+          { width: cS, height: cS, depth: cS },
+          this.scene
+        );
+        // base cube sits at y=cS/2; each next cube is one height + gap above
+        box.position.set(x, cS / 2 + i * (cS + gap), z);
+        box.material = mat;
+        this.corners.push(box);
+      }
     };
 
-    // Create corner boxes with appropriate texture rotations to keep images upward
-    makeCornerBox(+cx, +cz, "cornerTR", 0);           // Top-Right: no rotation
-    makeCornerBox(+cx, -cz, "cornerBR", 0);           // Bottom-Right: no rotation  
-    makeCornerBox(-cx, +cz, "cornerTL", 0);           // Top-Left: no rotation
-    makeCornerBox(-cx, -cz, "cornerBL", 0);           // Bottom-Left: no rotation
+    // Four corners — stack of three each
+    makeCornerStack(+cx, +cz, "cornerTR", 0);
+    makeCornerStack(+cx, -cz, "cornerBR", 0);
+    makeCornerStack(-cx, +cz, "cornerTL", 0);
+    makeCornerStack(-cx, -cz, "cornerBL", 0);
 
-    // Ball
+    // ----------------------------------------------------------------------------Ball----------//
     const ballMat = new StandardMaterial("ballMat", this.scene);
     ballMat.diffuseTexture = new Texture("/textures/ball.jpg", this.scene);
     ballMat.emissiveColor = this.currentGameTheme.ball.scale(0.3); // Add glow with theme color
@@ -621,7 +664,7 @@ export class Pong3D {
     this.ball.material = ballMat;
     this.ball.position = new Vector3(0, 0.3, 0);
 
-    // Paddles (L,R,B,T indices)
+    // --------------------------------------------------------------------------------Paddles (L,R,B,T indices)
     const dAxis = (this.config.playerCount === 4 ? height : width) / 2 - 0.3;
     const newPaddle = (
       x: number,
@@ -654,11 +697,11 @@ export class Pong3D {
     }
     this.updateNamesUI();
 
-    // Control roles
+    // --------------------------------------------------------------Control roles
     if (this.config.playerCount === 4) {
       if (this.config.connection === "ai3") {
         this.control = ["human", "ai", "ai", "ai"];
-        this.applyAIDifficulty([1, 2, 3], this.config.aiDifficulty ?? 6);
+        this.applyAIDifficulty([1, 2, 3], 10);
         this.setViewRotationForIndex(0);
       } else if (this.config.connection === "remote4Host") {
         this.control = ["human", "remoteGuest", "remoteGuest", "remoteGuest"];
@@ -678,7 +721,7 @@ export class Pong3D {
         this.control = ["human", "remoteGuest"];
         this.setViewRotationForIndex(0);
       } else if (this.config.connection === "remoteGuest") {
-        this.control = ["human", "human"]; // render only
+        this.control = ["remoteGuest", "human"]; // render only
       } else {
         // Local 2P
         this.control = ["human", "human"];
@@ -719,22 +762,122 @@ export class Pong3D {
     this.viewTheta = map[idx] ?? 0;
     this.camera.alpha = this.baseAlpha + this.viewTheta;
   }
+  // ai --------------------------------------------------------------------------------------- aiii
+    private runAI(i: number, width: number, height: number, maxStep: number) {
+    if (this.control[i] !== "ai") return;
+    const lerpAmt = this.aiLerpPerPaddle[i];
+    const err = this.aiError[i];
 
+    const isLR = i < 2; // paddles 0,1 are left/right (move in Z), paddles 2,3 are bottom/top (move in X)
+    const ballPos = this.ball.position.clone();
+    const ballVel = this.ballVelocity.clone();
+
+    // Get the paddle's fixed position (the axis it doesn't move along)
+    const paddleFixedPos = isLR
+      ? this.paddles[i].position.x
+      : this.paddles[i].position.z;
+
+    // Start with current ball position as target
+    let target = isLR ? ballPos.z : ballPos.x;
+
+    // Predictive simulation to find where ball will be when it reaches this paddle
+    const simulate = ballPos.clone();
+    const v = ballVel.clone();
+    const limitZ = height / 2 - this.ballRadius - this.wallThickness / 2;
+    const horizon = 120; // increased for better prediction
+
+    for (let k = 0; k < horizon; k++) {
+      simulate.addInPlace(v);
+
+      // Handle wall bounces in simulation
+      if (this.config.playerCount === 2) {
+        if (simulate.z > limitZ || simulate.z < -limitZ) v.z *= -1;
+      }
+      if (this.config.playerCount === 4) {
+        // No wall bounces in 4P mode, but still consider boundaries
+      }
+
+      // Check if ball has reached this paddle's X/Z plane
+      if (isLR) {
+        // For left/right paddles (0,1): check if ball reached paddle's X position
+        const reachedPaddle =
+          (i === 0 && simulate.x <= paddleFixedPos + 0.5) ||
+          (i === 1 && simulate.x >= paddleFixedPos - 0.5);
+        if (reachedPaddle && ((i === 0 && v.x < 0) || (i === 1 && v.x > 0))) {
+          // ball moving toward paddle
+          target = simulate.z;
+          break;
+        }
+      } else {
+        // For bottom/top paddles (2,3): check if ball reached paddle's Z position
+        const reachedPaddle =
+          (i === 2 && simulate.z >= paddleFixedPos - 0.5) ||
+          (i === 3 && simulate.z <= paddleFixedPos + 0.5);
+        if (reachedPaddle && ((i === 2 && v.z > 0) || (i === 3 && v.z < 0))) {
+          // ball moving toward paddle
+          target = simulate.x;
+          break;
+        }
+      }
+
+      // Safety check: if simulation goes too far, break
+      if (Math.abs(simulate.x) > width || Math.abs(simulate.z) > height) {
+        break;
+      }
+    }
+
+    // Apply AI error/difficulty
+    target += err;
+
+    // Move paddle toward target with smooth acceleration
+    const p = this.paddles[i];
+    const current = isLR ? p.position.z : p.position.x;
+    const delta = target - current;
+
+    // Enhanced responsiveness: larger deltas get faster response
+    const urgency = Math.min(1.0, Math.abs(delta) / 2.0); // urgency factor based on distance
+    const responsiveness = lerpAmt * (1.0 + urgency * 0.5); // boost response when far from target
+
+    const accel = delta * responsiveness;
+    this.aiVel[i] = this.aiVel[i] * 0.82 + accel * 0.18; // slightly more responsive interpolation
+
+    let step = this.aiVel[i];
+
+    // Clamp step size
+    if (step > maxStep) step = maxStep;
+    if (step < -maxStep) step = -maxStep;
+
+    // Apply movement
+    if (isLR) {
+      p.position.z += step;
+    } else {
+      p.position.x += step;
+    }
+  }
   private applyAIDifficulty(idxs: number[], d: number) {
+    // clamp 1..10 and normalize to 0..1
     const t = Math.min(10, Math.max(1, d));
-    const s = (t - 1) / 9; // 0..1
-    const errRange = lerp(2.2, 0.0, s);
-    const lerpAmt = lerp(0.06, 0.18, s);
+    const s = (t - 1) / 9;
+
+    // Non-linear easing for more dramatic difficulty curve
+    const sg = Math.pow(s, 0.7); // slightly steeper curve
+
+    // ⬇️ Enhanced error range: Easy=8 → Hard=0.1 (more dramatic)
+    const errRange = lerp(8.0, 0.1, sg);
+
+    // ⬇️ Improved response speed: Easy=0.008 → Hard=0.35 (much more responsive at high levels)
+    const lerpAmt = lerp(0.008, 0.35, sg);
+
     idxs.forEach((i) => {
       this.aiErrorRangePerPaddle[i] = errRange;
       this.aiLerpPerPaddle[i] = lerpAmt;
     });
   }
-
+  //------------------------------------------------------------------Obstacles -------------------
   private spawnObstacles(width: number, height: number) {
     const count = 3; // ≤3 obstacles
     const chosen: Vector3[] = [];
-    const minGap = 1.0;
+    const minGap = 4.0;
 
     this.obstacleInfo = [];
     for (let i = 0; i < count; i++) {
@@ -885,17 +1028,36 @@ export class Pong3D {
     this.obstacleAfterHit = false;
   }
 
-  // Randomize the rebound direction a bit, then clamp horizontal speed
-  private jitterBounce(axis: "x" | "z" | "xz", amount = 0.08) {
-    const rx = (Math.random() * 2 - 1) * amount;
-    const rz = (Math.random() * 2 - 1) * (amount * 0.6);
+  // Randomize the rebound direction more strongly, then clamp horizontal speed
+  private jitterBounce(axis: "x" | "z" | "xz", baseAmount = 0.08) {
+    // Scale randomness by ball speed (faster ball → more jitter)
+    const speed = this.ballVelocity.length();
+    const scale = 1 + Math.random() * 0.5; // 1.0–1.5x
+    const jitter = baseAmount * scale * (0.5 + Math.random()); // 0.5–1.5x base
+
+    // Random offset
+    const rx = (Math.random() * 2 - 1) * jitter;
+    const rz = (Math.random() * 2 - 1) * jitter;
+
     if (axis === "x" || axis === "xz") this.ballVelocity.x += rx;
     if (axis === "z" || axis === "xz") this.ballVelocity.z += rz;
+
+    // Occasionally rotate the velocity vector a few degrees for extra chaos
+    if (axis === "xz" && Math.random() < 0.4) {
+      const angle = (Math.random() - 0.5) * 0.4; // -0.125–0.125 rad (~±7°)
+      const cos = Math.cos(angle),
+        sin = Math.sin(angle);
+      const { x, z } = this.ballVelocity;
+      this.ballVelocity.x = x * cos - z * sin;
+      this.ballVelocity.z = x * sin + z * cos;
+    }
+
+    // Keep things playable
     clampHorizontal(this.ballVelocity, 0.6);
     ensureMinHorizontalSpeed(this.ballVelocity, this.minHorizontalSpeed);
   }
 
-  /* ---------------- Remote ---------------- */
+  /* --------------------------------------------------------------------------------- Remote ---------------- */
 
   private sendRemoteMessage(msg: RemoteMsg) {
     if (this.usingSocketIO) {
@@ -1030,7 +1192,9 @@ export class Pong3D {
     if (this.connectedGuests >= this.requiredGuests) {
       await this.beginMatch();
     } else {
-      this.showWaitingOverlay(`Waiting for players… ${this.connectedGuests}/${this.requiredGuests}`);
+      this.showWaitingOverlay(
+        `Waiting for players… ${this.connectedGuests}/${this.requiredGuests}`
+      );
     }
   }
 
@@ -1245,7 +1409,7 @@ export class Pong3D {
     this.sendRemoteMessage(msg);
   }
 
-  /* ---------------- Tick ---------------- */
+  /* ---------------------------------------------------------------------------------- Tick ---------------- */
 
   private update(width: number, height: number) {
     const now = performance.now();
@@ -1312,7 +1476,7 @@ export class Pong3D {
       }
     }
 
-    // Clamp paddles and keep out of corners
+    // --------------------------------------------------------------Clamp paddles and keep out of corners
     const padD2 = 1.0;
     const margin = 0.02,
       t = this.wallThickness;
@@ -1350,7 +1514,7 @@ export class Pong3D {
 
     // Physics
     this.ballVelocity.scaleInPlace(this.speedIncrement);
-    this.ballVelocity.y -= 0.006;
+    this.ballVelocity.y -= 0.007;
     this.ball.position.addInPlace(this.ballVelocity);
 
     ensureMinHorizontalSpeed(this.ballVelocity, this.minHorizontalSpeed);
@@ -1533,7 +1697,11 @@ export class Pong3D {
           this.scores[1]++;
           this.lastScorer = 1;
           // Add damage to right wall where ball hit
-          this.addWallDamage('right', this.ball.position.x, this.ball.position.z);
+          this.addWallDamage(
+            "right",
+            this.ball.position.x,
+            this.ball.position.z
+          );
           this.updateScoreUI();
           if (this.scores[1] >= target) {
             this.finishAndReport(1);
@@ -1547,7 +1715,11 @@ export class Pong3D {
           this.scores[0]++;
           this.lastScorer = 0;
           // Add damage to left wall where ball hit
-          this.addWallDamage('left', this.ball.position.x, this.ball.position.z);
+          this.addWallDamage(
+            "left",
+            this.ball.position.x,
+            this.ball.position.z
+          );
           this.updateScoreUI();
           if (this.scores[0] >= target) {
             this.finishAndReport(0);
@@ -1560,38 +1732,44 @@ export class Pong3D {
 
     if (this.isHost) this.broadcastState(now);
   }
-
-  private addWallDamage(wall: 'left' | 'right', hitX: number, hitZ: number) {
+//-----------------------------------------------------------------------------damaging
+  private addWallDamage(wall: "left" | "right", hitX: number, hitZ: number) {
     // Only add damage in 2P mode
     if (this.config.playerCount !== 2) return;
 
-    const wallMesh = wall === 'left' ? this.leftWall : this.rightWall;
+    const wallMesh = wall === "left" ? this.leftWall : this.rightWall;
     if (!wallMesh) return;
 
     // Store damage point
     this.wallDamagePoints.push({
       x: hitX,
       z: hitZ,
-      wall: wall
+      wall: wall,
     });
 
     // Create damage texture effect
     this.applyDamageToWall(wallMesh, hitX, hitZ);
   }
 
-  private createTiledWalls(width: number, height: number, thickness: number, leftMat: StandardMaterial, rightMat: StandardMaterial) {
+  private createTiledWalls(
+    width: number,
+    height: number,
+    thickness: number,
+    leftMat: StandardMaterial,
+    rightMat: StandardMaterial
+  ) {
     // Configuration for wall tiles
     const tilesPerWall = 10; // Number of tiles per wall (vertically)
     const tileHeight = height / tilesPerWall;
-    
+
     // Clear existing tile arrays
     this.leftWallTiles = [];
     this.rightWallTiles = [];
-    
+
     // Create left wall tiles
     for (let i = 0; i < tilesPerWall; i++) {
-      const tileZ = -height/2 + (i + 0.5) * tileHeight; // Center position of each tile
-      
+      const tileZ = -height / 2 + (i + 0.5) * tileHeight; // Center position of each tile
+
       const leftTile = MeshBuilder.CreateBox(
         `leftWallTile_${i}`,
         { width: thickness, height: tileHeight, depth: thickness },
@@ -1599,14 +1777,14 @@ export class Pong3D {
       );
       leftTile.position.set(-width / 2 - thickness / 2, 1 / 2, tileZ);
       leftTile.material = leftMat.clone(`leftTileMat_${i}`);
-      
+
       this.leftWallTiles.push(leftTile);
     }
-    
-    // Create right wall tiles  
+
+    // Create right wall tiles
     for (let i = 0; i < tilesPerWall; i++) {
-      const tileZ = -height/2 + (i + 0.5) * tileHeight; // Center position of each tile
-      
+      const tileZ = -height / 2 + (i + 0.5) * tileHeight; // Center position of each tile
+
       const rightTile = MeshBuilder.CreateBox(
         `rightWallTile_${i}`,
         { width: thickness, height: tileHeight, depth: thickness },
@@ -1614,70 +1792,90 @@ export class Pong3D {
       );
       rightTile.position.set(width / 2 + thickness / 2, 1 / 2, tileZ);
       rightTile.material = rightMat.clone(`rightTileMat_${i}`);
-      
+
       this.rightWallTiles.push(rightTile);
     }
-    
+
     // Note: Main wall references (this.leftWall, this.rightWall) are kept from original wall creation
     // Tiles are used only for damage system
-    
-    console.log(`🧱 Created ${tilesPerWall} tiles per wall (${tilesPerWall * 2} total wall tiles)`);
+
+    console.log(
+      `🧱 Created ${tilesPerWall} tiles per wall (${
+        tilesPerWall * 2
+      } total wall tiles)`
+    );
   }
 
-  private applyDamageToWall(wallMesh: import("@babylonjs/core").Mesh, _hitX: number, hitZ: number) {
+  private applyDamageToWall(
+    wallMesh: import("@babylonjs/core").Mesh,
+    _hitX: number,
+    hitZ: number
+  ) {
     // This method now needs to find which specific tile was hit and damage only that tile
-    
+
     // Determine which wall was hit (left or right)
-    const isLeftWall = wallMesh === this.leftWall || this.leftWallTiles.includes(wallMesh);
-    const isRightWall = wallMesh === this.rightWall || this.rightWallTiles.includes(wallMesh);
-    
+    const isLeftWall =
+      wallMesh === this.leftWall || this.leftWallTiles.includes(wallMesh);
+    const isRightWall =
+      wallMesh === this.rightWall || this.rightWallTiles.includes(wallMesh);
+
     if (!isLeftWall && !isRightWall) {
-      console.log('❌ Wall mesh not recognized');
+      console.log("❌ Wall mesh not recognized");
       return;
     }
-    
+
     // Get the appropriate tile array
     const wallTiles = isLeftWall ? this.leftWallTiles : this.rightWallTiles;
-    const wallName = isLeftWall ? 'left' : 'right';
-    
+    const wallName = isLeftWall ? "left" : "right";
+
     // Find which tile the ball hit based on hitZ position
     const tileHeight = 10 / wallTiles.length; // 10 is the total height from createTiledWalls
     const hitTileIndex = Math.floor((hitZ + 5) / tileHeight); // +5 to offset from center, 5 = height/2
-    const clampedIndex = Math.max(0, Math.min(hitTileIndex, wallTiles.length - 1));
-    
+    const clampedIndex = Math.max(
+      0,
+      Math.min(hitTileIndex, wallTiles.length - 1)
+    );
+
     const targetTile = wallTiles[clampedIndex];
-    
+
     if (!targetTile) {
-      console.log('❌ Could not find target tile');
+      console.log("❌ Could not find target tile");
       return;
     }
-    
+
     // Check if this specific tile is already damaged
     if ((targetTile as any)._isDamaged) {
-      console.log(`⚠️ Tile ${clampedIndex} on ${wallName} wall already damaged`);
+      console.log(
+        `⚠️ Tile ${clampedIndex} on ${wallName} wall already damaged`
+      );
       return;
     }
-    
+
     // Mark this specific tile as damaged
     (targetTile as any)._isDamaged = true;
-    
+
     // Create a new damaged material using the b2 damage texture for this tile only
     const material = targetTile.material as StandardMaterial;
-    const damagedMaterial = material.clone(`damagedTile_${wallName}_${clampedIndex}_${Date.now()}`);
-    
+    const damagedMaterial = material.clone(
+      `damagedTile_${wallName}_${clampedIndex}_${Date.now()}`
+    );
+
     // Load the damage wall texture (b2.png)
-    const damageTexture = new Texture('/textures/b2.png', this.scene);
-    
+    const damageTexture = new Texture("/textures/b2.png", this.scene);
+
     // Apply the damage texture to only this specific tile
     damagedMaterial.diffuseTexture = damageTexture;
     targetTile.material = damagedMaterial;
-    
-    console.log(`🔥 Tile ${clampedIndex} on ${wallName} wall damaged with b2 texture at position:`, { hitZ, tileHeight });
-  }
 
+    console.log(
+      `🔥 Tile ${clampedIndex} on ${wallName} wall damaged with b2 texture at position:`,
+      { hitZ, tileHeight }
+    );
+  }
+// -----------------------------------------------------------------------Pause
   private togglePause() {
     this.isPaused = !this.isPaused;
-    
+
     if (this.isPaused) {
       // Show pause overlay
       this.showPauseOverlay();
@@ -1692,10 +1890,11 @@ export class Pong3D {
   private showPauseOverlay() {
     // Remove existing pause overlay if any
     this.hidePauseOverlay();
-    
-    const overlay = document.createElement('div');
-    overlay.id = 'pause-overlay';
-    overlay.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50';
+
+    const overlay = document.createElement("div");
+    overlay.id = "pause-overlay";
+    overlay.className =
+      "fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50";
     overlay.innerHTML = `
       <div class="bg-gray-800 rounded-lg p-8 text-center border-2 border-lime-500">
         <div class="text-6xl mb-4">⏸️</div>
@@ -1703,78 +1902,24 @@ export class Pong3D {
         <div class="text-gray-300">Press P to resume</div>
       </div>
     `;
-    
+
     document.body.appendChild(overlay);
   }
 
   private hidePauseOverlay() {
-    const overlay = document.getElementById('pause-overlay');
+    const overlay = document.getElementById("pause-overlay");
     if (overlay) {
       overlay.remove();
     }
   }
 
-  private runAI(i: number, _width: number, height: number, maxStep: number) {
-    if (this.control[i] !== "ai") return;
-    const lerpAmt = this.aiLerpPerPaddle[i];
-    const err = this.aiError[i];
 
-    const isLR = i < 2;
-    const axisPos = isLR
-      ? this.paddles[i].position.x
-      : this.paddles[i].position.z;
-    const ballPos = this.ball.position.clone();
-    const ballVel = this.ballVelocity.clone();
-
-    let target = isLR ? ballPos.z : ballPos.x;
-    {
-      const simulate = ballPos.clone();
-      const v = ballVel.clone();
-      const limitZ = height / 2 - this.ballRadius - this.wallThickness / 2;
-      const horizon = 60;
-      for (let k = 0; k < horizon; k++) {
-        simulate.addInPlace(v);
-        if (this.config.playerCount === 2) {
-          if (simulate.z > limitZ || simulate.z < -limitZ) v.z *= -1;
-        }
-        if (isLR) {
-          if (
-            (i === 0 && simulate.x < axisPos) ||
-            (i === 1 && simulate.x > axisPos)
-          ) {
-            target = simulate.z;
-            break;
-          }
-        } else {
-          if (
-            (i === 2 && simulate.z > axisPos) ||
-            (i === 3 && simulate.z < axisPos)
-          ) {
-            target = simulate.x;
-            break;
-          }
-        }
-      }
-    }
-    target += err;
-
-    const p = this.paddles[i];
-    const current = isLR ? p.position.z : p.position.x;
-    const delta = target - current;
-    const accel = delta * lerpAmt;
-    this.aiVel[i] = this.aiVel[i] * 0.8 + accel * 0.2;
-    let step = this.aiVel[i];
-    if (step > maxStep) step = maxStep;
-    if (step < -maxStep) step = -maxStep;
-    if (isLR) p.position.z += step;
-    else p.position.x += step;
-  }
-
+//------------------------------------------------------------------------------finish and the winner
   private async finishAndReport(winnerIdx: number) {
     this.matchReady = false;
     const text =
       this.config.playerCount === 4
-        ? `Player ${["L", "R", "B", "T"][winnerIdx]} wins!`
+        ? `Player ${["R", "L", "B", "T"][winnerIdx]} wins!`
         : winnerIdx === 0
         ? (this.config.displayNames?.[0] || "Left") + " wins!"
         : (this.config.displayNames?.[1] || "Right") + " wins!";
@@ -1837,7 +1982,7 @@ export class Pong3D {
       location.reload();
   }
 
-  /* ---------------- AUDIO ---------------- */
+  /* ---------------------------------------------------------------------------- AUDIO ---------------- */
 
   private initAudio() {
     const load = (name: string, url: string, vol = 0.6) =>

@@ -1647,7 +1647,7 @@ async function start3DPongGame() {
 
 		// Import the Babylon.js 3D Pong game and menu
 		const { clearPongUI } = await import('../src/ui');
-		const { Menu } = await import('../src/menu');
+		const { Menu } = await import('../src/menu/MenuController');
 		const { Pong3D } = await import('../src/game/Pong3D');
 
 		// Clear the current UI and replace with simple game container

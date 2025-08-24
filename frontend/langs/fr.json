@@ -419,8 +419,15 @@
   "Active": "Actif",
   "Ready to start your Pong journey?": "Prêt à commencer ton aventure Pong ?",
   "Play your first game to see statistics here!": "Joue ta première partie pour voir tes statistiques ici !",
-  "Start Playing": "Commencer à jouer"
-
-
-
+  "Start Playing": "Commencer à jouer",
+  "Edit Profile": "Modifier le profil",
+  "Choose Avatar": "Choisir un avatar",
+  "Enter first name": "Entrez le prénom",
+  "Enter last name": "Entrez le nom",
+  "Enter username": "Entrez le nom d'utilisateur",
+  "Enter email": "Entrez l'email",
+  "Two-Factor Authentication": "Authentification à deux facteurs",
+  "Add an extra layer of security to your account": "Ajoutez une couche supplémentaire de sécurité à votre compte",
+  "2FA Disabled": "2FA désactivé",
+  "Save Changes": "Enregistrer les modifications"
 }
