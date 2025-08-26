@@ -457,7 +457,6 @@ export class SettingsBox {
 
   private loadSettings(): any {
     const defaultSettings = {
-      difficulty: 'medium',
       language: languageManager.getCurrentLanguage(),
       theme: simpleThemeManager.getCurrentTheme(),
       backgroundTheme: backgroundThemeManager.getCurrentTheme()

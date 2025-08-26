@@ -1,9 +1,11 @@
+import { any } from "three/tsl";
 import {
   AuthState,
   User,
   LoginCredentials,
   SignupCredentials,
   AuthResponse,
+  GameSettings
 } from "../types/User";
 import {
   STORAGE_KEYS,
@@ -44,6 +46,47 @@ type BackendUser = {
   twoFactorEnabled?: number | boolean;
 };
 
+// this is new, i want to send the settings to the back
+type BackendSettings =
+{
+  language: string;
+  accentColors: string;
+  backgroundTheme: string;
+  // this will be optional, i dont know if i handle it
+  NotificationEnabled?: number  | boolean;
+}
+
+function mapBackendSettingsToGameSettings(
+  raw: Partial<BackendSettings> | undefined
+): GameSettings {
+  if (!raw) {
+    throw new Error("Invalid settings payload from server.");
+  }
+
+  const mappedSettings: GameSettings = {
+    theme: String(raw.accentColors ?? "default"),
+    backgroundTheme: String(raw.backgroundTheme ?? "light"),
+    language: String(raw.language ?? "en"),
+    musicVolume: 50,
+    soundEnabled: true,
+    musicEnabled: true,
+    notificationsEnabled: Boolean(
+      raw.NotificationEnabled ?? true
+    ),
+  };
+
+  console.log(
+    "🔍 Raw backend settings:",
+    JSON.stringify(raw, null, 2)
+  );
+  console.log(
+    "🔍 Mapped settings:",
+    JSON.stringify(mappedSettings, null, 2)
+  );
+
+  return mappedSettings;
+}
+
 
 function mapBackendUserToUser(raw: any): User {
   const u = raw as Partial<BackendUser> | undefined;
@@ -60,9 +103,8 @@ function mapBackendUserToUser(raw: any): User {
     firstName: String(u.firstName ?? ""),
     lastName: String(u.lastName ?? ""),
     userName: String(u.username ?? ""),
-    // ✅ FIXED: Use the correct property name that backend actually sends
-    avatar: u.profilePath ? String(u.profilePath) : undefined,        // Changed from u.profilepath to u.profilePath
-    profilePath: u.profilePath ? String(u.profilePath) : undefined,   // Changed from u.profilepath to u.profilePath
+    avatar: u.profilePath ? String(u.profilePath) : undefined,
+    profilePath: u.profilePath ? String(u.profilePath) : undefined,
     createdAt: u.createdAt ? new Date(u.createdAt) : new Date(),
     updatedAt: u.updatedAt ? new Date(u.updatedAt) : new Date(),
     gameStats: undefined,
@@ -109,7 +151,7 @@ export class AuthService {
     }
   }
 
-  /** Public getters */
+
   getState(): AuthState {
     return { ...this.state };
   }
@@ -354,7 +396,6 @@ private async signupAPI(credentials: SignupCredentials): Promise<AuthResponse> {
     return (true);
   }
 
-  /** ---- API calls ---- */
 
 
 
@@ -363,6 +404,8 @@ private async loginAPI(
 ): Promise<AuthResponse> {
   const endpoint = `${API_BASE_URL}/auth/login`;
   try {
+    console.log('🔐 Login attempt for:', credentials.email);
+
     const res = await fetch(endpoint, {
       method: "POST",
       headers: {
@@ -375,12 +418,13 @@ private async loginAPI(
       }),
     });
 
+    console.log('📊 Login response status:', res.status);
+
     // ✅ Handle 303 - Email Not Verified
     if (res.status === 303) {
-      console.log('🔒 User not verified (303) - need email for verification');
+      console.log('📧 User not verified (303) - need email for verification');
 
       try {
-        // Get the actual email address from backend
         const emailResponse = await fetch(`${API_BASE_URL}/users/getEmail`, {
           method: "POST",
           headers: {
@@ -388,7 +432,7 @@ private async loginAPI(
             Accept: "application/json",
           },
           body: JSON.stringify({
-            username: credentials.email // Send the login input (email or username)
+            username: credentials.email
           }),
         });
 
@@ -400,7 +444,7 @@ private async loginAPI(
 
           return {
             success: false,
-            message: `email not verified:${userEmail}` // ✅ Include email in message
+            message: `email not verified:${userEmail}`
           };
         } else {
           console.error('❌ Failed to get email from backend');
@@ -414,6 +458,67 @@ private async loginAPI(
         return {
           success: false,
           message: 'Unable to send verification email. Please try again.'
+        };
+      }
+    }
+
+    // ✅ Handle 202 - 2FA Required
+    if (res.status === 202) {
+      console.log('🔐 2FA verification required (202)');
+
+      try {
+        // Get the response data first
+        const responseData = await res.json().catch(() => ({}));
+        console.log('📦 2FA response data:', responseData);
+
+        // Get the user's email for 2FA verification
+        const emailResponse = await fetch(`${API_BASE_URL}/users/getEmail`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify({
+            username: credentials.email
+          }),
+        });
+
+        if (emailResponse.ok) {
+          const emailData = await emailResponse.json();
+          const userEmail = emailData.email || emailData.userEmail;
+
+          console.log('✅ Got email for 2FA verification:', userEmail);
+
+          // ✅ Store ALL the login data needed for completing auth after 2FA
+          const tempToken = responseData.tempToken || responseData.token;
+          const userData = responseData.user;
+
+          if (tempToken && userData) {
+            // Store temporary session data for completing login after 2FA
+            sessionStorage.setItem('temp_2fa_token', tempToken);
+            sessionStorage.setItem('temp_2fa_user', JSON.stringify(userData));
+            sessionStorage.setItem('temp_2fa_email', userEmail);
+            sessionStorage.setItem('temp_2fa_credentials', JSON.stringify(credentials));
+          }
+
+          return {
+            success: false,
+            message: `2fa required:${userEmail}`,
+            requires2FA: true,
+            tempToken: tempToken
+          };
+        } else {
+          console.error('❌ Failed to get email for 2FA verification');
+          return {
+            success: false,
+            message: 'Unable to send 2FA verification code. Please contact support.'
+          };
+        }
+      } catch (emailError) {
+        console.error('❌ Error fetching user email for 2FA:', emailError);
+        return {
+          success: false,
+          message: 'Unable to send 2FA verification code. Please try again.'
         };
       }
     }
@@ -442,6 +547,75 @@ private async loginAPI(
   }
 }
 
+// ✅ NEW: Complete 2FA login directly without backend API call
+async complete2FALogin(email: string, code: string): Promise<AuthResponse> {
+  this.setLoading(true);
+
+  try {
+    const tempToken = sessionStorage.getItem('temp_2fa_token');
+    const tempUserData = sessionStorage.getItem('temp_2fa_user');
+    const tempEmail = sessionStorage.getItem('temp_2fa_email');
+
+    if (!tempToken || !tempUserData || !tempEmail || tempEmail !== email) {
+      return {
+        success: false,
+        message: '2FA session expired. Please login again.'
+      };
+    }
+
+    console.log('🔐 Completing 2FA login locally (no backend API call needed)');
+
+    // ✅ Parse the stored user data
+    const userData = JSON.parse(tempUserData);
+
+    // ✅ Map the backend user data to frontend User type
+    const user = mapBackendUserToUser(userData);
+
+    // ✅ Use the temp token as the real token (backend already validated credentials)
+    const realToken = tempToken;
+
+    // ✅ Clear temporary session data
+    sessionStorage.removeItem('temp_2fa_token');
+    sessionStorage.removeItem('temp_2fa_user');
+    sessionStorage.removeItem('temp_2fa_email');
+    sessionStorage.removeItem('temp_2fa_credentials');
+
+    // ✅ Set authentication state
+    this.setAuthState(realToken, user);
+
+    // ✅ Emit login event
+    globalEventManager.emit(AppEvent.AUTH_LOGIN, user);
+
+    console.log('✅ 2FA login completed successfully');
+    console.log('🎫 JWT Token stored:', realToken.substring(0, 20) + '...');
+    console.log('👤 User data:', user);
+
+    return {
+      success: true,
+      message: SUCCESS_MESSAGES.LOGIN_SUCCESS,
+      token: realToken,
+      user: user
+    };
+
+  } catch (error) {
+    console.error('❌ 2FA completion error:', error);
+
+    // Clear any corrupted session data
+    sessionStorage.removeItem('temp_2fa_token');
+    sessionStorage.removeItem('temp_2fa_user');
+    sessionStorage.removeItem('temp_2fa_email');
+    sessionStorage.removeItem('temp_2fa_credentials');
+
+    return {
+      success: false,
+      message: '2FA session error. Please login again.'
+    };
+  } finally {
+    this.setLoading(false);
+  }
+}
+
+
   /**
    * Offline demo login for when backend is not available
    */
@@ -467,12 +641,11 @@ private offlineDemoLogin(credentials: LoginCredentials): AuthResponse {
     };
   }
 
-  // Create demo user with matched credentials
   const demoUser: User = {
-    id: matchedUser.userName + '-' + Date.now(),  // ← Fix: use userName
+    id: matchedUser.userName + '-' + Date.now(),
     firstName: matchedUser.firstName,
     lastName: matchedUser.lastName,
-    userName: matchedUser.userName,  // ← Fix: use userName
+    userName: matchedUser.userName,
     email: matchedUser.email,
     profilePath: null,
     createdAt: new Date().toISOString(),
@@ -490,12 +663,6 @@ private offlineDemoLogin(credentials: LoginCredentials): AuthResponse {
   };
 }
 
-  /**
-   * GET /verify-token
-   * Expects Authorization: Bearer <token>
-   * Backend should respond with:
-   *   { valid: boolean, user?: BackendUser }
-   */
   private async verifyTokenAPI(token: string): Promise<boolean> {
     const endpoint = `${API_BASE_URL}/verify-token`;
     try {
@@ -564,9 +731,7 @@ private offlineDemoLogin(credentials: LoginCredentials): AuthResponse {
   }
 }
 
-/**
- * API call to update profile
- */
+
 private async updateProfileAPI(updateData: UpdateProfileData): Promise<AuthResponse> {
   const user = this.getUser();
   if (!user || !this.state.token) {

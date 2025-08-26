@@ -228,6 +228,25 @@ private async handleLogin(event: Event): Promise<void> {
 				return; // Exit early, don't show error
 			}
 
+			// ✅ NEW: Handle 2FA verification needed
+			if (result.message && result.message.includes('2fa required:')) {
+				const userEmail = result.message.split('2fa required:')[1];
+				console.log('🔐 2FA verification required (202) - switching to 2FA verification modal');
+				console.log('📧 Using email:', userEmail);
+
+				// Close the login modal
+				this.close();
+
+				// Show 2FA verification modal
+				this.show2FAVerificationModal(userEmail);
+
+				// Show info toast
+				this.showToast('info', t('Two-Factor Authentication Required'),
+					t('Please check your email and enter the 2FA verification code to continue.'));
+
+				return; // Exit early, don't show error
+			}
+
 			// Handle other login errors normally
 			console.error('❌ Login failed:', result.message);
 			this.showError('login-error', result.message || t('Login failed'));
@@ -239,6 +258,48 @@ private async handleLogin(event: Event): Promise<void> {
 		// Re-enable form
 		submitBtn.disabled = false;
 		submitBtn.textContent = t('Login');
+	}
+}
+
+/**
+ * ✅ NEW: Show 2FA verification modal
+ */
+private async show2FAVerificationModal(userEmail: string): Promise<void> {
+	try {
+		console.log('🔐 Showing 2FA verification modal for email:', userEmail);
+
+		// Dynamically import VerifyModal
+		const { VerifyModal } = await import('./VerifyModal');
+
+		// Create 2FA verification modal with success callback
+		const verify2FAModal = new VerifyModal(
+			userEmail,
+			() => {
+				// On 2FA verification success - user is now logged in
+				console.log('✅ 2FA verification completed - user logged in successfully');
+				this.showToast('success', t('Login Successful!'),
+					t('Two-factor authentication completed successfully.'));
+
+				// Trigger auth update to refresh UI
+				const authState = authService.getState();
+				if (authState.user) {
+					this.triggerAuthUpdate(true, authState.user);
+				}
+			},
+			() => {
+				// On resend 2FA code
+				console.log('📧 2FA verification code resent');
+			},
+			undefined, // No auth token needed for 2FA (uses temp token)
+			true // ✅ NEW: Flag to indicate this is 2FA verification
+		);
+
+		// Show the 2FA verification modal
+		verify2FAModal.showModal();
+
+	} catch (error) {
+		console.error('❌ Error loading 2FA verification modal:', error);
+		this.showError('login-error', t('Unable to load 2FA verification. Please try again.'));
 	}
 }
 

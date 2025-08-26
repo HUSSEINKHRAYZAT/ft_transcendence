@@ -423,5 +423,17 @@
   "Two-Factor Authentication": "Zwei-Faktor-Authentifizierung",
   "Add an extra layer of security to your account": "Fügen Sie eine zusätzliche Sicherheitsebene zu Ihrem Konto hinzu",
   "2FA Disabled": "2FA deaktiviert",
-  "Save Changes": "Änderungen speichern"
+  "Save Changes": "Änderungen speichern",
+  "Are you sure you want to reset all settings to default?": "Sind Sie sicher, dass Sie alle Einstellungen auf die Standardwerte zurücksetzen möchten?",
+  "All settings have been reset to default values.": "Alle Einstellungen wurden auf die Standardwerte zurückgesetzt.",
+  "Forgot your password?": "Passwort vergessen?",
+  "Demo Accounts Available": "Demo-Konten verfügbar",
+  "Welcome back": "Willkommen zurück",
+  "Saving...": "Speichern...",
+  "Two-Factor Authentication Required": "Zwei-Faktor-Authentifizierung erforderlich",
+  "Please check your email and enter the 2FA verification code to continue.": "Bitte überprüfen Sie Ihre E-Mail und geben Sie den 2FA-Bestätigungscode ein, um fortzufahren.",
+  "Two-factor authentication is enabled for your account. Please enter the verification code sent to your email.": "Die Zwei-Faktor-Authentifizierung ist für Ihr Konto aktiviert. Bitte geben Sie den an Ihre E-Mail gesendeten Code ein.",
+  "Enter 2FA Code": "2FA-Code eingeben",
+  "Enter the 6-digit code from your email": "Geben Sie den 6-stelligen Code aus Ihrer E-Mail ein",
+  "Verify & Login": "Überprüfen & Einloggen"
 }
