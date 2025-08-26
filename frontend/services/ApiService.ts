@@ -1,4 +1,4 @@
-import { API_ENDPOINTS, ERROR_MESSAGES } from '@/utils/Constants';
+import { API_ENDPOINTS, ERROR_MESSAGES } from '@//utils/Constants';
 import { authService } from './AuthService';
 
 /**

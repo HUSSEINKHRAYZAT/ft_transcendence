@@ -432,7 +432,19 @@
   "Two-Factor Authentication": "Two-Factor Authentication",
   "Add an extra layer of security to your account": "Add an extra layer of security to your account",
   "2FA Disabled": "2FA Disabled",
-  "Save Changes": "Save Changes"
+  "Save Changes": "Save Changes",
+  "Are you sure you want to reset all settings to default?": "Are you sure you want to reset all settings to default?",
+  "All settings have been reset to default values.": "All settings have been reset to default values.",
+  "Forgot your password?": "Forgot your password?",
+  "Demo Accounts Available": "Demo Accounts Available",
+  "Welcome back": "Welcome back",
+  "Saving...": "Saving...",
+  "Two-Factor Authentication Required": "Two-Factor Authentication Required",
+  "Please check your email and enter the 2FA verification code to continue.": "Please check your email and enter the 2FA verification code to continue.",
+  "Two-factor authentication is enabled for your account. Please enter the verification code sent to your email.": "Two-factor authentication is enabled for your account. Please enter the verification code sent to your email.",
+  "Enter 2FA Code": "Enter 2FA Code",
+  "Enter the 6-digit code from your email": "Enter the 6-digit code from your email",
+  "Verify & Login": "Verify & Login"
 }
 
 

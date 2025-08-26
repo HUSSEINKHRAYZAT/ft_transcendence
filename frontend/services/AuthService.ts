@@ -1,9 +1,12 @@
+import { any } from "three/tsl";
 import {
   AuthState,
   User,
   LoginCredentials,
   SignupCredentials,
   AuthResponse,
+  GameSettings,
+  UpdateProfileData
 } from "../types/User";
 import {
   STORAGE_KEYS,
@@ -13,7 +16,6 @@ import {
 import { globalEventManager, AppEvent } from "../utils/EventManager";
 
 const API_BASE_URL = "http://localhost:8080";
-
 
 let isBackendAvailable = true;
 const checkBackendAvailability = async (): Promise<boolean> => {
@@ -27,7 +29,7 @@ const checkBackendAvailability = async (): Promise<boolean> => {
     return false;
   }
 };
-
+//hi
 
 type BackendUser = {
   id: number | string;
@@ -44,6 +46,43 @@ type BackendUser = {
   twoFactorEnabled?: number | boolean;
 };
 
+type BackendSettings = {
+  language: string;
+  accentColors: string;
+  backgroundTheme: string;
+  NotificationEnabled?: number | boolean;
+}
+
+function mapBackendSettingsToGameSettings(
+  raw: Partial<BackendSettings> | undefined
+): GameSettings {
+  if (!raw) {
+    throw new Error("Invalid settings payload from server.");
+  }
+
+  const mappedSettings: GameSettings = {
+    theme: String(raw.accentColors ?? "default"),
+    backgroundTheme: String(raw.backgroundTheme ?? "light"),
+    language: String(raw.language ?? "en"),
+    musicVolume: 50,
+    soundEnabled: true,
+    musicEnabled: true,
+    notificationsEnabled: Boolean(
+      raw.NotificationEnabled ?? true
+    ),
+  };
+
+  console.log(
+    "Raw backend settings:",
+    JSON.stringify(raw, null, 2)
+  );
+  console.log(
+    "Mapped settings:",
+    JSON.stringify(mappedSettings, null, 2)
+  );
+
+  return mappedSettings;
+}
 
 function mapBackendUserToUser(raw: any): User {
   const u = raw as Partial<BackendUser> | undefined;
@@ -51,8 +90,7 @@ function mapBackendUserToUser(raw: any): User {
     throw new Error("Invalid user payload from server.");
   }
 
-  console.log('🔍 Raw backend user data:', JSON.stringify(u, null, 2));
-
+  console.log('Raw backend user data:', JSON.stringify(u, null, 2));
 
   const mappedUser = {
     id: String(u.id ?? ""),
@@ -60,18 +98,17 @@ function mapBackendUserToUser(raw: any): User {
     firstName: String(u.firstName ?? ""),
     lastName: String(u.lastName ?? ""),
     userName: String(u.username ?? ""),
-    // ✅ FIXED: Use the correct property name that backend actually sends
-    avatar: u.profilePath ? String(u.profilePath) : undefined,        // Changed from u.profilepath to u.profilePath
-    profilePath: u.profilePath ? String(u.profilePath) : undefined,   // Changed from u.profilepath to u.profilePath
+    avatar: u.profilePath ? String(u.profilePath) : undefined,
+    profilePath: u.profilePath ? String(u.profilePath) : undefined,
     createdAt: u.createdAt ? new Date(u.createdAt) : new Date(),
     updatedAt: u.updatedAt ? new Date(u.updatedAt) : new Date(),
     gameStats: undefined,
-     enable2fa: Boolean(u.twoFactorEnabled)
+    enable2fa: Boolean(u.twoFactorEnabled)
   };
 
-  console.log('🔍 Mapped user data:', JSON.stringify(mappedUser, null, 2));
-  console.log('🔍 Final avatar value:', mappedUser.avatar);
-  console.log('🔍 Final profilePath value:', mappedUser.profilePath);
+  console.log('Mapped user data:', JSON.stringify(mappedUser, null, 2));
+  console.log('Final avatar value:', mappedUser.avatar);
+  console.log('Final profilePath value:', mappedUser.profilePath);
 
   return mappedUser;
 }
@@ -109,7 +146,6 @@ export class AuthService {
     }
   }
 
-  /** Public getters */
   getState(): AuthState {
     return { ...this.state };
   }
@@ -155,94 +191,92 @@ export class AuthService {
     }
   }
 
-async signup(credentials: SignupCredentials): Promise<AuthResponse> {
-  this.setLoading(true);
-  try {
-    const validation = this.validateSignupCredentials(credentials);
-    if (!validation.isValid) {
-      return { success: false, message: validation.message };
-    }
-
-    const response = await this.signupAPI(credentials);
-
-    if (response.success && response.user) {
-      // if backend starts sending tokens, handle here
-      this.state = {
-        isAuthenticated: true,
-        isLoading: false,
-        token: response.token ?? null,
-        user: response.user,
-      };
-      localStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(response.user));
-      if (response.token) {
-        localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, response.token);
+  async signup(credentials: SignupCredentials): Promise<AuthResponse> {
+    this.setLoading(true);
+    try {
+      const validation = this.validateSignupCredentials(credentials);
+      if (!validation.isValid) {
+        return { success: false, message: validation.message };
       }
-      globalEventManager.emit(AppEvent.AUTH_SIGNUP, response.user);
-    }
 
-    return response;
-  } catch (error) {
-    console.error("Signup error:", error);
-    return { success: false, message: ERROR_MESSAGES.NETWORK_ERROR };
-  } finally {
-    this.setLoading(false);
+      const response = await this.signupAPI(credentials);
+
+      if (response.success && response.user) {
+        // if backend starts sending tokens, handle here
+        this.state = {
+          isAuthenticated: true,
+          isLoading: false,
+          token: response.token ?? null,
+          user: response.user,
+        };
+        localStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(response.user));
+        if (response.token) {
+          localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, response.token);
+        }
+        globalEventManager.emit(AppEvent.AUTH_SIGNUP, response.user);
+      }
+
+      return response;
+    } catch (error) {
+      console.error("Signup error:", error);
+      return { success: false, message: ERROR_MESSAGES.NETWORK_ERROR };
+    } finally {
+      this.setLoading(false);
+    }
   }
-}
 
   /** Signup */
-private async signupAPI(credentials: SignupCredentials): Promise<AuthResponse> {
-  try {
-  const endpoint = `${API_BASE_URL}/users`;
-    const res = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify(credentials),
-    });
+  private async signupAPI(credentials: SignupCredentials): Promise<AuthResponse> {
+    try {
+      const endpoint = `${API_BASE_URL}/users`;
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify(credentials),
+      });
 
-    // Handle conflicts (email/username already exists)
-    if (res.status === 409) {
-      const payload = await res.json().catch(() => ({}));
-      return {
-        success: false,
-        message: payload?.error || "Conflict",
-        conflict: payload?.conflict,             // 'email' | 'username'
-        suggestions: payload?.suggestions || [], // backend can send alternatives
-        statusCode: 409,
-      };
-    }
+      // Handle conflicts (email/username already exists)
+      if (res.status === 409) {
+        const payload = await res.json().catch(() => ({}));
+        return {
+          success: false,
+          message: payload?.error || "Conflict",
+          conflict: payload?.conflict,             // 'email' | 'username'
+          suggestions: payload?.suggestions || [], // backend can send alternatives
+          statusCode: 409,
+        };
+      }
 
-    // Handle other errors
-    if (!res.ok) {
-      const errorPayload = await res.json().catch(() => ({}));
+      // Handle other errors
+      if (!res.ok) {
+        const errorPayload = await res.json().catch(() => ({}));
+        return {
+          success: false,
+          message: errorPayload?.message || "Signup failed",
+          statusCode: res.status,
+        };
+      }
+
+      // Success response
+      const data = await res.json();
+
+      // If backend sends { user } inside data
+      const user = mapBackendUserToUser(data.user ?? data);
+
       return {
-        success: false,
-        message: errorPayload?.message || "Signup failed",
+        success: true,
+        token: data.token ?? null, // optional (backend may add later)
+        user,
         statusCode: res.status,
       };
+    } catch (err) {
+      console.error("signupAPI error:", err);
+      return { success: false, message: ERROR_MESSAGES.NETWORK_ERROR };
     }
-
-    // ✅ Success response
-    const data = await res.json();
-
-    // If backend sends { user } inside data
-    const user = mapBackendUserToUser(data.user ?? data);
-
-    return {
-      success: true,
-      token: data.token ?? null, // optional (backend may add later)
-      user,
-      statusCode: res.status,
-    };
-  } catch (err) {
-    console.error("signupAPI error:", err);
-    return { success: false, message: ERROR_MESSAGES.NETWORK_ERROR };
   }
-}
-
-
 
   /** Logout */
   async logout(): Promise<void> {
@@ -354,148 +388,233 @@ private async signupAPI(credentials: SignupCredentials): Promise<AuthResponse> {
     return (true);
   }
 
-  /** ---- API calls ---- */
+  private async loginAPI(
+    credentials: LoginCredentials
+  ): Promise<AuthResponse> {
+    const endpoint = `${API_BASE_URL}/auth/login`;
+    try {
+      console.log('Login attempt for:', credentials.email);
 
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          username: credentials.email,
+          password: credentials.password
+        }),
+      });
 
+      console.log('Login response status:', res.status);
 
-private async loginAPI(
-  credentials: LoginCredentials
-): Promise<AuthResponse> {
-  const endpoint = `${API_BASE_URL}/auth/login`;
-  try {
-    const res = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify({
-        username: credentials.email,
-        password: credentials.password
-      }),
-    });
+      // Handle 303 - Email Not Verified
+      if (res.status === 303) {
+        console.log('User not verified (303) - need email for verification');
 
-    // ✅ Handle 303 - Email Not Verified
-    if (res.status === 303) {
-      console.log('🔒 User not verified (303) - need email for verification');
+        try {
+          const emailResponse = await fetch(`${API_BASE_URL}/users/getEmail`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+            },
+            body: JSON.stringify({
+              username: credentials.email
+            }),
+          });
 
-      try {
-        // Get the actual email address from backend
-        const emailResponse = await fetch(`${API_BASE_URL}/users/getEmail`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
-          body: JSON.stringify({
-            username: credentials.email // Send the login input (email or username)
-          }),
-        });
+          if (emailResponse.ok) {
+            const emailData = await emailResponse.json();
+            const userEmail = emailData.email || emailData.userEmail;
 
-        if (emailResponse.ok) {
-          const emailData = await emailResponse.json();
-          const userEmail = emailData.email || emailData.userEmail;
+            console.log('Got email for verification:', userEmail);
 
-          console.log('✅ Got email for verification:', userEmail);
-
+            return {
+              success: false,
+              message: `email not verified:${userEmail}`
+            };
+          } else {
+            console.error('Failed to get email from backend');
+            return {
+              success: false,
+              message: 'Unable to send verification email. Please contact support.'
+            };
+          }
+        } catch (emailError) {
+          console.error('Error fetching user email:', emailError);
           return {
             success: false,
-            message: `email not verified:${userEmail}` // ✅ Include email in message
-          };
-        } else {
-          console.error('❌ Failed to get email from backend');
-          return {
-            success: false,
-            message: 'Unable to send verification email. Please contact support.'
+            message: 'Unable to send verification email. Please try again.'
           };
         }
-      } catch (emailError) {
-        console.error('❌ Error fetching user email:', emailError);
+      }
+
+      // Handle 202 - 2FA Required
+      if (res.status === 202) {
+        console.log('2FA verification required (202)');
+
+        try {
+          // Get the response data first
+          const responseData = await res.json().catch(() => ({}));
+          console.log('2FA response data:', responseData);
+
+          // Get the user's email for 2FA verification
+          const emailResponse = await fetch(`${API_BASE_URL}/users/getEmail`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+            },
+            body: JSON.stringify({
+              username: credentials.email
+            }),
+          });
+
+          if (emailResponse.ok) {
+            const emailData = await emailResponse.json();
+            const userEmail = emailData.email || emailData.userEmail;
+
+            console.log('Got email for 2FA verification:', userEmail);
+
+            // Store ALL the login data needed for completing auth after 2FA
+            const tempToken = responseData.tempToken || responseData.token;
+            const userData = responseData.user;
+
+            if (tempToken && userData) {
+              // Store temporary session data for completing login after 2FA
+              sessionStorage.setItem('temp_2fa_token', tempToken);
+              sessionStorage.setItem('temp_2fa_user', JSON.stringify(userData));
+              sessionStorage.setItem('temp_2fa_email', userEmail);
+              sessionStorage.setItem('temp_2fa_credentials', JSON.stringify(credentials));
+            }
+
+            return {
+              success: false,
+              message: `2fa required:${userEmail}`,
+              requires2FA: true,
+              tempToken: tempToken
+            };
+          } else {
+            console.error('Failed to get email for 2FA verification');
+            return {
+              success: false,
+              message: 'Unable to send 2FA verification code. Please contact support.'
+            };
+          }
+        } catch (emailError) {
+          console.error('Error fetching user email for 2FA:', emailError);
+          return {
+            success: false,
+            message: 'Unable to send 2FA verification code. Please try again.'
+          };
+        }
+      }
+
+      if (!res.ok) {
+        const rawErr = await res.text().catch(() => "");
+        let errMsg = ERROR_MESSAGES.INVALID_CREDENTIALS;
+        try {
+          const errorData = JSON.parse(rawErr);
+          errMsg = errorData.error || errorData.message || errMsg;
+        } catch {}
+        return { success: false, message: errMsg };
+      }
+
+      const data = await res.json();
+
+      if (!data.token) {
+        return { success: false, message: "No token received from server" };
+      }
+
+      const user = mapBackendUserToUser(data.user);
+      return { success: true, token: data.token, user };
+    } catch (err) {
+      console.error("Backend not available, using offline demo auth:", err);
+      return this.offlineDemoLogin(credentials);
+    }
+  }
+
+  // Complete 2FA login directly without backend API call
+  async complete2FALogin(email: string, code: string): Promise<AuthResponse> {
+    this.setLoading(true);
+
+    try {
+      const tempToken = sessionStorage.getItem('temp_2fa_token');
+      const tempUserData = sessionStorage.getItem('temp_2fa_user');
+      const tempEmail = sessionStorage.getItem('temp_2fa_email');
+
+      if (!tempToken || !tempUserData || !tempEmail || tempEmail !== email) {
         return {
           success: false,
-          message: 'Unable to send verification email. Please try again.'
+          message: '2FA session expired. Please login again.'
         };
       }
+
+      console.log('Completing 2FA login locally (no backend API call needed)');
+
+      // Parse the stored user data
+      const userData = JSON.parse(tempUserData);
+
+      // Map the backend user data to frontend User type
+      const user = mapBackendUserToUser(userData);
+
+      // Use the temp token as the real token (backend already validated credentials)
+      const realToken = tempToken;
+
+      // Clear temporary session data
+      sessionStorage.removeItem('temp_2fa_token');
+      sessionStorage.removeItem('temp_2fa_user');
+      sessionStorage.removeItem('temp_2fa_email');
+      sessionStorage.removeItem('temp_2fa_credentials');
+
+      // Set authentication state
+      this.setAuthState(realToken, user);
+
+      // Emit login event
+      globalEventManager.emit(AppEvent.AUTH_LOGIN, user);
+
+      console.log('2FA login completed successfully');
+      console.log('JWT Token stored:', realToken.substring(0, 20) + '...');
+      console.log('User data:', user);
+
+      return {
+        success: true,
+        message: SUCCESS_MESSAGES.LOGIN_SUCCESS,
+        token: realToken,
+        user: user
+      };
+
+    } catch (error) {
+      console.error('2FA completion error:', error);
+
+      // Clear any corrupted session data
+      sessionStorage.removeItem('temp_2fa_token');
+      sessionStorage.removeItem('temp_2fa_user');
+      sessionStorage.removeItem('temp_2fa_email');
+      sessionStorage.removeItem('temp_2fa_credentials');
+
+      return {
+        success: false,
+        message: '2FA session error. Please login again.'
+      };
+    } finally {
+      this.setLoading(false);
     }
-
-    if (!res.ok) {
-      const rawErr = await res.text().catch(() => "");
-      let errMsg = ERROR_MESSAGES.INVALID_CREDENTIALS;
-      try {
-        const errorData = JSON.parse(rawErr);
-        errMsg = errorData.error || errorData.message || errMsg;
-      } catch {}
-      return { success: false, message: errMsg };
-    }
-
-    const data = await res.json();
-
-    if (!data.token) {
-      return { success: false, message: "No token received from server" };
-    }
-
-    const user = mapBackendUserToUser(data.user);
-    return { success: true, token: data.token, user };
-  } catch (err) {
-    console.error("Backend not available, using offline demo auth:", err);
-    return this.offlineDemoLogin(credentials);
   }
-}
 
   /**
    * Offline demo login for when backend is not available
    */
-private offlineDemoLogin(credentials: LoginCredentials): AuthResponse {
-  // Demo credentials - Multiple accounts for testing multiplayer
-  const validCredentials = [
-    { email: 'demo@ftpong.com', password: 'demo123', firstName: 'Demo', lastName: 'Player', userName: 'demo_player' },
-    { email: 'alice@ftpong.com', password: 'alice123', firstName: 'Alice', lastName: 'Smith', userName: 'alice_smith' },
-    { email: 'bob@ftpong.com', password: 'bob123', firstName: 'Bob', lastName: 'Johnson', userName: 'bob_johnson' },
-    { email: 'carol@ftpong.com', password: 'carol123', firstName: 'Carol', lastName: 'Brown', userName: 'carol_brown' },
-    { email: 'david@ftpong.com', password: 'david123', firstName: 'David', lastName: 'Wilson', userName: 'david_wilson' }
-  ];
-
-  const matchedUser = validCredentials.find(cred =>
-    cred.email.toLowerCase() === credentials.email.toLowerCase() &&
-    cred.password === credentials.password
-  );
-
-  if (!matchedUser) {
+  private offlineDemoLogin(credentials: LoginCredentials): AuthResponse {
+    console.log('Backend not available, offline mode not supported');
     return {
       success: false,
-      message: 'Invalid demo credentials. Available accounts:\n• alice@ftpong.com / alice123\n• bob@ftpong.com / bob123\n• carol@ftpong.com / carol123\n• david@ftpong.com / david123\n• demo@ftpong.com / demo123'
+      message: 'Backend service is currently unavailable. Please try again later.'
     };
   }
 
-  // Create demo user with matched credentials
-  const demoUser: User = {
-    id: matchedUser.userName + '-' + Date.now(),  // ← Fix: use userName
-    firstName: matchedUser.firstName,
-    lastName: matchedUser.lastName,
-    userName: matchedUser.userName,  // ← Fix: use userName
-    email: matchedUser.email,
-    profilePath: null,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  };
-
-  const demoToken = 'demo-token-' + Date.now();
-
-  console.log('✅ Offline demo login successful');
-  return {
-    success: true,
-    token: demoToken,
-    user: demoUser,
-    message: 'Demo login successful (offline mode)'
-  };
-}
-
-  /**
-   * GET /verify-token
-   * Expects Authorization: Bearer <token>
-   * Backend should respond with:
-   *   { valid: boolean, user?: BackendUser }
-   */
   private async verifyTokenAPI(token: string): Promise<boolean> {
     const endpoint = `${API_BASE_URL}/verify-token`;
     try {
@@ -529,309 +648,536 @@ private offlineDemoLogin(credentials: LoginCredentials): AuthResponse {
   }
 
   async updateProfile(updateData: UpdateProfileData): Promise<AuthResponse> {
-  this.setLoading(true);
+    this.setLoading(true);
 
-  try {
-    const validation = this.validateProfileUpdateData(updateData);
-    if (!validation.isValid) {
-      return { success: false, message: validation.message };
-    }
-
-    const response = await this.updateProfileAPI(updateData);
-
-    if (response.success && response.user) {
-      // Update the current auth state with new user data
-      this.setAuthState(this.state.token!, response.user);
-
-      globalEventManager.emit(AppEvent.AUTH_PROFILE_UPDATE, response.user);
-
-      return {
-        success: true,
-        message: SUCCESS_MESSAGES.PROFILE_UPDATE_SUCCESS,
-        user: response.user,
-      };
-    }
-
-    return {
-      success: false,
-      message: response.message || 'Failed to update profile',
-    };
-  } catch (error) {
-    console.error('Profile update error:', error);
-    return { success: false, message: ERROR_MESSAGES.NETWORK_ERROR };
-  } finally {
-    this.setLoading(false);
-  }
-}
-
-/**
- * API call to update profile
- */
-private async updateProfileAPI(updateData: UpdateProfileData): Promise<AuthResponse> {
-  const user = this.getUser();
-  if (!user || !this.state.token) {
-    return { success: false, message: 'User not authenticated' };
-  }
-
-  const endpoint = `${API_BASE_URL}/users/${user.id}`;
-
-  try {
-    console.log('🔄 Sending PATCH request to:', endpoint);
-    console.log('📦 Update data:', updateData);
-    console.log('🎫 Token:', this.state.token.substring(0, 20) + '...');
-
-    const res = await fetch(endpoint, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Authorization': `Bearer ${this.state.token}`,
-      },
-      body: JSON.stringify({
-        firstName: updateData.firstName,
-        lastName: updateData.lastName,
-        username: updateData.userName,
-        email: updateData.email,
-        profilepath: updateData.profilePath,
-        twoFactorEnabled: updateData.enable2fa  // ✅ Send as twoFactorEnabled to match DB column
-      }),
-    });
-
-    if (!res.ok) {
-      let errorMessage = 'Failed to update profile';
-
-      try {
-        const errorData = await res.json();
-        errorMessage = errorData.message || errorData.error || errorMessage;
-
-        if (res.status === 409) {
-          if (errorData.conflict === 'email') {
-            errorMessage = 'Email address is already in use';
-          } else if (errorData.conflict === 'username') {
-            errorMessage = 'Username is already taken';
-          }
-        } else if (res.status === 401) {
-          errorMessage = 'Authentication failed. Please login again.';
-          this.clearAuthState();
-        } else if (res.status === 403) {
-          errorMessage = 'You do not have permission to update this profile';
-        }
-      } catch (parseError) {
-        console.error('Error parsing error response:', parseError);
+    try {
+      const validation = this.validateProfileUpdateData(updateData);
+      if (!validation.isValid) {
+        return { success: false, message: validation.message };
       }
 
-      return { success: false, message: errorMessage };
-    }
+      const response = await this.updateProfileAPI(updateData);
 
-    const data = await res.json();
-    console.log('✅ Profile update response:', data);
+      if (response.success && response.user) {
+        // Update the current auth state with new user data
+        this.setAuthState(this.state.token!, response.user);
 
-    console.log('🔍 DEBUG Complete backend response:', JSON.stringify(data, null, 2));
-    console.log('🔍 DEBUG data.user:', JSON.stringify(data.user, null, 2));
-    console.log('🔍 DEBUG data.twoFactorEnabled:', data.twoFactorEnabled); // ✅ Updated debug log
+        globalEventManager.emit(AppEvent.AUTH_PROFILE_UPDATE, response.user);
 
-    const updatedUser = mapBackendUserToUser(data.user || data);
+        return {
+          success: true,
+          message: SUCCESS_MESSAGES.PROFILE_UPDATE_SUCCESS,
+          user: response.user,
+        };
+      }
 
-    return {
-      success: true,
-      user: updatedUser,
-      message: 'Profile updated successfully'
-    };
-
-  } catch (err) {
-    console.error('updateProfileAPI error:', err);
-
-    if (err instanceof TypeError && err.message.includes('fetch')) {
       return {
         success: false,
-        message: 'Unable to connect to server. Please check your internet connection.'
+        message: response.message || 'Failed to update profile',
       };
+    } catch (error) {
+      console.error('Profile update error:', error);
+      return { success: false, message: ERROR_MESSAGES.NETWORK_ERROR };
+    } finally {
+      this.setLoading(false);
+    }
+  }
+
+  private async updateProfileAPI(updateData: UpdateProfileData): Promise<AuthResponse> {
+    const user = this.getUser();
+    if (!user || !this.state.token) {
+      return { success: false, message: 'User not authenticated' };
     }
 
-    return { success: false, message: ERROR_MESSAGES.NETWORK_ERROR };
-  }
-}
-/**
- * Validate profile update data
- */
-private validateProfileUpdateData(data: UpdateProfileData): { isValid: boolean; message?: string } {
-  if (!data.firstName.trim()) {
-    return { isValid: false, message: 'First name is required' };
-  }
+    const endpoint = `${API_BASE_URL}/users/${user.id}`;
 
-  if (!data.lastName.trim()) {
-    return { isValid: false, message: 'Last name is required' };
-  }
+    try {
+      console.log('Sending PATCH request to:', endpoint);
+      console.log('Update data:', updateData);
+      console.log('Token:', this.state.token.substring(0, 20) + '...');
 
-  if (!data.userName.trim()) {  // ← Fix: Use 'userName'
-    return { isValid: false, message: 'Username is required' };
-  }
+      const res = await fetch(endpoint, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${this.state.token}`,
+        },
+        body: JSON.stringify({
+          firstName: updateData.firstName,
+          lastName: updateData.lastName,
+          username: updateData.userName,
+          email: updateData.email,
+          profilepath: updateData.profilePath,
+          twoFactorEnabled: updateData.enable2fa  // Send as twoFactorEnabled to match DB column
+        }),
+      });
 
-  if (!data.email.trim()) {
-    return { isValid: false, message: 'Email is required' };
-  }
+      if (!res.ok) {
+        let errorMessage = 'Failed to update profile';
 
-  if (!this.isValidEmail(data.email)) {
-    return { isValid: false, message: 'Please enter a valid email address' };
-  }
+        try {
+          const errorData = await res.json();
+          errorMessage = errorData.message || errorData.error || errorMessage;
 
-  // Username validation
-  if (data.userName.length < 3) {  // ← Fix: Use 'userName'
-    return { isValid: false, message: 'Username must be at least 3 characters long' };
-  }
+          if (res.status === 409) {
+            if (errorData.conflict === 'email') {
+              errorMessage = 'Email address is already in use';
+            } else if (errorData.conflict === 'username') {
+              errorMessage = 'Username is already taken';
+            }
+          } else if (res.status === 401) {
+            errorMessage = 'Authentication failed. Please login again.';
+            this.clearAuthState();
+          } else if (res.status === 403) {
+            errorMessage = 'You do not have permission to update this profile';
+          }
+        } catch (parseError) {
+          console.error('Error parsing error response:', parseError);
+        }
 
-  if (!/^[a-zA-Z0-9._-]+$/.test(data.userName)) {  // ← Fix: Use 'userName'
-    return { isValid: false, message: 'Username can only contain letters, numbers, dots, hyphens, and underscores' };
-  }
+        return { success: false, message: errorMessage };
+      }
 
-  return { isValid: true };
-}
+      const data = await res.json();
+      console.log('Profile update response:', data);
 
-// Add these methods to your AuthService class
+      console.log('DEBUG Complete backend response:', JSON.stringify(data, null, 2));
+      console.log('DEBUG data.user:', JSON.stringify(data.user, null, 2));
+      console.log('DEBUG data.twoFactorEnabled:', data.twoFactorEnabled);
 
-/**
- * Initiate password reset process
- * Generates verification code and sends it to user's email
- */
-async initiatePasswordReset(email: string, newPassword: string): Promise<AuthResponse> {
-  this.setLoading(true);
+      const updatedUser = mapBackendUserToUser(data.user || data);
 
-  try {
-    // Generate 6-digit verification code
-    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-    console.log('🔢 Generated password reset code:', verificationCode);
-
-    // Store code and password temporarily (in real app, store in backend)
-    localStorage.setItem('password_reset_code', verificationCode);
-    localStorage.setItem('password_reset_email', email);
-    localStorage.setItem('password_reset_password', newPassword);
-
-    // Send verification code to backend
-    const response = await fetch(`${API_BASE_URL}/users/send-verification`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        email: email,
-        code: verificationCode
-      })
-    });
-
-    console.log('📥 Password reset verification response status:', response.status);
-
-    if (response.status === 404) {
-      return {
-        success: false,
-        message: 'Email address not found in our system'
-      };
-    }
-
-    if (response.status === 200 || response.status === 201) {
-      console.log('✅ Password reset verification code sent successfully');
       return {
         success: true,
-        message: 'Verification code sent to your email'
+        user: updatedUser,
+        message: 'Profile updated successfully'
       };
+
+    } catch (err) {
+      console.error('updateProfileAPI error:', err);
+
+      if (err instanceof TypeError && err.message.includes('fetch')) {
+        return {
+          success: false,
+          message: 'Unable to connect to server. Please check your internet connection.'
+        };
+      }
+
+      return { success: false, message: ERROR_MESSAGES.NETWORK_ERROR };
+    }
+  }
+
+  /**
+   * Validate profile update data
+   */
+  private validateProfileUpdateData(data: UpdateProfileData): { isValid: boolean; message?: string } {
+    if (!data.firstName.trim()) {
+      return { isValid: false, message: 'First name is required' };
     }
 
-    // Handle other errors
-    const errorData = await response.json().catch(() => ({}));
-    return {
-      success: false,
-      message: errorData.message || 'Failed to send verification code. Please try again.'
-    };
+    if (!data.lastName.trim()) {
+      return { isValid: false, message: 'Last name is required' };
+    }
 
-  } catch (error) {
-    console.error('❌ Error initiating password reset:', error);
-    return {
-      success: false,
-      message: ERROR_MESSAGES.NETWORK_ERROR
-    };
-  } finally {
-    this.setLoading(false);
+    if (!data.userName.trim()) {
+      return { isValid: false, message: 'Username is required' };
+    }
+
+    if (!data.email.trim()) {
+      return { isValid: false, message: 'Email is required' };
+    }
+
+    if (!this.isValidEmail(data.email)) {
+      return { isValid: false, message: 'Please enter a valid email address' };
+    }
+
+    // Username validation
+    if (data.userName.length < 3) {
+      return { isValid: false, message: 'Username must be at least 3 characters long' };
+    }
+
+    if (!/^[a-zA-Z0-9._-]+$/.test(data.userName)) {
+      return { isValid: false, message: 'Username can only contain letters, numbers, dots, hyphens, and underscores' };
+    }
+
+    return { isValid: true };
   }
-}
 
-/**
- * Complete password reset after code verification
- */
-async completePasswordReset(email: string, code: string, newPassword: string): Promise<AuthResponse> {
-  this.setLoading(true);
+  /**
+   * Initiate password reset process
+   * Generates verification code and sends it to user's email
+   */
+  async initiatePasswordReset(email: string, newPassword: string): Promise<AuthResponse> {
+    this.setLoading(true);
 
-  try {
-    // Verify the code matches what we stored
-    const storedCode = localStorage.getItem('password_reset_code');
-    const storedEmail = localStorage.getItem('password_reset_email');
-    const storedPassword = localStorage.getItem('password_reset_password');
+    try {
+      // Generate 6-digit verification code
+      const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+      console.log('Generated password reset code:', verificationCode);
 
-    if (!storedCode || !storedEmail || !storedPassword) {
+      // Store code and password temporarily (in real app, store in backend)
+      localStorage.setItem('password_reset_code', verificationCode);
+      localStorage.setItem('password_reset_email', email);
+      localStorage.setItem('password_reset_password', newPassword);
+
+      // Send verification code to backend
+      const response = await fetch(`${API_BASE_URL}/users/send-verification`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: email,
+          code: verificationCode
+        })
+      });
+
+      console.log('Password reset verification response status:', response.status);
+
+      if (response.status === 404) {
+        return {
+          success: false,
+          message: 'Email address not found in our system'
+        };
+      }
+
+      if (response.status === 200 || response.status === 201) {
+        console.log('Password reset verification code sent successfully');
+        return {
+          success: true,
+          message: 'Verification code sent to your email'
+        };
+      }
+
+      // Handle other errors
+      const errorData = await response.json().catch(() => ({}));
       return {
         success: false,
-        message: 'Password reset session expired. Please start over.'
+        message: errorData.message || 'Failed to send verification code. Please try again.'
       };
-    }
 
-    if (storedEmail !== email || storedCode !== code || storedPassword !== newPassword) {
+    } catch (error) {
+      console.error('Error initiating password reset:', error);
       return {
         success: false,
-        message: 'Invalid verification code'
+        message: ERROR_MESSAGES.NETWORK_ERROR
       };
+    } finally {
+      this.setLoading(false);
     }
-
-    // Send password reset to backend
-    const response = await fetch(`${API_BASE_URL}/users/reset-password`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        email: email,
-        newPassword: newPassword
-      })
-    });
-
-    if (response.status === 200) {
-      // Clean up temporary storage
-      localStorage.removeItem('password_reset_code');
-      localStorage.removeItem('password_reset_email');
-      localStorage.removeItem('password_reset_password');
-
-      console.log('✅ Password reset completed successfully');
-      return {
-        success: true,
-        message: 'Password reset successful'
-      };
-    }
-
-    const errorData = await response.json().catch(() => ({}));
-    return {
-      success: false,
-      message: errorData.message || 'Failed to reset password. Please try again.'
-    };
-
-  } catch (error) {
-    console.error('❌ Error completing password reset:', error);
-    return {
-      success: false,
-      message: ERROR_MESSAGES.NETWORK_ERROR
-    };
-  } finally {
-    this.setLoading(false);
   }
-}
 
-/**
- * Resend password reset verification code
- */
-async resendPasswordResetCode(email: string, newPassword: string): Promise<AuthResponse> {
-  console.log('📧 Resending password reset verification code');
+  /**
+   * Complete password reset after code verification
+   */
+  async completePasswordReset(email: string, code: string, newPassword: string): Promise<AuthResponse> {
+    this.setLoading(true);
 
-  // Simply call initiatePasswordReset again to generate and send a new code
-  return this.initiatePasswordReset(email, newPassword);
-}
+    try {
+      // Verify the code matches what we stored
+      const storedCode = localStorage.getItem('password_reset_code');
+      const storedEmail = localStorage.getItem('password_reset_email');
+      const storedPassword = localStorage.getItem('password_reset_password');
 
+      if (!storedCode || !storedEmail || !storedPassword) {
+        return {
+          success: false,
+          message: 'Password reset session expired. Please start over.'
+        };
+      }
 
+      if (storedEmail !== email || storedCode !== code || storedPassword !== newPassword) {
+        return {
+          success: false,
+          message: 'Invalid verification code'
+        };
+      }
+
+      // Send password reset to backend
+      const response = await fetch(`${API_BASE_URL}/users/reset-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: email,
+          newPassword: newPassword
+        })
+      });
+
+      if (response.status === 200) {
+        // Clean up temporary storage
+        localStorage.removeItem('password_reset_code');
+        localStorage.removeItem('password_reset_email');
+        localStorage.removeItem('password_reset_password');
+
+        console.log('Password reset completed successfully');
+        return {
+          success: true,
+          message: 'Password reset successful'
+        };
+      }
+
+      const errorData = await response.json().catch(() => ({}));
+      return {
+        success: false,
+        message: errorData.message || 'Failed to reset password. Please try again.'
+      };
+
+    } catch (error) {
+      console.error('Error completing password reset:', error);
+      return {
+        success: false,
+        message: ERROR_MESSAGES.NETWORK_ERROR
+      };
+    } finally {
+      this.setLoading(false);
+    }
+  }
+
+  /**
+   * Resend password reset verification code
+   */
+  async resendPasswordResetCode(email: string, newPassword: string): Promise<AuthResponse> {
+    console.log('Resending password reset verification code');
+
+    // Simply call initiatePasswordReset again to generate and send a new code
+    return this.initiatePasswordReset(email, newPassword);
+  }
+
+  // ========================================
+  // FRIENDS & RELATIONS API METHODS
+  // ========================================
+
+  /**
+   * Send friend request
+   */
+  async sendFriendRequest(usernameOne: string, usernameTwo: string): Promise<AuthResponse> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/relation`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.state.token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          usernameOne,
+          usernameTwo,
+          type: 'PENDING'
+        }),
+      });
+
+      if (response.ok) {
+        return { success: true, message: 'Friend request sent successfully' };
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        return {
+          success: false,
+          message: errorData.message || 'Failed to send friend request',
+          statusCode: response.status
+        };
+      }
+    } catch (error) {
+      console.error('Error sending friend request:', error);
+      return { success: false, message: ERROR_MESSAGES.NETWORK_ERROR };
+    }
+  }
+
+  /**
+   * Get friend requests for a user
+   */
+  async getFriendRequests(userId: string): Promise<AuthResponse> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/relation/requests/${userId}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${this.state.token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        return { success: true, data };
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        return {
+          success: false,
+          message: errorData.message || 'Failed to load friend requests',
+          statusCode: response.status
+        };
+      }
+    } catch (error) {
+      console.error('Error loading friend requests:', error);
+      return { success: false, message: ERROR_MESSAGES.NETWORK_ERROR };
+    }
+  }
+
+  /**
+   * Accept friend request
+   */
+  async acceptFriendRequest(usernameOne: string, usernameTwo: string): Promise<AuthResponse> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/relation`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${this.state.token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          usernameOne,
+          usernameTwo,
+          type: 'FRIEND'
+        }),
+      });
+
+      if (response.ok) {
+        return { success: true, message: 'Friend request accepted' };
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        return {
+          success: false,
+          message: errorData.message || 'Failed to accept friend request',
+          statusCode: response.status
+        };
+      }
+    } catch (error) {
+      console.error('Error accepting friend request:', error);
+      return { success: false, message: ERROR_MESSAGES.NETWORK_ERROR };
+    }
+  }
+
+  /**
+   * Block user from friend request
+   */
+  async blockUserFromRequest(usernameOne: string, usernameTwo: string): Promise<AuthResponse> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/relation`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${this.state.token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          usernameOne,
+          usernameTwo,
+          type: 'BLOCKED'
+        }),
+      });
+
+      if (response.ok) {
+        return { success: true, message: 'User blocked successfully' };
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        return {
+          success: false,
+          message: errorData.message || 'Failed to block user',
+          statusCode: response.status
+        };
+      }
+    } catch (error) {
+      console.error('Error blocking user:', error);
+      return { success: false, message: ERROR_MESSAGES.NETWORK_ERROR };
+    }
+  }
+
+  /**
+   * Block user directly
+   */
+  async blockUser(usernameOne: string, usernameTwo: string): Promise<AuthResponse> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/relation`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.state.token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          usernameOne,
+          usernameTwo,
+          type: 'BLOCKED'
+        }),
+      });
+
+      if (response.ok) {
+        return { success: true, message: 'User blocked successfully' };
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        return {
+          success: false,
+          message: errorData.message || 'Failed to block user',
+          statusCode: response.status
+        };
+      }
+    } catch (error) {
+      console.error('Error blocking user:', error);
+      return { success: false, message: ERROR_MESSAGES.NETWORK_ERROR };
+    }
+  }
+
+  /**
+   * Remove friend
+   */
+  async removeFriend(usernameOne: string, usernameTwo: string): Promise<AuthResponse> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/relation`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${this.state.token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          usernameOne,
+          usernameTwo
+        }),
+      });
+
+      if (response.ok) {
+        return { success: true, message: 'Friend removed successfully' };
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        return {
+          success: false,
+          message: errorData.message || 'Failed to remove friend',
+          statusCode: response.status
+        };
+      }
+    } catch (error) {
+      console.error('Error removing friend:', error);
+      return { success: false, message: ERROR_MESSAGES.NETWORK_ERROR };
+    }
+  }
+
+  /**
+   * Get friends list
+   */
+  async getFriendsList(userId: string): Promise<AuthResponse> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/relation/friends/${userId}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${this.state.token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        return { success: true, data };
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        return {
+          success: false,
+          message: errorData.message || 'Failed to load friends list',
+          statusCode: response.status
+        };
+      }
+    } catch (error) {
+      console.error('Error loading friends list:', error);
+      return { success: false, message: ERROR_MESSAGES.NETWORK_ERROR };
+    }
+  }
 }
 
 export const authService = new AuthService();
