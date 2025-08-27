@@ -130,37 +130,49 @@ private async handleForgotPassword(): Promise<void> {
 	}
 }
 
-	/**
-	 * Handle Google authentication
-	 */
-	private handleGoogleAuth(): void {
-		console.log('🌐 Google login clicked...');
 
-		// Show temporary message
-		this.showToast('info', t('Google Authentication'), t('Google OAuth will be implemented in the next version!'));
+private async handleGoogleAuth(): Promise<void> {
+  console.log('🌐 Google login clicked...');
 
-		setTimeout(() => {
-			const googleUser = {
-				id: 'google-' + Date.now(),
-				firstName: 'Google',
-				lastName: 'User',
-				email: 'google.user@gmail.com',
-				username: 'google_user',
-				avatar: 'https://lh3.googleusercontent.com/a/default-user=s96-c',
-				createdAt: new Date().toISOString(),
-				updatedAt: new Date().toISOString()
-			};
+  this.showToast('info', t('Google Authentication'), t('Redirecting to Google...'));
 
-			// Use AuthService to properly store the Google user and token
-			const googleToken = 'google-token-' + Date.now();
-			authService['setAuthState'](googleToken, googleUser);
+  try {
+    // 1. Start Google login (redirect or popup)
+    const authWindow = window.open(
+      "http://localhost:8080/auth/google",
+      'googleAuth',
+      'width=500,height=600'
+    );
 
-			this.close();
-			this.showToast('success', t('Google Authentication'), t('Welcome {name}!', { name: googleUser.firstName }));
+    // 2. Wait for the backend to finish OAuth and send us data
+    //    (assuming your backend redirects to /auth/callback and posts message back)
+    window.addEventListener("message", async (event) => {
+      if (event.origin !== "http://localhost:8080") return;
 
-			this.triggerAuthUpdate(true, googleUser);
-		}, 2000);
-	}
+      const { token, user, error } = event.data;
+
+      if (error) {
+        this.showToast('error', t('Google Authentication'), error);
+        return;
+      }
+
+      if (!token || !user) {
+        this.showToast('error', t('Google Authentication'), 'No token received from Google login.');
+        return;
+      }
+
+      // 3. Set auth state (same as loginAPI success)
+      authService['setAuthState'](token, user);
+
+      this.close();
+      this.showToast('success', t('Google Authentication'), t('Welcome {name}!', { name: user.firstName }));
+      this.triggerAuthUpdate(true, user);
+    });
+  } catch (err) {
+    console.error('Google OAuth failed:', err);
+    this.showToast('error', t('Google Authentication'), 'Google login failed.');
+  }
+}
 
 private async handleLogin(event: Event): Promise<void> {
 	event.preventDefault();

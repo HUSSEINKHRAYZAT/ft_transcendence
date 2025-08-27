@@ -29,7 +29,6 @@ const checkBackendAvailability = async (): Promise<boolean> => {
     return false;
   }
 };
-//hi
 
 type BackendUser = {
   id: number | string;
@@ -1048,9 +1047,7 @@ export class AuthService {
     }
   }
 
-  /**
-   * Block user from friend request
-   */
+
   async blockUserFromRequest(usernameOne: string, usernameTwo: string): Promise<AuthResponse> {
     try {
       const response = await fetch(`${API_BASE_URL}/relation`, {
@@ -1082,43 +1079,7 @@ export class AuthService {
     }
   }
 
-  /**
-   * Block user directly
-   */
-  async blockUser(usernameOne: string, usernameTwo: string): Promise<AuthResponse> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/relation`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${this.state.token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          usernameOne,
-          usernameTwo,
-          type: 'BLOCKED'
-        }),
-      });
 
-      if (response.ok) {
-        return { success: true, message: 'User blocked successfully' };
-      } else {
-        const errorData = await response.json().catch(() => ({}));
-        return {
-          success: false,
-          message: errorData.message || 'Failed to block user',
-          statusCode: response.status
-        };
-      }
-    } catch (error) {
-      console.error('Error blocking user:', error);
-      return { success: false, message: ERROR_MESSAGES.NETWORK_ERROR };
-    }
-  }
-
-  /**
-   * Remove friend
-   */
   async removeFriend(usernameOne: string, usernameTwo: string): Promise<AuthResponse> {
     try {
       const response = await fetch(`${API_BASE_URL}/relation`, {

@@ -1,9 +1,7 @@
 import { API_ENDPOINTS, ERROR_MESSAGES } from '@//utils/Constants';
 import { authService } from './AuthService';
 
-/**
- * HTTP request configuration
- */
+
 interface RequestConfig {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
   headers?: Record<string, string>;
