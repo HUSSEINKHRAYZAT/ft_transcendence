@@ -7,6 +7,7 @@ export const APP_CONFIG = {
 
 
 export const API_BASE_URL = "http://localhost:8080";
+export const SOCKET_BASE_URL = "http://localhost:3005";
 
 export const COLORS = {
   PRIMARY: {
@@ -97,7 +98,8 @@ export const STORAGE_KEYS = {
   USER_DATA: 'ft_pong_user_data',
   GAME_SETTINGS: 'ft_pong_game_settings',
   THEME_PREFERENCE: 'ft_pong_theme',
-  USER_STATISTICS: 'ft_pong_statistics'
+  USER_STATISTICS: 'ft_pong_statistics',
+  WEB_SETTINGS: 'ft_pong_settings'
 } as const;
 
 export const GAME_CONFIG = {

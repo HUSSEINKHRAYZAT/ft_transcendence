@@ -1,3 +1,4 @@
+import { stat } from "fs";
 import {
 	AuthState,
 	User,
@@ -15,6 +16,8 @@ import {
 	API_BASE_URL
 } from "../utils/Constants";
 import { globalEventManager, AppEvent } from "../utils/EventManager";
+import { SocketService } from "./SocketService";
+import { circleOfConfusionPixelShader } from "@babylonjs/core";
 
 let isBackendAvailable = true;
 const checkBackendAvailability = async (): Promise<boolean> => {
@@ -44,92 +47,63 @@ type BackendUser = {
 	twoFactorEnabled?: number | boolean;
 };
 
-// type BackendSettings = {
-// 	language: string;
-// 	accentColors: string;
-// 	backgroundTheme: string;
-// 	NotificationEnabled?: number | boolean;
-// }
-
-// afayad // we will implement this later
-// function mapBackendSettingsToWebSettings(
-// 	raw: Partial<BackendSettings> | undefined
-// ): WebSettings {
-// 	if (!raw) {
-// 		throw new Error("Invalid settings payload from server.");
-// 	}
-
-// 	const mappedSettings: WebSettings = {
-// 		theme: String(raw.accentColors ?? "default"),
-// 		backgroundTheme: String(raw.backgroundTheme ?? "light"),
-// 		language: String(raw.language ?? "en")
-// 	};
-
-// 	console.log(
-// 		"Raw backend settings:",
-// 		JSON.stringify(raw, null, 2)
-// 	);
-// 	console.log(
-// 		"Mapped settings:",
-// 		JSON.stringify(mappedSettings, null, 2)
-// 	);
-
-// 	return mappedSettings;
-// }
 
 export function mapBackendUserToUser(raw: any): User {
-	const u = raw as Partial<BackendUser> | undefined;
-	if (!u) {
-		throw new Error("Invalid user payload from server.");
-	}
+    // Use the raw object directly since OAuth responses can vary
+    const u = raw;
 
-	console.log('Raw backend user data:', JSON.stringify(u, null, 2));
+    if (!u) {
+        throw new Error("Invalid user payload from server.");
+    }
 
-	const userId = u.id || u.sub || u.user_id || "";
-	const userEmail = u.email || u.user_email || "";
-	const userFirstName = u.firstName || u.first_name || u.given_name || "";
-	const userLastName = u.lastName || u.last_name || u.family_name || "";
-	const userName = u.username || u.user_name || u.name || "";
+    console.log('Raw backend user data:', JSON.stringify(u, null, 2));
 
-	// Handle nested user object (common in OAuth responses)
-	if (u.user && typeof u.user === 'object') {
-		const nestedUser = u.user;
-		return mapBackendUserToUser(nestedUser);
-	}
+    // Extract properties with all possible aliases
+    const userId = u.id || u.sub || u.user_id || "";
+    const userEmail = u.email || u.user_email || "";
+    const userFirstName = u.firstName || u.first_name || u.given_name || "";
+    const userLastName = u.lastName || u.last_name || u.family_name || "";
+    const userName = u.username || u.user_name || u.name || "";
 
-	// Validate that we have the minimum required fields
-	if (!userId && !userEmail && !userName) {
-		console.error('Missing critical user data:', {
-			id: userId,
-			email: userEmail,
-			username: userName,
-			rawData: u
-		});
-		throw new Error("Insufficient user data from server - missing ID, email, and username.");
-	}
+    // Handle nested user object (common in OAuth responses)
+    if (u.user && typeof u.user === 'object') {
+        const nestedUser = u.user;
+        return mapBackendUserToUser(nestedUser);
+    }
 
-	const mappedUser = {
-		id: String(userId || ""),
-		email: String(userEmail || ""),
-		firstName: String(userFirstName || ""),
-		lastName: String(userLastName || ""),
-		userName: String(userName || ""),
-		profilePath: u.profilePath || u.profile_path || u.picture || u.avatar_url ? String(u.profilePath || u.profile_path || u.picture || u.avatar_url) : undefined,
-		createdAt: u.createdAt ? new Date(u.createdAt) : (u.created_at ? new Date(u.created_at) : new Date()),
-		updatedAt: u.updatedAt ? new Date(u.updatedAt) : (u.updated_at ? new Date(u.updated_at) : new Date()),
-		gameStats: undefined,
-		enable2fa: Boolean(u.twoFactorEnabled || u.two_factor_enabled || u.enable2fa),
-	};
+    // Validate that we have the minimum required fields
+    if (!userId && !userEmail && !userName) {
+        console.error('Missing critical user data:', {
+            id: userId,
+            email: userEmail,
+            username: userName,
+            rawData: u
+        });
+        throw new Error("Insufficient user data from server - missing ID, email, and username.");
+    }
 
-	console.log('Mapped user data:', JSON.stringify(mappedUser, null, 2));
+    const mappedUser = {
+        id: String(userId || ""),
+        email: String(userEmail || ""),
+        firstName: String(userFirstName || ""),
+        lastName: String(userLastName || ""),
+        userName: String(userName || ""),
+        profilePath: u.profilePath || u.profile_path || u.picture || u.avatar_url ?
+            String(u.profilePath || u.profile_path || u.picture || u.avatar_url) : undefined,
+        createdAt: u.createdAt ? new Date(u.createdAt) : (u.created_at ? new Date(u.created_at) : new Date()),
+        updatedAt: u.updatedAt ? new Date(u.updatedAt) : (u.updated_at ? new Date(u.updated_at) : new Date()),
+        gameStats: undefined,
+        enable2fa: Boolean(u.twoFactorEnabled || u.two_factor_enabled || u.enable2fa),
+    };
 
-	// Final validation
-	if (!mappedUser.id || !mappedUser.email) {
-		console.error('Mapping failed - missing required fields:', mappedUser);
-		throw new Error("User mapping failed - missing required ID or email.");
-	}
+    console.log('Mapped user data:', JSON.stringify(mappedUser, null, 2));
 
-	return mappedUser;
+    if (!mappedUser.id || !mappedUser.email) {
+        console.error('Mapping failed - missing required fields:', mappedUser);
+        throw new Error("User mapping failed - missing required ID or email.");
+    }
+
+    return mappedUser;
 }
 
 export class AuthService {
@@ -138,35 +112,41 @@ export class AuthService {
 		isLoading: false,
 		token: null,
 		user: null,
-		statistics: null
+		statistics: null,
+		settings: null,
 	};
+
+	private socketService: SocketService | null = null;
 
 	constructor() {
 		this.initializeFromStorage();
 	}
 
 	private initializeFromStorage(): void {
-			try {
-					const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
-					const userData = localStorage.getItem(STORAGE_KEYS.USER_DATA);
-					const statsData = localStorage.getItem(STORAGE_KEYS.USER_STATISTICS);
+		try {
+			const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+			const userData = localStorage.getItem(STORAGE_KEYS.USER_DATA);
+			const statsData = localStorage.getItem(STORAGE_KEYS.USER_STATISTICS);
+			const settingsData = localStorage.getItem(STORAGE_KEYS.GAME_SETTINGS);
 
-					if (token && userData) {
-							const parsedUser = JSON.parse(userData) as User;
-							const parsedStats = statsData ? JSON.parse(statsData) as UserStats : null;
+			if (token && userData) {
+				const parsedUser = JSON.parse(userData) as User;
+				const parsedStats = statsData ? JSON.parse(statsData) as UserStats : null;
+				const parsedSettings = settingsData ? JSON.parse(settingsData) as WebSettings : null;
 
-							this.state = {
-									isAuthenticated: true,
-									isLoading: false,
-									token,
-									user: parsedUser,
-									statistics: parsedStats,
-							};
-					}
-			} catch (err) {
-					console.error("Error loading auth state from storage:", err);
-					this.clearStoredAuth();
+				this.state = {
+					isAuthenticated: true,
+					isLoading: false,
+					token,
+					user: parsedUser,
+					statistics: parsedStats,
+					settings: parsedSettings,
+				};
 			}
+		} catch (err) {
+			console.error("Error loading auth state from storage:", err);
+			this.clearStoredAuth();
+		}
 	}
 
 	getState(): AuthState {
@@ -181,22 +161,11 @@ export class AuthService {
 		return this.state.user;
 	}
 
-	async getStatistics(): Promise<UserStats | null> {
-	// if (this.state.user == null)
+	async getStatistics(refresh: boolean = false): Promise<UserStats | null> {
+		if (refresh && this.state.user) {
+			await this.refreshStatistics();
+		}
 		return this.state.statistics;
-
-	// try {
-	// 	const demo = await this.statisticsAPI(JSON.stringify(this.state.user.id));
-
-	// 	if (demo && demo !== this.state.statistics)
-	// 	this.state.statistics = demo;
-	// 	localStorage.setItem("ft_pong_statistics", JSON.stringify(demo));
-
-	// 	return this.state.statistics;
-	// } catch (error) {
-	// 	console.error("Failed to fetch statistics:", error);
-	// 	return this.state.statistics;
-	// }
 	}
 
 
@@ -214,7 +183,6 @@ export class AuthService {
 
 			const response = await this.loginAPI(credentials);
 			if (response.success && response.token && response.user) {
-
 				this.setAuthState(response.token, response.user);
 
 				globalEventManager.emit(AppEvent.AUTH_LOGIN, response.user);
@@ -281,7 +249,7 @@ export class AuthService {
 
 				return {
 					success: true,
-					message: SUCCESS_MESSAGES.LOGIN_SUCCESS,
+					message: SUCCESS_MESSAGES.SIGNUP_SUCCESS,
 					token: response.token,
 					user: response.user
 				};
@@ -297,32 +265,102 @@ export class AuthService {
 	}
 
 
-	async createSettingsAPI(username: string): Promise<void> {
-	try {
-		const endpoint = `${API_BASE_URL}/settings`;
-		const response = await fetch(endpoint, {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json'
-			},
-			body: JSON.stringify({
-				username: username,
-				languageCode: 'en',
-				accentColor: 'lime',
-				backgroundTheme: 'dark'
-			})
-		});
+	async createSettingsAPI(username: string): Promise<boolean> {
+		try {
+			const endpoint = `${API_BASE_URL}/settings`;
+			const response = await fetch(endpoint, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					'Authorization': this.state.token ? `Bearer ${this.state.token}` : '',
+				},
+				body: JSON.stringify({
+					username: username,
+					languageCode: 'en',
+					accentColor: 'lime',
+					backgroundTheme: 'dark'
+				})
+			});
 
-		if (response.status === 200) {
-			console.log(`✅ Default settings created for user: ${username}`);
-		} else {
-			console.warn(`⚠️ Failed to create settings for user: ${username}, status: ${response.status}`);
+			if (response.ok) {
+				console.log(`✅ Default settings created for user: ${username}`);
+
+				const settings = await this.settingsAPI(username);
+				if (settings) {
+					this.state.settings = this.mapBackendSettingsToWebSettings(settings);
+					localStorage.setItem(STORAGE_KEYS.GAME_SETTINGS, JSON.stringify(this.state.settings));
+				}
+
+				return true;
+			} else {
+				console.warn(`⚠️ Failed to create settings for user: ${username}, status: ${response.status}`);
+				return false;
+			}
+		} catch (error) {
+			console.error(`❌ Error creating settings for user: ${username}`, error);
+			return false;
 		}
-	} catch (error) {
-		console.error(`❌ Error creating settings for user: ${username}`, error);
-	}
 	}
 
+	async updateUserSettings(settings: {
+		username: string;
+		languageCode: string;
+		accentColor: string;
+		backgroundTheme: string;
+	}): Promise<boolean> {
+		try {
+			const endpoint = `${API_BASE_URL}/settings`;
+			const response = await fetch(endpoint, {
+				method: 'PUT', // or 'PATCH' depending on your backend
+				headers: {
+					'Content-Type': 'application/json',
+					'Authorization': this.state.token ? `Bearer ${this.state.token}` : '',
+				},
+				body: JSON.stringify(settings)
+			});
+
+			if (response.ok) {
+				console.log(`✅ Settings updated for user: ${settings.username}`);
+
+				// Update local state with new settings
+				const updatedSettings = await this.settingsAPI(settings.username);
+				if (updatedSettings) {
+					this.state.settings = this.mapBackendSettingsToWebSettings(updatedSettings);
+					localStorage.setItem(STORAGE_KEYS.GAME_SETTINGS, JSON.stringify(this.state.settings));
+					globalEventManager.emit(AppEvent.SETTINGS_UPDATED, this.state.settings);
+				}
+
+				return true;
+			} else {
+				console.warn(`⚠️ Failed to update settings for user: ${settings.username}, status: ${response.status}`);
+				return false;
+			}
+		} catch (error) {
+			console.error(`❌ Error updating settings for user: ${settings.username}`, error);
+			return false;
+		}
+	}
+
+	getSettings(): WebSettings | null {
+		return this.state.settings;
+	}
+
+	async refreshSettings(): Promise<WebSettings | null> {
+		if (!this.state.user) return null;
+
+		try {
+			const settings = await this.settingsAPI(this.state.user.userName);
+			if (settings) {
+				this.state.settings = this.mapBackendSettingsToWebSettings(settings);
+				localStorage.setItem(STORAGE_KEYS.GAME_SETTINGS, JSON.stringify(this.state.settings));
+				return this.state.settings;
+			}
+			return null;
+		} catch (error) {
+			console.error('Failed to refresh settings:', error);
+			return null;
+		}
+	}
 
 	private async signupAPI(credentials: SignupCredentials): Promise<AuthResponse> {
 		try {
@@ -400,17 +438,21 @@ export class AuthService {
 		}
 	}
 
-	async setAuthState(token: string, user: User): Promise<void> {
+	async setAuthState(token: string, user: User): Promise<void>
+	{
+		this.state.token = token;
+		this.state.user = user;
+		localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, token);
+		localStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(user));
+
 		this.state = {
 			isAuthenticated: true,
 			isLoading: false,
 			token,
 			user,
-			statistics: this.state.statistics ?? this.setAuthState_statistics(),
+			statistics: this.state.statistics ?? await this.setAuthState_statistics(user.id),
+			settings: this.state.settings ?? await this.setAuthState_settings(user.userName)
 		};
-
-		localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, token);
-		localStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(user));
 
 		if (!this.state.statistics) {
 			const statistics = await this.statisticsAPI(user.id);
@@ -419,20 +461,80 @@ export class AuthService {
 				localStorage.setItem(STORAGE_KEYS.USER_STATISTICS, JSON.stringify(statistics));
 			}
 		}
+
+		if (!this.state.settings) {
+			const settings = await this.settingsAPI(user.userName);
+			if (settings) {
+				this.state.settings = this.mapBackendSettingsToWebSettings(settings);
+				localStorage.setItem(STORAGE_KEYS.WEB_SETTINGS, JSON.stringify(this.state.settings));
+			}
+		}
+
+			this.socketService = new SocketService(token, this);
+		if (this.state.user?.id && this.state.user?.userName) {
+			this.socketService.connect(this.state.user.id, this.state.user.userName);
+			}
+		else
+			console.error("failed to connect to the socker from the setAuthState!");
+		}
+
+	private async setAuthState_settings(username: string): Promise<WebSettings | null> {
+		const raw = localStorage.getItem(STORAGE_KEYS.WEB_SETTINGS);
+
+		if (!raw) {
+			console.log(`[DEBUG] No settings found in localStorage for key: ${STORAGE_KEYS.WEB_SETTINGS}. Fetching from API for user: ${username}`);
+			return await this.settingsAPI(username);
+		}
+
+		return JSON.parse(raw) as WebSettings;
 	}
 
-	private setAuthState_statistics(): UserStats | null {
+
+	private async settingsAPI(username: string): Promise<any | null> {
+    if (!this.state.token) return null;
+
+    try {
+        const res = await fetch(`${API_BASE_URL}/settings/${username}`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${this.state.token}`,
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (!res.ok) {
+            console.error('Failed to fetch settings:', res.status);
+            return null;
+        }
+
+        const data = await res.json();
+        return data;
+    } catch (err) {
+        console.error('Error fetching settings:', err);
+        return null;
+    }
+	}
+
+
+	private async setAuthState_statistics(userId: string): Promise<UserStats | null> {
+		console.log("Token state:", this.state.token);
 		const raw = localStorage.getItem(STORAGE_KEYS.USER_STATISTICS);
-		return raw ? JSON.parse(raw) as UserStats : null;
+		return raw ? JSON.parse(raw) as UserStats : await this.statisticsAPI(userId);
 	}
 
-	private clearAuthState(): void {
+
+	public clearAuthState(): void {
+		const userId = this.state.user?.id;
+		if (userId)
+			this.socketService?.disconnect(userId);
+
 		this.state = {
 			isAuthenticated: false,
 			isLoading: false,
 			token: null,
 			user: null,
-			statistics: null
+			statistics: null,
+			settings: null
 		};
 		this.clearStoredAuth();
 	}
@@ -441,10 +543,37 @@ export class AuthService {
 		localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
 		localStorage.removeItem(STORAGE_KEYS.USER_DATA);
 		localStorage.removeItem(STORAGE_KEYS.USER_STATISTICS);
+		localStorage.removeItem(STORAGE_KEYS.WEB_SETTINGS);
 	}
 
 	private setLoading(loading: boolean): void {
 		this.state.isLoading = loading;
+	}
+
+	public mapBackendSettingsToWebSettings(
+    raw: any | undefined
+	): WebSettings {
+		if (!raw) {
+			console.warn("No settings payload from server, using defaults.");
+			return {
+				theme: "lime",
+				backgroundTheme: "dark",
+				language: "en"
+			};
+		}
+
+		const mappedSettings: WebSettings = {
+			theme: String(raw.accentColor ?? raw.accentColors ?? "lime"),
+			backgroundTheme: String(raw.backgroundTheme ?? "dark"),
+			language: String(raw.languageCode ?? raw.language ?? "en")
+		};
+
+		console.log(
+			"Mapped settings:",
+			JSON.stringify(mappedSettings, null, 2)
+		);
+
+		return mappedSettings;
 	}
 
 	private validateLoginCredentials(
@@ -630,6 +759,7 @@ export class AuthService {
 			}
 
 			const data = await res.json();
+			console.log("Login success (200) - response data:", data);
 
 			if (!data.token) {
 				return { success: false, message: "No token received from server" };
@@ -643,44 +773,93 @@ export class AuthService {
 		}
 	}
 
-	private async statisticsAPI(userId: string): Promise<UserStats | null> {
-	if (!this.state.token) return null;
+	async refreshStatistics(): Promise<UserStats | null> {
+		if (!this.state.user) return null;
 
-	try {
-		const res = await fetch(`${API_BASE_URL}/statistics/${userId}`, {
-			method: 'GET',
-			headers: {
-				'Authorization': `Bearer ${this.state.token}`,
-				'Content-Type': 'application/json',
-			},
-		});
+		try {
+			const stats = await this.statisticsAPI(this.state.user.id);
+			if (stats) {
+				// Update state
+				this.state.statistics = stats;
 
-		if (!res.ok) {
-			console.error('Failed to fetch statistics:', res.status);
+				// Update localStorage
+				localStorage.setItem("ft_pong_statistics", JSON.stringify(stats));
+
+				// Emit event for components to refresh
+				globalEventManager.emit(AppEvent.STATISTICS_UPDATED, stats);
+
+				console.log('Statistics refreshed successfully');
+				return stats;
+			}
+			return null;
+		} catch (error) {
+			console.error('Failed to refresh statistics:', error);
 			return null;
 		}
-
-		const data = await res.json();
-		const stats: UserStats = {
-			winCount: data.winCount ?? 0,
-			lossCount: data.lossCount ?? 0,
-			tournamentWinCount: data.tournamentWinCount ?? 0,
-			tournamentCount: data.tournamentCount ?? 0,
-			totalGames: data.totalGames ?? 0,
-		};
-
-		this.state.statistics = stats;
-
-		// attach to user if it exists
-		if (this.state.user) {
-			(this.state.user as any).statistics = stats;
 		}
 
-		return stats;
-	} catch (err) {
-		console.error('Error fetching statistics:', err);
-		return null;
+	public async setStatus(status: string, userId: string): Promise<boolean> {
+		const mode = status.toLowerCase();
+
+		try {
+			const token = localStorage.getItem("ft_pong_auth_token");
+			console.warn("the token here is", token);
+			const response = await fetch(`${API_BASE_URL}/users/${userId}`, {
+				method: 'PATCH',
+				headers: {
+					'Authorization': `Bearer ${token}`,
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({
+					status: mode
+				}),
+			});
+
+			if (!response.ok) {
+				const errorData = await response.json().catch(() => ({}));
+				console.error(`Failed to set status: ${response.status} ${response.statusText}`, errorData);
+				return false;
+			}
+
+			const result = await response.json();
+			return true;
+
+		} catch (error) {
+			return false;
+		}
 	}
+
+	private async statisticsAPI(userId: string): Promise<UserStats | null> {
+		if (!this.state.token) return null;
+
+		try {
+			const res = await fetch(`${API_BASE_URL}/statistics/${userId}`, {
+				method: 'GET',
+				headers: {
+					'Authorization': `Bearer ${this.state.token}`,
+					'Content-Type': 'application/json',
+				},
+			});
+
+			if (!res.ok) {
+				console.error('Failed to fetch statistics:', res.status);
+				return null;
+			}
+
+			const data = await res.json();
+			const stats: UserStats = {
+				winCount: data.winCount ?? 0,
+				lossCount: data.lossCount ?? 0,
+				tournamentWinCount: data.tournamentWinCount ?? 0,
+				tournamentCount: data.tournamentCount ?? 0,
+				totalGames: data.totalGames ?? 0,
+			};
+
+			return stats;
+		} catch (err) {
+			console.error('Error fetching statistics:', err);
+			return null;
+		}
 	}
 
 	async complete2FALogin(email: string, code: string): Promise<AuthResponse> {
@@ -855,7 +1034,7 @@ export class AuthService {
 					username: updateData.userName,
 					email: updateData.email,
 					profilepath: updateData.profilePath,
-					twoFactorEnabled: updateData.enable2fa  // Send as twoFactorEnabled to match DB column
+					twoFactorEnabled: updateData.enable2fa
 				}),
 			});
 

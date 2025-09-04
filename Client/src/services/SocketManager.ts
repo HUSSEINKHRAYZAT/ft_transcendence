@@ -13,7 +13,6 @@ export interface RoomInfo {
 }
 
 export interface SocketEvents {
-  // Connection events
   'connected': (data: { playerId: string; playerName: string }) => void;
   'disconnected': () => void;
   'error': (error: string) => void;
@@ -59,9 +58,6 @@ export class SocketManager {
     });
   }
 
-  /**
-   * Connect to Socket.IO server
-   */
   public async connect(playerName: string = 'Player'): Promise<boolean> {
     if (this.isConnected) {
       console.log('Already connected to Socket.IO server');

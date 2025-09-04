@@ -4,6 +4,7 @@ export interface AuthState {
   token: string | null;
   user: User | null;
   statistics: UserStats | null;
+  settings: WebSettings | null;
 }
 
 export interface User {

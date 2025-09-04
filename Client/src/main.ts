@@ -6,9 +6,7 @@ import {
   backgroundThemeManager,
   authService
 } from './';
-
 import './styles/main.css';
-
 import { handleOAuthCallback } from './auth/callback';
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -26,9 +24,6 @@ interface Component {
 let componentInstances: Component[] = [];
 let isComponentsLoaded = false;
 
-console.log('🚀 main.ts script loaded and executing...');
-console.log('📅 Current time:', new Date().toISOString());
-console.log('🌐 Document ready state:', document.readyState);
 
 initializeApplication();
 
@@ -65,63 +60,56 @@ function updateGlobalTranslations(): void {
   console.log('🔄 Updating global translations...');
 
   addBasicNavbar();
-
   updateJumbotronButton();
-
   updateOpenModals();
 }
 
 async function loadSafeComponents(): Promise<void> {
-	console.log('📦 Loading safe components (no API calls)...');
+    console.log('📦 Loading safe components (no API calls)...');
 
-	try {
-		const safeComponents = [
-			{ path: './components/home/SettingsBox', name: 'SettingsBox' },
-			{ path: './components/home/NotificationBox', name: 'NotificationBox' },
-			{ path: './components/home/FriendsBox', name: 'FriendsBox' },
-			{ path: './components/modals/ModalService', name: 'ModalService' },
-			{ path: './components/modals/StatisticsModal', name: 'StatisticsModal' },
-			{ path: './components/modals/ProfileModal', name: 'ProfileModal' },
-			{ path: './components/modals/LoginModal', name: 'LoginModal' }
-		];
+    try {
+        const safeComponents = [
+            { path: './components/home/SettingsBox', name: 'SettingsBox' },
+            { path: './components/home/NotificationBox', name: 'NotificationBox' },
+            { path: './components/home/FriendsBox', name: 'FriendsBox' },
+            { path: './components/modals/ModalService', name: 'ModalService' },
+            { path: './components/modals/StatisticsModal', name: 'StatisticsModal' },
+            { path: './components/modals/ProfileModal', name: 'ProfileModal' },
+            { path: './components/modals/LoginModal', name: 'LoginModal' }
+        ];
 
-		const componentPromises = safeComponents.map(comp =>
-			loadComponent(comp.path, comp.name)
-		);
+        const componentPromises = safeComponents.map(comp =>
+            loadComponent(comp.path, comp.name)
+        );
 
-		const results = await Promise.allSettled(componentPromises);
-		const successful = results.filter(result => result.status === 'fulfilled').length;
+        const results = await Promise.allSettled(componentPromises);
+        const successful = results.filter(result => result.status === 'fulfilled').length;
 
-		console.log(`📊 Component loading: ${successful}/${safeComponents.length} successful`);
+        console.log(`📊 Component loading: ${successful}/${safeComponents.length} successful`);
 
-		await initializeWithSafeComponents(results);
+        await initializeWithSafeComponents(results);
 
-	} catch (error) {
-		console.error('❌ Safe component loading failed:', error);
-		await initializeBasicContent();
-	}
+    } catch (error) {
+        console.error('❌ Safe component loading failed:', error);
+        await initializeBasicContent();
+    }
 }
 
-async function loadComponent(path: string, componentName: string): Promise<any>
-{
-  try
-  {
-    console.log(`📦 Loading ${componentName} from ${path}...`);
-    const module = await import(/* @vite-ignore */ path);
+async function loadComponent(path: string, componentName: string): Promise<any> {
+    try {
+        console.log(`📦 Loading ${componentName} from ${path}...`);
+        const module = await import(/* @vite-ignore */ path);
 
-    if (module[componentName])
-	{
-      console.log(`✅ ${componentName} loaded successfully`);
-      return { name: componentName, constructor: module[componentName], module };
+        if (module[componentName]) {
+            console.log(`✅ ${componentName} loaded successfully`);
+            return { name: componentName, constructor: module[componentName], module };
+        } else {
+            throw new Error(`${componentName} not found in module`);
+        }
+    } catch (error) {
+        console.error(`❌ Failed to load ${componentName}:`, error);
+        throw error;
     }
-	else
-      throw new Error(`${componentName} not found in module`);
-  }
-  catch (error)
-  {
-    console.error(`❌ Failed to load ${componentName}:`, error);
-    throw error;
-  }
 }
 
 async function initializeWithSafeComponents(results: PromiseSettledResult<any>[]): Promise<void> {
@@ -676,7 +664,6 @@ function showBasicToast(type: 'success' | 'error' | 'info', message: string): vo
 function addBasicNavbar(): void {
   const navbar = document.getElementById('navbar');
   if (navbar) {
-    // Use AuthService instead of localStorage
     const authState = authService.getState();
     const isAuthenticated = authState.isAuthenticated;
     const user = authState.user;
@@ -912,76 +899,17 @@ function setupProfileDropdown(): void {
 	}
 };
 
-(window as any).testLogoutModalDirect = function() {
-  console.log('🧪 Testing logout modal DIRECTLY...');
-
-  const backdrop = document.createElement('div');
-  backdrop.className = 'fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm transition-all duration-300';
-  backdrop.id = 'test-logout-modal';
-
-  backdrop.innerHTML = `
-    <div class="bg-gray-800 rounded-lg shadow-2xl max-w-sm w-full mx-4 p-6 border border-gray-700">
-      <div class="flex justify-between items-center mb-6">
-        <h2 class="text-2xl font-bold text-lime-500">Confirm Logout</h2>
-        <button id="test-close" class="text-gray-400 hover:text-white text-2xl transition-colors duration-300">&times;</button>
-      </div>
-
-      <div class="text-center">
-        <div class="w-12 h-12 mx-auto mb-4 bg-red-100 rounded-full flex items-center justify-center">
-          <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
-          </svg>
-        </div>
-        <p class="text-gray-300 mb-6">Are you sure you want to logout? You will need to login again to access your account.</p>
-        <div class="flex space-x-3">
-          <button id="test-cancel" class="flex-1 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors duration-300">
-            Cancel
-          </button>
-          <button id="test-confirm" class="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors duration-300">
-            Yes, Logout
-          </button>
-        </div>
-      </div>
-    </div>
-  `;
-
-  document.body.appendChild(backdrop);
-
-  const closeBtn = backdrop.querySelector('#test-close');
-  const cancelBtn = backdrop.querySelector('#test-cancel');
-  const confirmBtn = backdrop.querySelector('#test-confirm');
-
-  const closeModal = () => {
-    backdrop.remove();
-  };
-
-  closeBtn?.addEventListener('click', closeModal);
-  cancelBtn?.addEventListener('click', () => {
-    console.log('❌ Test logout cancelled');
-    closeModal();
-  });
-  confirmBtn?.addEventListener('click', () => {
-    console.log('✅ Test logout confirmed');
-    alert('Logout confirmed! (This is just a test)');
-    closeModal();
-  });
-
-  backdrop.addEventListener('click', (e) => {
-    if (e.target === backdrop) closeModal();
-  });
-};
-
 (window as any).handleLogout = async function() {
   console.log('👋 Logout clicked...');
 
   const confirmed = confirm('Are you sure you want to logout?');
   if (confirmed) {
     try {
-      await authService.logout();
+    	await authService.logout();
+		simpleThemeManager.resetTheme();
+		backgroundThemeManager.resetTheme();
+		languageManager.setLanguage('en');
 
-      console.log('✅ User logged out successfully via AuthService');
-
-      // Update UI
       if (typeof (window as any).addBasicNavbar === 'function') {
         (window as any).addBasicNavbar();
       }

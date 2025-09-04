@@ -1,7 +1,7 @@
 import { BaseModal } from './BaseModal';
 import { t } from '../../langs/LanguageManager';
 import { authService } from '../../services/AuthService';
-import { stat } from 'fs';
+import { UserStats } from '../../types/User';
 
 export class StatisticsModal extends BaseModal {
     private static instance: StatisticsModal | null = null;
@@ -15,27 +15,26 @@ export class StatisticsModal extends BaseModal {
     }
 
     protected getModalTitle(): string {
-        return `📊 ${t('Statistics')}`;
-    }
+		return t('Statistics');
+	}
 
     protected getModalContent(): string {
-    const user = authService.getUser();
-    const statsRaw = localStorage.getItem("ft_pong_statistics");
-    const stats = statsRaw ? JSON.parse(statsRaw) : null; // parse JSON safely
+        const user = authService.getUser();
+        const statsRaw = localStorage.getItem("ft_pong_statistics");
+        const stats = statsRaw ? JSON.parse(statsRaw) : null;
 
-    if (!user) {
-        return `
-            <div class="text-center text-red-400">
-                <p>${t('No user data found')}</p>
-                <p class="text-sm text-gray-500 mt-2">${t('Please login to view your statistics')}</p>
-            </div>
-            <button id="close-statistics-btn" class="w-full btn-lime mt-4">
-                ${t('Close')}
-            </button>
-        `;
-    }
+        if (!user) {
+            return `
+                <div class="text-center text-red-400">
+                    <p>${t('No user data found')}</p>
+                    <p class="text-sm text-gray-500 mt-2">${t('Please login to view your statistics')}</p>
+                </div>
+                <button id="close-statistics-btn" class="w-full btn-lime mt-4">
+                    ${t('Close')}
+                </button>
+            `;
+        }
 
-        // safe defaults
         const totalGames = stats?.totalGames || 0;
         const winCount = stats?.winCount || 0;
         const lossCount = stats?.lossCount || 0;
@@ -50,6 +49,13 @@ export class StatisticsModal extends BaseModal {
                 <p class="text-gray-400">${user.email || 'No email'}</p>
             </div>
 
+            <!-- Refresh button -->
+            <div class="flex justify-end mb-4">
+                <button id="refresh-stats-btn" class="btn-gray text-sm flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-600 transition-colors">
+                    🔄 ${t('Refresh')}
+                </button>
+            </div>
+
             <div class="space-y-4 mb-6">
                 <!-- Games Statistics -->
                 <div class="bg-gray-700 p-4 rounded-lg border border-gray-600 shadow-md">
@@ -59,11 +65,11 @@ export class StatisticsModal extends BaseModal {
 
                     <div class="grid grid-cols-2 gap-4 text-center">
                         <div class="bg-gray-800 p-3 rounded-lg border border-gray-700">
-                            <div class="text-2xl font-bold text-white">${totalGames}</div>
+                            <div class="text-2xl font-bold text-white" data-stat="total-games">${totalGames}</div>
                             <div class="text-sm text-gray-400">${t('Games Played')}</div>
                         </div>
                         <div class="bg-gray-800 p-3 rounded-lg border border-gray-700">
-                            <div class="text-2xl font-bold text-lime-500">${winRate}%</div>
+                            <div class="text-2xl font-bold text-lime-500" data-stat="win-rate">${winRate}%</div>
                             <div class="text-sm text-gray-400">${t('Win Rate')}</div>
                         </div>
                     </div>
@@ -77,11 +83,11 @@ export class StatisticsModal extends BaseModal {
 
                     <div class="grid grid-cols-2 gap-4">
                         <div class="text-center bg-gray-800 p-4 rounded-lg border border-gray-700">
-                            <div class="text-3xl font-bold text-green-500">${winCount}</div>
+                            <div class="text-3xl font-bold text-green-500" data-stat="win-count">${winCount}</div>
                             <div class="text-sm text-gray-400">${t('Wins')}</div>
                         </div>
                         <div class="text-center bg-gray-800 p-4 rounded-lg border border-gray-700">
-                            <div class="text-3xl font-bold text-red-400">${lossCount}</div>
+                            <div class="text-3xl font-bold text-red-400" data-stat="loss-count">${lossCount}</div>
                             <div class="text-sm text-gray-400">${t('Losses')}</div>
                         </div>
                     </div>
@@ -90,26 +96,31 @@ export class StatisticsModal extends BaseModal {
                         <div class="mt-4">
                             <div class="flex justify-between text-sm text-gray-400 mb-1">
                                 <span>${t('Win Rate Progress')}</span>
-                                <span>${winRate}%</span>
+                                <span data-stat="win-rate">${winRate}%</span>
                             </div>
                             <div class="w-full bg-gray-800 rounded-full h-2 border border-gray-700">
                                 <div class="bg-lime-500 h-2 rounded-full transition-all duration-1000 ease-out"
+                                    data-stat="win-rate-bar"
                                     style="width: ${winRate}%"></div>
                             </div>
                         </div>
                     ` : ''}
                 </div>
+            </div>
 
-                <!-- Additional stats... -->
+            <div class="flex gap-3">
+                <button id="close-statistics-btn" class="flex-1 btn-gray">
+                    ${t('Close')}
+                </button>
             </div>
         `;
     }
-
 
     protected setupEventListeners(): void {
         const closeBtn = document.querySelector('#close-statistics-btn');
         const playAgainBtn = document.querySelector('#play-again-btn');
         const startPlayingBtn = document.querySelector('#start-playing-btn');
+        const refreshStatsBtn = document.querySelector('#refresh-stats-btn');
 
         if (closeBtn) {
             closeBtn.addEventListener('click', () => this.close());
@@ -134,6 +145,44 @@ export class StatisticsModal extends BaseModal {
                 }
             });
         }
+
+        if (refreshStatsBtn) {
+            refreshStatsBtn.addEventListener('click', async () => {
+                const btn = refreshStatsBtn as HTMLButtonElement;
+
+                // Show loading state
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '⏳ Loading...';
+                btn.classList.add('opacity-50', 'cursor-not-allowed');
+                btn.setAttribute('disabled', 'true');
+
+                try {
+                    const updatedStats = await authService.refreshStatistics();
+
+                    if (updatedStats) {
+                        this.updateStatisticsInModal(updatedStats); // ✅ update live
+
+                        btn.innerHTML = '✅ Refreshed';
+                        setTimeout(() => {
+                            btn.innerHTML = originalText;
+                            btn.classList.remove('opacity-50', 'cursor-not-allowed');
+                            btn.removeAttribute('disabled');
+                        }, 1500);
+                    } else {
+                        throw new Error('Failed to refresh statistics');
+                    }
+                } catch (error) {
+                    console.error('Failed to refresh statistics:', error);
+                    btn.innerHTML = '❌ Error';
+                    setTimeout(() => {
+                        btn.innerHTML = originalText;
+                        btn.classList.remove('opacity-50', 'cursor-not-allowed');
+                        btn.removeAttribute('disabled');
+                    }, 1500);
+                }
+            });
+        }
+
     }
 
     public static show(): void {
@@ -162,10 +211,41 @@ export class StatisticsModal extends BaseModal {
         return super.close();
     }
 
-    async render(): Promise<void> {
-        console.log('📊 StatisticsModal render() called - use show() to display modal');
+    public render(): void {
+        const modalContent = this.getModalContent();
+        // Your existing modal rendering logic here
+        // Example:
+        const modalElement = document.getElementById('statistics-modal');
+        if (modalElement) {
+            modalElement.innerHTML = modalContent;
+            this.setupEventListeners(); // Re-attach event listeners after re-render
+        }
+
+    }
+
+    protected updateStatisticsInModal(stats: UserStats): void {
+    const totalGamesElement = document.querySelector('[data-stat="total-games"]');
+    const winCountElement = document.querySelector('[data-stat="win-count"]');
+    const lossCountElement = document.querySelector('[data-stat="loss-count"]');
+    const winRateElement = document.querySelector('[data-stat="win-rate"]');
+    const winRateBarElement = document.querySelector('[data-stat="win-rate-bar"]');
+
+    const totalGames = stats.totalGames || 0;
+    const winCount = stats.winCount || 0;
+    const lossCount = stats.lossCount || 0;
+    const winRate = totalGames > 0 ? Math.round((winCount / totalGames) * 100) : 0;
+
+    if (totalGamesElement) totalGamesElement.textContent = totalGames.toString();
+    if (winCountElement) winCountElement.textContent = winCount.toString();
+    if (lossCountElement) lossCountElement.textContent = lossCount.toString();
+    if (winRateElement) winRateElement.textContent = `${winRate}%`;
+    if (winRateBarElement) {
+        (winRateBarElement as HTMLElement).style.width = `${winRate}%`;
     }
 }
+}
+
+
 (window as any).StatisticsModal = StatisticsModal;
 
 export default StatisticsModal;

@@ -121,15 +121,13 @@ export class LoginModal extends BaseModal {
 		}
 	}
 
-// In your login modal, replace the existing handleGoogleAuth with:
-private handleGoogleAuth(): void {
-    const cfg = { GATEWAY_URL: "http://localhost:8080" };
-    const redirectTo = location.origin; // your frontend
-    const startUrl = `${cfg.GATEWAY_URL}/authWithGoogle/start?redirectTo=${encodeURIComponent(redirectTo)}`;
+	private handleGoogleAuth(): void {
+		const cfg = { GATEWAY_URL: "http://localhost:8080" };
+		const redirectTo = location.origin; // your frontend
+		const startUrl = `${cfg.GATEWAY_URL}/authWithGoogle/start?redirectTo=${encodeURIComponent(redirectTo)}`;
 
-    // Navigate directly in the same tab
-    window.location.href = startUrl;
-}
+		window.location.href = startUrl;
+	}
 
 	private async handleLogin(event: Event): Promise<void> {
 		event.preventDefault();
@@ -145,7 +143,7 @@ private handleGoogleAuth(): void {
 		}
 
 		const email = emailInput.value.trim();
-		const password = passwordInput.value;
+		const password = passwordInput.value; // Store password for potential retry
 
 		errorDiv?.classList.add('hidden');
 
@@ -183,7 +181,8 @@ private handleGoogleAuth(): void {
 
 					this.close();
 
-					this.showEmailVerificationModal(userEmail);
+					// Pass both email and password for retry after verification
+					this.showEmailVerificationModal(userEmail, password);
 
 					this.showToast('info', t('Email Verification Required'),
 						t('Please check your email and enter the verification code to continue.'));
@@ -251,7 +250,7 @@ private handleGoogleAuth(): void {
 		}
 	}
 
-	private async showEmailVerificationModal(userEmail: string): Promise<void> {
+	private async showEmailVerificationModal(userEmail: string, password: string): Promise<void> {
 		try {
 			console.log('📧 Showing verification modal for email:', userEmail);
 
@@ -259,13 +258,19 @@ private handleGoogleAuth(): void {
 
 			const verifyModal = new VerifyModal(
 				userEmail,
-				() => {
-					console.log('✅ Email verification completed - user can now login');
-					this.showToast('success', t('Email Verified!'),
-						t('Your email has been verified. You can now login.'));
+				async () => {
+					console.log('✅ Email verification completed - retrying login automatically');
+
+					// Close verification modal
+					verifyModal.close();
+
+					// Retry login with the same credentials
+					await this.retryLogin(userEmail, password);
 				},
 				() => {
 					console.log('📧 Verification code resent');
+					this.showToast('info', t('Code Resent'),
+						t('A new verification code has been sent to your email.'));
 				}
 			);
 
@@ -277,26 +282,38 @@ private handleGoogleAuth(): void {
 		}
 	}
 
-/**
- * Optional: Auto-retry login after successful verification
- * You would need to store the password temporarily (not recommended for security)
- * Alternative: Just show success message and let user login again
- */
-	private async autoRetryLogin(email: string, password: string): Promise<void> {
-		console.log('🔄 Auto-retrying login after verification...');
-
+	private async retryLogin(email: string, password: string): Promise<void> {
 		try {
-			const result = await authService.login({ email, password });
+			console.log('🔄 Retrying login after successful verification...');
 
-			if (result.success && result.user) {
-				console.log('✅ Auto-login successful after verification!');
+			const result = await authService.login({
+				email: email,
+				password: password
+			});
+
+			console.log('🔐 Retry login result:', result);
+
+			if (result.success && result.user && result.token) {
+				console.log('✅ Login successful after verification!');
+				console.log('🎫 JWT Token stored:', result.token);
+				console.log('👤 User data:', result.user);
+
+				this.close();
 				this.showToast('success', t('Welcome!'), t('Hello {name}!', { name: result.user.firstName }));
 				this.triggerAuthUpdate(true, result.user);
 			} else {
-				console.error('❌ Auto-login failed:', result.message);
+				console.error('❌ Retry login failed:', result.message);
+				this.showError('login-error', result.message || t('Login failed after verification'));
+
+				// Re-open login modal if retry fails
+				this.showModal();
 			}
 		} catch (error) {
-			console.error('❌ Auto-login error:', error);
+			console.error('❌ Retry login error:', error);
+			this.showError('login-error', t('An unexpected error occurred during login'));
+
+			// Re-open login modal on error
+			this.showModal();
 		}
 	}
 

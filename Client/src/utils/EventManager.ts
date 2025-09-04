@@ -264,6 +264,9 @@ export enum AppEvent {
   THEME_CHANGE = 'theme:change',
   NOTIFICATION_SHOW = 'notification:show',
   NOTIFICATION_HIDE = 'notification:hide',
+
+  STATISTICS_UPDATED = 'statistics_updated',
+  SETTINGS_UPDATED = 'settings_updated',
 }
 
 export function cleanupEventManagers(): void {
