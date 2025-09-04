@@ -1,5 +1,6 @@
 import { languageManager, t } from '../../langs/LanguageManager';
 import { RequestModal } from '../modals/RequestModal';
+import { MessageFriendsModal } from '../modals/MessageFriendsModal';
 import { authService } from '../../services/AuthService';
 
 export class FriendsBox
@@ -8,6 +9,7 @@ export class FriendsBox
   private isRendered: boolean = false;
   private unsubscribeLanguageChange?: () => void;
   private requestModal: RequestModal;
+  private messageModal: MessageFriendsModal | null = null;
 
   constructor() {
     this.container = document.getElementById("friends-box");
@@ -82,6 +84,11 @@ export class FriendsBox
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2M4 13h2m13-8l-4 4-2-2-4 4"></path>
             </svg>
           </button>
+          <button id="messages-toggle" class="p-2 bg-gray-700 hover:bg-gray-600 rounded-full transition-all duration-300" title="${t('Messages')}">
+            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+            </svg>
+          </button>
         </div>
       </div>
 
@@ -116,6 +123,7 @@ export class FriendsBox
     const signinBtn = document.getElementById("friends-signin");
     const addFriendBtn = document.getElementById("add-friend");
     const requestsBtn = document.getElementById("friend-requests");
+    const messagesToggleBtn = document.getElementById("messages-toggle");
     const searchInput = document.getElementById("friends-search") as HTMLInputElement;
 
     if (signinBtn) {
@@ -128,6 +136,10 @@ export class FriendsBox
 
     if (requestsBtn) {
       requestsBtn.addEventListener("click", () => this.showRequestsModal());
+    }
+
+    if (messagesToggleBtn) {
+      messagesToggleBtn.addEventListener("click", () => this.showMessagesModal());
     }
 
     if (searchInput) {
@@ -164,6 +176,20 @@ export class FriendsBox
       console.error("Modal service not available");
       alert(t('Login - Modal service not loaded'));
     }
+  }
+
+  private showMessagesModal(): void {
+    console.log("📱 Opening general messages modal");
+
+    // Create or reuse message modal without target username (for general messaging)
+    if (!this.messageModal) {
+      this.messageModal = new MessageFriendsModal();
+    } else {
+      // Create new one for general messaging
+      this.messageModal = new MessageFriendsModal();
+    }
+
+    this.messageModal.showModal();
   }
 
   private async showAddFriendModal(): Promise<void> {
@@ -242,8 +268,36 @@ export class FriendsBox
   }
 
   private handleChatFriend(friendUsername: string): void {
-    // TODO: Implement chat functionality
-    console.log(`Chat with ${friendUsername} - functionality to be implemented`);
+    console.log(`💬 Opening chat with ${friendUsername}`);
+
+    // Create or reuse message modal with target username
+    if (!this.messageModal) {
+      this.messageModal = new MessageFriendsModal(friendUsername);
+    } else {
+      // If modal exists, create new one with target username
+      this.messageModal = new MessageFriendsModal(friendUsername);
+    }
+
+    this.messageModal.showModal();
+  }
+
+  /**
+   * Method to handle incoming messages from socket
+   * This should be called by your socket service when a message is received
+   */
+  public showIncomingMessage(message: string, fromUsername: string): void {
+    console.log(`📥 Incoming message from ${fromUsername}: ${message}`);
+
+    // Create modal if it doesn't exist
+    if (!this.messageModal) {
+      this.messageModal = new MessageFriendsModal();
+    }
+
+    // Show the message in the modal
+    this.messageModal.showReceivedMessage(message, fromUsername);
+
+    // If modal isn't visible, show it as toast notification
+    this.messageModal.showModal();
   }
 
   updateAuthState(_isAuthenticated: boolean): void {
@@ -445,6 +499,11 @@ export class FriendsBox
     // Cleanup request modal
     if (this.requestModal) {
       this.requestModal.destroy();
+    }
+
+    // Cleanup message modal
+    if (this.messageModal) {
+      this.messageModal.close();
     }
 
     if (this.container) {

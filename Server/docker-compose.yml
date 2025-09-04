@@ -1,5 +1,5 @@
 services:
-  user_management: 
+  user_management:
     image: maxplushchreif/user_management:1.0.0
     container_name: user_management
     environment:
@@ -18,7 +18,28 @@ services:
       start_period: 5s
     restart: unless-stopped
 
-  game_microservice: 
+  socket_service:
+    image: maxplushchreif/socket_microservice:1.0.0
+    container_name: socket_microservice
+    environment:
+      - NODE_ENV=production
+      - PORT=3005
+      - USER_SERVICE_URL=http://user_management:3000
+      - AUTH_JWT_SECRET=dev-gateway-secret
+      - HEARTBEAT_MS=15000
+    ports:
+      - "3005:3005"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:3005/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    depends_on:
+      - user_management
+    restart: unless-stopped
+
+  game_microservice:
     image: maxplushchreif/game_microservice:1.0.0
     container_name: game_microservice
     environment:
@@ -44,16 +65,16 @@ services:
       - NODE_ENV=production
       - PORT=3000
       - SMTP_HOST=smtp.gmail.com
-      - SMTP_PORT=465         
-      - SMTP_SECURE=true      
+      - SMTP_PORT=465
+      - SMTP_SECURE=true
       - SMTP_USER=42transcender@gmail.com
       - SMTP_PASS=jrlrgyfofocmliou
-      - FROM_EMAIL=42transcender@gmail.com 
+      - FROM_EMAIL=42transcender@gmail.com
       - FROM_NAME=Transcender
     ports:
       - "3002:3000"
 
-  session_microservice:  
+  session_microservice:
     image: maxplushchreif/session_microservice:1.0.0
     container_name: session_microservice
     environment:
@@ -95,9 +116,10 @@ services:
       - NODE_ENV=production
       - PORT=8080
       - USER_SERVICE_URL=http://user_management:3000
-      - SESSION_SERVICE_URL=http://session_service:3000
+      - SESSION_SERVICE_URL=http://session_microservice:3000
       - GAME_SERVICE_URL=http://game_microservice:3000
       - GOOGLE_OAUTH_URL=http://google_oauth2:3000
+      - SOCKET_URL=ws://socket_microservice:3005
       - MAILER_URL=http://mailer:3000
       - CORS_ORIGIN=*
       - UPSTREAM_TIMEOUT_MS=15000
@@ -111,6 +133,7 @@ services:
       - session_microservice
       - game_microservice
       - google_oauth2
+      - socket_service
     healthcheck:
       test: ["CMD-SHELL", "node -e \"fetch('http://localhost:8080/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
       interval: 10s
@@ -118,9 +141,6 @@ services:
       retries: 5
       start_period: 5s
     restart: unless-stopped
-
-
-
 
 volumes:
   usermgmt_data: {}
