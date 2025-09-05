@@ -1,4 +1,3 @@
-import { stat } from "fs";
 import {
 	AuthState,
 	User,
@@ -482,7 +481,6 @@ export class AuthService {
 		const raw = localStorage.getItem(STORAGE_KEYS.WEB_SETTINGS);
 
 		if (!raw) {
-			console.log(`[DEBUG] No settings found in localStorage for key: ${STORAGE_KEYS.WEB_SETTINGS}. Fetching from API for user: ${username}`);
 			return await this.settingsAPI(username);
 		}
 

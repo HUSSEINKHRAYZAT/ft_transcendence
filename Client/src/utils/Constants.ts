@@ -5,9 +5,12 @@ export const APP_CONFIG = {
   description: 'A lime-themed Pong game',
 } as const;
 
+// Use the current hostname for API and Socket connections
+const HOSTNAME = window.location.hostname;
 
-export const API_BASE_URL = "http://localhost:8080";
-export const SOCKET_BASE_URL = "http://localhost:3005";
+export const API_BASE_URL = `http://${HOSTNAME}:8080`;
+export const SOCKET_BASE_URL = `http://${HOSTNAME}:3005`;
+export const WS_URL = `ws://${HOSTNAME}:3005/ws`;
 
 export const COLORS = {
   PRIMARY: {

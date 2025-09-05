@@ -2,6 +2,7 @@ import { BaseModal } from './BaseModal';
 import { authService } from '../../services/AuthService';
 import { findElement } from '../../utils/DOMHelpers';
 import { t } from "../../langs/LanguageManager";
+import { API_BASE_URL } from '../../utils';
 
 export class VerifyModal extends BaseModal {
   private userEmail: string = '';
@@ -198,12 +199,12 @@ export class VerifyModal extends BaseModal {
       };
 
       console.log(`📤 Sending ${this.is2FA ? '2FA' : 'verification'} request:`, {
-        url: 'http://localhost:8080/users/send-verification',
+        url: `${API_BASE_URL}/users/send-verification`,
         body: requestBody,
         is2FA: this.is2FA
       });
 
-      const response = await fetch('http://localhost:8080/users/send-verification', {
+      const response = await fetch(`${API_BASE_URL}/users/send-verification`, {
         method: 'POST',
         headers,
         body: JSON.stringify(requestBody)
@@ -298,7 +299,7 @@ export class VerifyModal extends BaseModal {
             headers['Authorization'] = `Bearer ${token}`;
           }
 
-          const response = await fetch('http://localhost:8080/users/verify', {
+          const response = await fetch(`${API_BASE_URL}/users/verify`, {
             method: 'POST',
             headers,
             body: JSON.stringify({

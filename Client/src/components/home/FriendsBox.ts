@@ -1,15 +1,16 @@
 import { languageManager, t } from '../../langs/LanguageManager';
 import { RequestModal } from '../modals/RequestModal';
-import { MessageFriendsModal } from '../modals/MessageFriendsModal';
+import { ToastMessageModal } from '../modals/ToastMessageModal';
 import { authService } from '../../services/AuthService';
 
-export class FriendsBox
-{
+export class FriendsBox {
   private container: HTMLElement | null = null;
   private isRendered: boolean = false;
   private unsubscribeLanguageChange?: () => void;
   private requestModal: RequestModal;
-  private messageModal: MessageFriendsModal | null = null;
+  private generalMessageModal: ToastMessageModal | null = null;
+  private chatModals: Map<string, ToastMessageModal> = new Map();
+  private friendsData: any[] = [];
 
   constructor() {
     this.container = document.getElementById("friends-box");
@@ -23,8 +24,72 @@ export class FriendsBox
       }
     });
 
+    // Listen for friends list changes
     window.addEventListener('friends-list-changed', () => {
       this.loadAndRenderFriends().catch(() => {});
+    });
+
+    // Listen for real-time friend status changes from socket
+    window.addEventListener('friend-status-change', this.handleFriendStatusChange.bind(this));
+
+    // Listen for direct messages to handle notifications
+    window.addEventListener('direct-message-received', this.handleDirectMessageReceived.bind(this));
+  }
+
+  private handleFriendStatusChange(event: CustomEvent): void {
+    const { username, status } = event.detail;
+    console.log(`Friend status update: ${username} is ${status}`);
+
+    // Update friend status in the UI
+    this.updateFriendStatus(username, status);
+  }
+
+  private handleDirectMessageReceived(event: CustomEvent): void {
+    const { from } = event.detail;
+    console.log(`Message received from: ${from}`);
+
+    // If we don't have a chat modal open for this user, create one temporarily for notification
+    if (!this.chatModals.has(from) && !this.isGeneralMessageModalOpen()) {
+      // Create a general message modal to show the incoming message
+      if (!this.generalMessageModal) {
+        this.generalMessageModal = new ToastMessageModal();
+        this.generalMessageModal.show();
+      }
+    }
+  }
+
+  private updateFriendStatus(username: string, status: string): void {
+    // Find friend in the DOM and update status indicator
+    const friendCards = this.container?.querySelectorAll('.friend-card') || [];
+
+    friendCards.forEach((card) => {
+      const usernameElement = card.querySelector('.friend-username');
+      const statusCircle = card.querySelector('.status-circle');
+
+      if (usernameElement?.textContent?.includes(username)) {
+        if (statusCircle) {
+          // Remove existing status classes
+          statusCircle.classList.remove('bg-green-500', 'bg-red-500', 'bg-gray-500');
+
+          // Add new status class
+          switch (status.toLowerCase()) {
+            case 'online':
+              statusCircle.classList.add('bg-green-500');
+              break;
+            case 'offline':
+              statusCircle.classList.add('bg-red-500');
+              break;
+            default:
+              statusCircle.classList.add('bg-gray-500');
+          }
+        }
+
+        // Update the friends data array
+        const friendIndex = this.friendsData.findIndex(f => f.username === username);
+        if (friendIndex !== -1) {
+          this.friendsData[friendIndex].status = status;
+        }
+      }
     });
   }
 
@@ -139,7 +204,7 @@ export class FriendsBox
     }
 
     if (messagesToggleBtn) {
-      messagesToggleBtn.addEventListener("click", () => this.showMessagesModal());
+      messagesToggleBtn.addEventListener("click", () => this.showGeneralMessagesModal());
     }
 
     if (searchInput) {
@@ -178,18 +243,21 @@ export class FriendsBox
     }
   }
 
-  private showMessagesModal(): void {
-    console.log("📱 Opening general messages modal");
+  private showGeneralMessagesModal(): void {
+    console.log("Opening general messages modal");
 
-    // Create or reuse message modal without target username (for general messaging)
-    if (!this.messageModal) {
-      this.messageModal = new MessageFriendsModal();
-    } else {
-      // Create new one for general messaging
-      this.messageModal = new MessageFriendsModal();
+    // Close existing general modal if open
+    if (this.generalMessageModal) {
+      this.generalMessageModal.close();
     }
 
-    this.messageModal.showModal();
+    // Create new general message modal (shows all received messages)
+    this.generalMessageModal = new ToastMessageModal();
+    this.generalMessageModal.show();
+  }
+
+  private isGeneralMessageModalOpen(): boolean {
+    return this.generalMessageModal?.isOpen() || false;
   }
 
   private async showAddFriendModal(): Promise<void> {
@@ -268,36 +336,27 @@ export class FriendsBox
   }
 
   private handleChatFriend(friendUsername: string): void {
-    console.log(`💬 Opening chat with ${friendUsername}`);
+    console.log(`Opening chat with ${friendUsername}`);
 
-    // Create or reuse message modal with target username
-    if (!this.messageModal) {
-      this.messageModal = new MessageFriendsModal(friendUsername);
-    } else {
-      // If modal exists, create new one with target username
-      this.messageModal = new MessageFriendsModal(friendUsername);
+    // Close existing chat modal for this user if open
+    const existingModal = this.chatModals.get(friendUsername);
+    if (existingModal) {
+      existingModal.close();
     }
 
-    this.messageModal.showModal();
-  }
+    // Create new targeted chat modal
+    const chatModal = new ToastMessageModal(friendUsername);
+    this.chatModals.set(friendUsername, chatModal);
 
-  /**
-   * Method to handle incoming messages from socket
-   * This should be called by your socket service when a message is received
-   */
-  public showIncomingMessage(message: string, fromUsername: string): void {
-    console.log(`📥 Incoming message from ${fromUsername}: ${message}`);
+    chatModal.show();
 
-    // Create modal if it doesn't exist
-    if (!this.messageModal) {
-      this.messageModal = new MessageFriendsModal();
-    }
-
-    // Show the message in the modal
-    this.messageModal.showReceivedMessage(message, fromUsername);
-
-    // If modal isn't visible, show it as toast notification
-    this.messageModal.showModal();
+    // Clean up modal reference when it's closed
+    // Note: This is a simple cleanup - in production you might want a more robust system
+    setTimeout(() => {
+      if (!chatModal.isOpen()) {
+        this.chatModals.delete(friendUsername);
+      }
+    }, 1000);
   }
 
   updateAuthState(_isAuthenticated: boolean): void {
@@ -323,6 +382,7 @@ export class FriendsBox
 
       if (response.success && response.data) {
         const friends = Array.isArray(response.data) ? response.data : [];
+        this.friendsData = friends; // Store friends data for status updates
 
         if (friends.length === 0) {
           if (emptyEl) {
@@ -387,10 +447,11 @@ export class FriendsBox
     const firstName = (friend.firstName || "").toString();
     const lastName = (friend.lastName || "").toString();
     const profilePath = friend.profilePath;
+    const status = (friend.status || "offline").toString().toLowerCase();
 
     const displayName = [firstName, lastName].filter(Boolean).join(" ").trim() || username || "Unknown";
     const initials = this.initialsFrom(displayName);
-    const isOnline = String(friend.status || "").toLowerCase() === "online";
+    const isOnline = status === "online";
 
     const color = this.colorFor(username);
 
@@ -419,7 +480,7 @@ export class FriendsBox
       <div class="friend-card flex items-center justify-between bg-gray-700 p-3 rounded">
         <div class="flex items-center">
           <!-- Status Circle -->
-          <div class="w-3 h-3 rounded-full ${isOnline ? 'bg-green-500' : 'bg-red-500'} mr-3"></div>
+          <div class="status-circle w-3 h-3 rounded-full ${isOnline ? 'bg-green-500' : 'bg-red-500'} mr-3"></div>
 
           ${avatarHtml}
 
@@ -496,15 +557,26 @@ export class FriendsBox
       this.unsubscribeLanguageChange();
     }
 
+    // Remove event listeners
+    window.removeEventListener('friend-status-change', this.handleFriendStatusChange.bind(this));
+    window.removeEventListener('direct-message-received', this.handleDirectMessageReceived.bind(this));
+
     // Cleanup request modal
     if (this.requestModal) {
       this.requestModal.destroy();
     }
 
-    // Cleanup message modal
-    if (this.messageModal) {
-      this.messageModal.close();
+    // Cleanup general message modal
+    if (this.generalMessageModal) {
+      this.generalMessageModal.destroy();
+      this.generalMessageModal = null;
     }
+
+    // Cleanup all chat modals
+    this.chatModals.forEach((modal) => {
+      modal.destroy();
+    });
+    this.chatModals.clear();
 
     if (this.container) {
       this.container.innerHTML = "";

@@ -2,6 +2,7 @@ import { BaseModal } from './BaseModal';
 import { authService } from '../../services/AuthService';
 import { findElement } from '../../utils/DOMHelpers';
 import { t } from '../../langs/LanguageManager';
+import { API_BASE_URL } from '../../utils';
 
 export class LoginModal extends BaseModal {
 	private onSwitchToSignup?: () => void;
@@ -122,7 +123,7 @@ export class LoginModal extends BaseModal {
 	}
 
 	private handleGoogleAuth(): void {
-		const cfg = { GATEWAY_URL: "http://localhost:8080" };
+		const cfg = { GATEWAY_URL: `${API_BASE_URL}` };
 		const redirectTo = location.origin; // your frontend
 		const startUrl = `${cfg.GATEWAY_URL}/authWithGoogle/start?redirectTo=${encodeURIComponent(redirectTo)}`;
 

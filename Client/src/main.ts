@@ -8,6 +8,7 @@ import {
 } from './';
 import './styles/main.css';
 import { handleOAuthCallback } from './auth/callback';
+import { API_BASE_URL } from './';
 
 document.addEventListener("DOMContentLoaded", () => {
     if (window.location.hash.includes('token')) {
@@ -1417,7 +1418,8 @@ window.addEventListener('storage', (e) => {
 
 async function checkBackendStatus() {
   try {
-    const response = await fetch('http://localhost:8080/health', {
+	const endpoint = `${API_BASE_URL}/health`;
+    const response = await fetch(endpoint, {
       method: 'GET',
       signal: AbortSignal.timeout(3000)
     });
