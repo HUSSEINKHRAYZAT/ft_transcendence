@@ -48,4 +48,5 @@ export type deleteRelationBodyTS = Static<typeof deleteRelationBody>;
 export const Friend = Type.Object({
   id: Type.Number(),
   username: Type.String(),
+  status: Type.String(),
 });

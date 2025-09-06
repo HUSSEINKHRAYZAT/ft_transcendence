@@ -27,7 +27,7 @@ const wsInfoRoutes: FastifyPluginAsync = async (app) => {
     connectViaQuery: 'ws://<host>:3005/ws?token=<JWT>',
     connectViaHeader: 'Authorization: Bearer <JWT>',
     note: 'JWT is already validated by the API Gateway. This service does not verify it again.',
-    exampleWelcome: { t: 'welcome', userId: 1 }
+    exampleWelcome: { type: 'welcome', userId: 1 }
   }));
 };
 

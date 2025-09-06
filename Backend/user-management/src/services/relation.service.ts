@@ -140,7 +140,8 @@ export function relationService(app: FastifyInstance) {
       .prepare(
         `SELECT
           u.id AS id,
-          u.username AS username
+          u.username AS username,
+          u.status as status
         FROM user_relation ur
         JOIN user_relation_type rt ON rt.id = ur.typeId
         JOIN users u ON u.id = CASE
@@ -151,7 +152,7 @@ export function relationService(app: FastifyInstance) {
           AND (ur.userOneId = @uid OR ur.userTwoId = @uid)
         ORDER BY u.username`
       )
-      .all({ uid: userId }) as Array<{ id: number; username: string }>;
+      .all({ uid: userId }) as Array<{ id: number; username: string; status: string}>;
   }
 
   function listRequests(userId: number) {
