@@ -1,333 +1,467 @@
+import { BaseModal } from './BaseModal';
+import { findElement } from '../../utils/DOMHelpers';
 import { t } from '../../langs/LanguageManager';
 
-export class ToastMessageModal {
-	private container: HTMLElement | null = null;
-	private targetUsername: string | null = null;
-	private isVisible: boolean = false;
+interface Message {
+    id: string;
+    from: string;
+    to: string;
+    text: string;
+    timestamp: Date;
+    isRead: boolean;
+}
 
-	constructor(targetUsername?: string) {
-		this.targetUsername = targetUsername || null;
-		this.setupSocketListeners();
-	}
+export class ToastMessageModal extends BaseModal {
+    private targetUser: string | null = null;
+    private messages: Message[] = [];
+    private maxMessages: number = 5;
+    private unreadCount: number = 0;
+    private isModalOpen: boolean = false;
+	private processedMessages: Set<string> = new Set();
 
-	private setupSocketListeners(): void {
-		// Listen for received messages to show temporary toast
-		window.addEventListener('direct-message-received', this.handleMessageReceived.bind(this));
-	}
+    // Bound event handlers with proper typing
+    private boundHandleDirectMessageReceived: (event: Event) => void;
+    private boundHandleDirectMessageSent: (event: Event) => void;
 
-	private handleMessageReceived(event: CustomEvent): void {
-		const { from, text, timestamp } = event.detail;
+    constructor(targetUser?: string) {
+        super();
+        this.targetUser = targetUser || null;
 
-		console.log('Toast received message from:', from);
+        // Bind event handlers with proper type casting
+        this.boundHandleDirectMessageReceived = this.handleDirectMessageReceived.bind(this);
+        this.boundHandleDirectMessageSent = this.handleDirectMessageSent.bind(this);
 
-		if (this.targetUsername && from !== this.targetUsername) {
-			return;
-		}
+        // Listen for incoming messages
+        window.addEventListener('direct-message-received', this.boundHandleDirectMessageReceived);
+        window.addEventListener('direct-message-sent', this.boundHandleDirectMessageSent);
 
-		this.showReceivedMessageToast(from, text);
-	}
-
-	private showReceivedMessageToast(from: string, text: string): void {
-		const toastId = 'received-msg-' + Date.now();
-		const toast = document.createElement('div');
-		toast.id = toastId;
-		toast.className = 'fixed top-20 left-4 z-50 bg-blue-600 text-white p-4 rounded-lg shadow-lg max-w-sm transform transition-all duration-300 opacity-0 translate-x-[-100%]';
-
-		toast.innerHTML = `
-			<div class="flex items-start gap-3">
-				<div class="flex-shrink-0">
-					<svg class="w-5 h-5 text-blue-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
-					</svg>
-				</div>
-				<div class="flex-1">
-					<p class="font-medium text-sm">${t('Message from')} ${this.escapeHtml(from)}</p>
-					<p class="text-sm text-blue-100 mt-1 break-words">${this.escapeHtml(text)}</p>
-				</div>
-				<button class="flex-shrink-0 text-blue-200 hover:text-white" onclick="this.parentElement.parentElement.remove()">
-					<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-					</svg>
-				</button>
-			</div>
-		`;
-
-		document.body.appendChild(toast);
-
-		// Animate in
-		setTimeout(() => {
-			toast.style.transform = 'translateX(0)';
-			toast.style.opacity = '1';
-		}, 10);
-
-		// Auto-remove after 5 seconds
-		setTimeout(() => {
-			if (document.getElementById(toastId)) {
-				toast.style.transform = 'translateX(-100%)';
-				toast.style.opacity = '0';
-				setTimeout(() => {
-					if (toast.parentNode) {
-						toast.parentNode.removeChild(toast);
-					}
-				}, 300);
-			}
-		}, 5000);
-	}
-
-	public show(): void {
-		if (this.isVisible || !this.targetUsername) return;
-
-		console.log('Showing chat input for:', this.targetUsername);
-
-		this.createModal();
-		this.setupEventListeners();
-		this.isVisible = true;
-
-		// Focus on input
-		setTimeout(() => {
-			const messageInput = this.container?.querySelector('#message-content') as HTMLTextAreaElement;
-			if (messageInput) {
-				messageInput.focus();
-			}
-		}, 100);
-	}
-
-	public close(): void {
-		if (!this.isVisible || !this.container) return;
-
-		console.log('Closing chat input modal');
-
-		this.container.style.transform = 'translateX(-100%)';
-		this.container.style.opacity = '0';
-
-		setTimeout(() => {
-			if (this.container && this.container.parentNode) {
-				this.container.parentNode.removeChild(this.container);
-			}
-			this.container = null;
-			this.isVisible = false;
-		}, 300);
-	}
-
-    private createModal(): void {
-        if (!this.targetUsername) {
-            console.error('Cannot create modal without target username');
-            return;
-        }
-
-        // Remove any existing modal for this user
-        const existing = document.querySelector('.message-toast-modal');
-        if (existing) {
-            existing.remove();
-        }
-
-        this.container = document.createElement('div');
-        this.container.className = 'message-toast-modal fixed top-4 left-4 z-50 w-80 bg-gray-800 rounded-lg shadow-2xl border border-gray-600 transform transition-all duration-300 opacity-0 -translate-x-full';
-
-        this.container.innerHTML = this.getModalContent();
-
-        document.body.appendChild(this.container);
-
-        // Animate in after a longer delay to prevent auto-close
-        setTimeout(() => {
-            if (this.container) {
-                this.container.style.transform = 'translateX(0)';
-                this.container.style.opacity = '1';
-            }
-        }, 50);
+        console.log(`💬 ToastMessageModal created for user: ${this.targetUser || 'general'}`);
     }
 
-    private getModalContent(): string {
-        const username = this.targetUsername || 'Unknown';
-        const titleText = t('Chat with {username}', { username: username });
+    protected getModalTitle(): string {
+        return this.targetUser ?
+            t('Chat with {user}', { user: this.targetUser }) :
+            t('Messages');
+    }
 
+    protected getModalContent(): string {
         return `
-            <div class="p-4">
-                <!-- Header -->
-                <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-lg font-bold text-lime-500">${titleText}</h3>
-                    <button id="toast-close-btn" class="text-gray-400 hover:text-white transition-colors">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                        </svg>
-                    </button>
-                </div>
-
-                <!-- Info Message -->
-                <div class="mb-4 p-3 bg-gray-700 rounded-lg border border-gray-600">
-                    <p class="text-sm text-gray-300">${t('Type your message below. Received messages will appear as notifications.')}</p>
-                </div>
-
-                <!-- Message Input Form -->
-                <form id="send-message-form" class="send-message-form">
-                    <div class="mb-3">
-                        <textarea id="message-content" required rows="3"
-                            class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:border-lime-500 focus:ring-1 focus:ring-lime-500 transition-colors duration-300 resize-none"
-                            placeholder="${t('Type your message...')}"></textarea>
+            <div class="conversation-container flex flex-col h-96">
+                <!-- Messages Display Area -->
+                <div id="messages-display" class="flex-1 bg-gray-800 border border-gray-600 rounded-lg p-3 mb-4 overflow-y-auto">
+                    <div id="no-messages" class="text-gray-400 text-center py-8 text-sm">
+                        ${this.targetUser ?
+                            t('No messages with {user} yet', { user: this.targetUser }) :
+                            t('No messages yet')
+                        }
                     </div>
-                    <div id="send-error" class="hidden mb-3 p-2 bg-red-900/50 border border-red-500 rounded text-red-200 text-sm"></div>
+                    <div id="messages-list" class="space-y-2"></div>
+                </div>
+
+                <!-- Message Input Form (only show if targetUser is specified) -->
+                ${this.targetUser ? `
+                <form id="send-message-form" class="send-message-form border-t border-gray-600 pt-3">
                     <div class="flex gap-2">
-                        <button type="submit" id="send-message-btn"
-                            class="flex-1 bg-lime-500 hover:bg-lime-600 text-white font-bold py-2 px-4 rounded transition-all duration-300">
-                            ${t('Send Message')}
+                        <textarea id="message-input"
+                            class="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:border-lime-500 focus:ring-1 focus:ring-lime-500 transition-colors duration-300 resize-none"
+                            placeholder="${t('Type your message...')}"
+                            rows="2"
+                            maxlength="500"></textarea>
+                        <button type="submit" id="send-btn"
+                            class="bg-lime-500 hover:bg-lime-600 text-white font-bold px-4 rounded transition-all duration-300 self-end">
+                            ${t('Send')}
                         </button>
                     </div>
+                    <div id="send-error" class="hidden mt-2 p-2 bg-red-900/50 border border-red-500 rounded text-red-200 text-sm"></div>
                 </form>
+                ` : ''}
+
+                <!-- Clear Messages Button -->
+                <div class="mt-3 flex justify-between items-center">
+                    <button type="button" id="clear-messages-btn"
+                        class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded transition-all duration-300">
+                        ${t('Clear Chat')}
+                    </button>
+                    ${!this.targetUser ? `
+                    <span class="text-sm text-gray-400">
+                        ${t('General message inbox')}
+                    </span>
+                    ` : ''}
+                </div>
             </div>
         `;
     }
 
-    private setupEventListeners(): void {
-        if (!this.container) return;
+    protected setupEventListeners(): void {
+        const form = findElement('#send-message-form') as HTMLFormElement;
+        const clearBtn = findElement('#clear-messages-btn');
+        const messageInput = findElement('#message-input') as HTMLTextAreaElement;
 
-        // Close button
-        const closeBtn = this.container.querySelector('#toast-close-btn');
-        if (closeBtn) {
-            closeBtn.addEventListener('click', () => this.close());
-        }
-
-        // Send message form
-        const form = this.container.querySelector('#send-message-form') as HTMLFormElement;
         if (form) {
             form.addEventListener('submit', (e) => this.handleSendMessage(e));
         }
 
-        // Enter to send (Ctrl+Enter for new line)
-        const messageInput = this.container.querySelector('#message-content') as HTMLTextAreaElement;
-        if (messageInput) {
-            messageInput.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter' && !e.ctrlKey) {
-                    e.preventDefault();
-                    this.handleSendMessage(e);
-                }
-            });
+        if (clearBtn) {
+            clearBtn.addEventListener('click', () => this.clearMessages());
         }
 
-        // Remove the outside click handler that was causing auto-close
-        // document.addEventListener('click', this.handleOutsideClick.bind(this));
+        if (messageInput) {
+            // Handle Enter key to send message (Shift+Enter for new line)
+            messageInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    const formEvent = new Event('submit', { cancelable: true });
+                    form?.dispatchEvent(formEvent);
+                }
+            });
+
+            // Focus on input when modal opens
+            setTimeout(() => messageInput.focus(), 100);
+        }
     }
 
-	private handleOutsideClick = (event: Event): void => {
-		if (this.container && !this.container.contains(event.target as Node)) {
-			this.close();
-		}
-	};
+private handleDirectMessageReceived(data: any): void {
+        // Backend sends: { "type": "direct-message", "from": "username", "text": "message" }
+        const from = data.from;
+        const text = data.text;
+        const messageId = data.id || `${from}_${text}_${Date.now()}`;
 
-	private async handleSendMessage(event: Event): Promise<void> {
-		event.preventDefault();
+        console.log(`[SocketService] Received message from ${from}: ${text}`);
+        console.log(`[SocketService] Raw message data:`, JSON.stringify(data, null, 2));
 
-		if (!this.targetUsername) {
-			console.error('Cannot send message - no target username');
-			return;
-		}
+        if (!from || !text) {
+            console.error('[SocketService] Invalid message data received:', data);
+            return;
+        }
 
-		const messageInput = this.container?.querySelector('#message-content') as HTMLTextAreaElement;
-		const sendBtn = this.container?.querySelector('#send-message-btn') as HTMLButtonElement;
-		const errorDiv = this.container?.querySelector('#send-error') as HTMLElement;
+        // Check if we've already processed this message
+        if (this.processedMessages.has(messageId)) {
+            console.log('[SocketService] Duplicate message detected, ignoring:', messageId);
+            return;
+        }
 
-		if (!messageInput || !sendBtn) {
-			console.error('Required form elements not found');
-			return;
-		}
+        // Mark message as processed
+        this.processedMessages.add(messageId);
 
-		const messageContent = messageInput.value.trim();
+        // Limit the size of the processed messages set
+        if (this.processedMessages.size > 100) {
+            const iterator = this.processedMessages.values();
+            this.processedMessages.delete(iterator.next().value);
+        }
 
-		// Clear previous errors
-		errorDiv?.classList.add('hidden');
+        // Show toast notification for received messages
+        this.showToast('info', 'New Message', `${from}: ${text.substring(0, 50)}${text.length > 50 ? '...' : ''}`);
 
-		if (!messageContent) {
-			this.showError('send-error', t('Please enter a message'));
-			return;
-		}
+        // Emit event for any open chat modals to handle
+        console.log('[SocketService] Dispatching direct-message-received event');
+        window.dispatchEvent(new CustomEvent('direct-message-received', {
+            detail: {
+                from: from,
+                text: text,
+                timestamp: new Date(),
+                messageId: messageId
+            }
+        }));
+        console.log('[SocketService] Event dispatched successfully');
+    }
 
-		// Disable send button during processing
-		sendBtn.disabled = true;
-		sendBtn.textContent = t('Sending...');
+    private handleDirectMessageSent(event: Event): void {
+        const customEvent = event as CustomEvent;
+        const { to, text, timestamp } = customEvent.detail;
 
-		try {
-			console.log('Sending message to:', this.targetUsername, '- Message:', messageContent);
+        console.log(`Message sent to ${to}: ${text}`);
 
-			// Dispatch event that socket service will handle
-			window.dispatchEvent(new CustomEvent('send-message-request', {
-				detail: {
-					recipient: this.targetUsername,
-					message: messageContent
-				}
-			}));
+        // If this is a targeted modal and message is not to target user, ignore
+        if (this.targetUser && to !== this.targetUser) {
+            return;
+        }
 
-			// Clear form after successful send
-			messageInput.value = '';
+        const message: Message = {
+            id: this.generateMessageId(),
+            from: 'me',
+            to: to,
+            text: text,
+            timestamp: timestamp || new Date(),
+            isRead: true // Sent messages are always "read"
+        };
 
-			// Show success toast
-			this.showSuccessToast('Message sent to ' + this.targetUsername);
+        this.addMessage(message);
+    }
 
-			console.log('Message sent successfully');
+    private addMessage(message: Message): void {
+        // Add to beginning of array (newest first)
+        this.messages.unshift(message);
 
-		} catch (error) {
-			console.error('Send message error:', error);
-			this.showError('send-error', t('Failed to send message. Please try again.'));
-		} finally {
-			sendBtn.disabled = false;
-			sendBtn.textContent = t('Send Message');
-		}
-	}
+        // Keep only last maxMessages messages (increased from 5 to 20)
+        if (this.messages.length > this.maxMessages) {
+            this.messages = this.messages.slice(0, this.maxMessages);
+        }
 
-	private showSuccessToast(message: string): void {
-		// Use the global notification system if available
-		if ((window as any).notifyBox) {
-			(window as any).notifyBox.addNotification(message, 'success');
-		} else {
-			// Fallback: create temporary success toast
-			const toast = document.createElement('div');
-			toast.className = 'fixed top-4 right-4 z-50 bg-green-600 text-white p-3 rounded shadow-lg transform transition-all duration-300 opacity-0 translate-x-full';
-			toast.textContent = message;
+        // Update display if modal is open
+        if (this.isModalOpen) {
+            this.updateMessagesDisplay();
+            this.markAllAsRead();
+        }
+    }
 
-			document.body.appendChild(toast);
+    private updateMessagesDisplay(): void {
+        const messagesList = findElement('#messages-list');
+        const noMessages = findElement('#no-messages');
 
-			setTimeout(() => {
-				toast.style.transform = 'translateX(0)';
-				toast.style.opacity = '1';
-			}, 10);
+        if (!messagesList) return;
 
-			setTimeout(() => {
-				toast.style.transform = 'translateX(100%)';
-				toast.style.opacity = '0';
-				setTimeout(() => {
-					if (toast.parentNode) {
-						toast.parentNode.removeChild(toast);
-					}
-				}, 300);
-			}, 3000);
-		}
-	}
+        if (this.messages.length === 0) {
+            if (noMessages) noMessages.classList.remove('hidden');
+            messagesList.innerHTML = '';
+            return;
+        }
 
-	private escapeHtml(text: string): string {
-		const div = document.createElement('div');
-		div.textContent = text;
-		return div.innerHTML;
-	}
+        if (noMessages) noMessages.classList.add('hidden');
 
-	private showError(errorId: string, message: string): void {
-		const errorDiv = this.container?.querySelector(`#${errorId}`) as HTMLElement;
-		if (errorDiv) {
-			errorDiv.textContent = message;
-			errorDiv.classList.remove('hidden');
-		}
-	}
+        // Create messages HTML (reverse order to show newest at bottom)
+        const messagesHtml = this.messages
+            .slice()
+            .reverse()
+            .map(msg => this.renderMessage(msg))
+            .join('');
 
-	public destroy(): void {
-		// Remove event listeners
-		window.removeEventListener('direct-message-received', this.handleMessageReceived.bind(this));
-		document.removeEventListener('click', this.handleOutsideClick);
+        messagesList.innerHTML = messagesHtml;
 
-		this.close();
-	}
+        // Scroll to bottom to show newest message
+        const messagesDisplay = findElement('#messages-display');
+        if (messagesDisplay) {
+            messagesDisplay.scrollTop = messagesDisplay.scrollHeight;
+        }
+    }
 
-	public isOpen(): boolean {
-		return this.isVisible;
-	}
+    private renderMessage(message: Message): string {
+        const timeStr = message.timestamp.toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit'
+        });
 
-	public getTargetUsername(): string | null {
-		return this.targetUsername;
-	}
+        const isSent = message.from === 'me';
+        const displayName = isSent ? t('You') : message.from;
+        const alignment = isSent ? 'ml-auto text-right' : 'mr-auto text-left';
+        const bgColor = isSent ? 'bg-lime-600' : 'bg-blue-600';
+        const readStatus = message.isRead ? '' : 'opacity-75 border-l-4 border-yellow-400';
+
+        return `
+            <div class="message-bubble mb-2 ${alignment}">
+                <div class="max-w-xs ${bgColor} rounded-lg p-3 text-white ${readStatus}">
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="font-medium text-sm">${this.escapeHtml(displayName)}</span>
+                        <span class="text-xs text-gray-200 opacity-75">${timeStr}</span>
+                    </div>
+                    <div class="text-sm break-words">${this.escapeHtml(message.text)}</div>
+                </div>
+            </div>
+        `;
+    }
+
+    private async handleSendMessage(event: Event): Promise<void> {
+        event.preventDefault();
+
+        if (!this.targetUser) {
+            this.showError('send-error', t('No recipient specified'));
+            return;
+        }
+
+        const messageInput = findElement('#message-input') as HTMLTextAreaElement;
+        const sendBtn = findElement('#send-btn') as HTMLButtonElement;
+
+        if (!messageInput) return;
+
+        const messageText = messageInput.value.trim();
+        if (!messageText) {
+            this.showError('send-error', t('Please enter a message'));
+            return;
+        }
+
+        // Disable send button during processing
+        if (sendBtn) {
+            sendBtn.disabled = true;
+            sendBtn.textContent = t('Sending...');
+        }
+
+        try {
+            console.log(`Sending message to ${this.targetUser}: ${messageText}`);
+
+            // Get current user info
+            const userData = localStorage.getItem('ft_pong_user_data');
+            const user = userData ? JSON.parse(userData) : null;
+
+            if (!user || !user.userName) {
+                throw new Error('User not logged in');
+            }
+
+            // Dispatch event for socket service to handle
+            window.dispatchEvent(new CustomEvent('send-message-request', {
+                detail: {
+                    recipient: this.targetUser,
+                    message: messageText,
+                    sender: user.userName
+                }
+            }));
+
+            // Clear input
+            messageInput.value = '';
+
+            // Focus on the input for next message
+            messageInput.focus();
+
+            // Hide any error messages
+            const errorDiv = findElement('#send-error');
+            if (errorDiv) {
+                errorDiv.classList.add('hidden');
+            }
+
+        } catch (error) {
+            console.error('Send message error:', error);
+            this.showError('send-error', t('Failed to send message. Please try again.'));
+        } finally {
+            if (sendBtn) {
+                sendBtn.disabled = false;
+                sendBtn.textContent = t('Send');
+            }
+        }
+    }
+
+    private clearMessages(): void {
+        this.messages = [];
+        this.unreadCount = 0;
+        this.updateMessagesDisplay();
+
+        // Show success message
+        this.showToast('info', t('Chat Cleared'), t('All messages have been cleared'));
+    }
+
+    private markAllAsRead(): void {
+        this.messages.forEach(msg => {
+            msg.isRead = true;
+        });
+        this.unreadCount = 0;
+    }
+
+    private showMissedMessageNotification(from: string, text: string): void {
+        // Show notification in NotificationBox
+        if ((window as any).notifyBox) {
+            const notifyBox = (window as any).notifyBox;
+            const truncatedText = text.length > 30 ? text.substring(0, 30) + '...' : text;
+            notifyBox.addNotification(
+                t('New message from {user}: {message}', {
+                    user: from,
+                    message: truncatedText
+                }),
+                'info'
+            );
+        }
+    }
+
+    public showWithMissedMessage(from: string, text: string): void {
+        // Add the missed message to the conversation
+        const message: Message = {
+            id: this.generateMessageId(),
+            from: from,
+            to: 'me',
+            text: text,
+            timestamp: new Date(),
+            isRead: false
+        };
+
+        this.addMessage(message);
+
+        // Show the modal
+        this.show('toast-message-modal');
+
+        // Mark as read after showing
+        setTimeout(() => {
+            this.markAllAsRead();
+            this.updateMessagesDisplay();
+        }, 500);
+    }
+
+    // Override BaseModal show method
+    public async show(modalId?: string): Promise<void> {
+        this.isModalOpen = true;
+        await super.show(modalId || 'toast-message-modal');
+
+        // Mark all messages as read when modal opens
+        this.markAllAsRead();
+
+        // Update display
+        setTimeout(() => {
+            this.updateMessagesDisplay();
+
+            // Position modal as toast (override BaseModal positioning)
+            if (this.backdropElement) {
+                this.backdropElement.classList.remove('items-center', 'justify-center');
+                this.backdropElement.classList.add('items-start', 'justify-start');
+
+                const modalContent = this.backdropElement.querySelector('.transform') as HTMLElement;
+                if (modalContent) {
+                    modalContent.style.margin = '20px';
+                    modalContent.style.maxWidth = '500px';
+                    modalContent.style.minWidth = '400px';
+                }
+            }
+
+            // Focus on message input if it exists
+            setTimeout(() => {
+                const messageInput = findElement('#message-input') as HTMLTextAreaElement;
+                if (messageInput) {
+                    messageInput.focus();
+                }
+            }, 100);
+        }, 10);
+    }
+
+    // Override BaseModal close method
+    public async close(): Promise<void> {
+        this.isModalOpen = false;
+        await super.close();
+    }
+
+    public isOpen(): boolean {
+        return this.isModalOpen;
+    }
+
+    public getUnreadCount(): number {
+        return this.unreadCount;
+    }
+
+    public hasUnreadMessages(): boolean {
+        return this.unreadCount > 0;
+    }
+
+    private generateMessageId(): string {
+        return 'msg_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    }
+
+    private escapeHtml(text: string): string {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Override BaseModal destroy method
+    public destroy(): void {
+        // Remove event listeners with proper typing
+        window.removeEventListener('direct-message-received', this.boundHandleDirectMessageReceived);
+        window.removeEventListener('direct-message-sent', this.boundHandleDirectMessageSent);
+
+        // Clear messages
+        this.messages = [];
+        this.isModalOpen = false;
+
+        console.log(`ToastMessageModal destroyed for user: ${this.targetUser || 'general'}`);
+
+        // Call parent destroy
+        super.destroy();
+    }
 }
+
+// Make it available globally
+(window as any).ToastMessageModal = ToastMessageModal;
+
+export default ToastMessageModal;

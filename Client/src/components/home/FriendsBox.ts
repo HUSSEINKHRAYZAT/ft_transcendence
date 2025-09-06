@@ -11,10 +11,23 @@ export class FriendsBox {
   private generalMessageModal: ToastMessageModal | null = null;
   private chatModals: Map<string, ToastMessageModal> = new Map();
   private friendsData: any[] = [];
+  private pendingMessages: Map<string, number> = new Map(); // Track unread messages per friend
+
+  // Store bound event handlers
+  private boundHandleFriendStatusChange!: (event: Event) => void;
+  private boundHandleDirectMessageReceived!: (event: Event) => void;
+  private boundHandleFriendsListChanged!: () => void;
 
   constructor() {
     this.container = document.getElementById("friends-box");
     this.requestModal = new RequestModal();
+
+    // Bind event handlers once
+    this.boundHandleFriendStatusChange = this.handleFriendStatusChange.bind(this);
+    this.boundHandleDirectMessageReceived = this.handleDirectMessageReceived.bind(this);
+    this.boundHandleFriendsListChanged = () => {
+      this.loadAndRenderFriends().catch(() => {});
+    };
 
     this.unsubscribeLanguageChange = languageManager.onLanguageChange(() => {
       if (this.isRendered) {
@@ -25,73 +38,183 @@ export class FriendsBox {
     });
 
     // Listen for friends list changes
-    window.addEventListener('friends-list-changed', () => {
-      this.loadAndRenderFriends().catch(() => {});
-    });
+    window.addEventListener('friends-list-changed', this.boundHandleFriendsListChanged);
 
     // Listen for real-time friend status changes from socket
-    window.addEventListener('friend-status-change', this.handleFriendStatusChange.bind(this));
+    window.addEventListener('friend-status-change', this.boundHandleFriendStatusChange);
 
     // Listen for direct messages to handle notifications
-    window.addEventListener('direct-message-received', this.handleDirectMessageReceived.bind(this));
+    window.addEventListener('direct-message-received', this.boundHandleDirectMessageReceived);
   }
 
-  private handleFriendStatusChange(event: CustomEvent): void {
-    const { username, status } = event.detail;
+private handleFriendStatusChange(event: Event): void {
+    const customEvent = event as CustomEvent;
+    const { username, status } = customEvent.detail;
     console.log(`Friend status update: ${username} is ${status}`);
 
-    // Update friend status in the UI
+    // Update friend status in the UI immediately
     this.updateFriendStatus(username, status);
-  }
 
-  private handleDirectMessageReceived(event: CustomEvent): void {
-    const { from } = event.detail;
-    console.log(`Message received from: ${from}`);
-
-    // If we don't have a chat modal open for this user, create one temporarily for notification
-    if (!this.chatModals.has(from) && !this.isGeneralMessageModalOpen()) {
-      // Create a general message modal to show the incoming message
-      if (!this.generalMessageModal) {
-        this.generalMessageModal = new ToastMessageModal();
-        this.generalMessageModal.show();
-      }
+    // Refresh friends list if needed (not relying only on UI updates)
+    if (this.isRendered) {
+        setTimeout(() => {
+            this.loadAndRenderFriends().catch(err => {
+                console.error("Error refreshing friends list after status change:", err);
+            });
+        }, 5000); // Refresh after 5 seconds to ensure server state is updated
     }
+}
+
+
+private handleDirectMessageReceived(event: Event): void {
+    const customEvent = event as CustomEvent;
+    const { from, text } = customEvent.detail;
+    console.log(`Message received from: ${from} - "${text}"`);
+
+    // Always increment pending message count
+    this.incrementPendingMessageCount(from);
+
+    // Update the UI to show pending message indicator
+    this.updateFriendMessageIndicator(from);
+
+    // If the friend is not in our list, refresh the list
+    const friendExists = this.friendsData.some(f => f.username === from);
+    if (!friendExists) {
+        console.log(`Received message from ${from} who is not in friends list. Refreshing list.`);
+        this.loadAndRenderFriends().catch(err => {
+            console.error("Error refreshing friends list after message:", err);
+        });
+    }
+}
+
+private incrementPendingMessageCount(username: string): void {
+    const currentCount = this.pendingMessages.get(username) || 0;
+    this.pendingMessages.set(username, currentCount + 1);
+    console.log(`Incremented message count for ${username} to ${currentCount + 1}`);
+}
+
+  private clearPendingMessageCount(username: string): void {
+    this.pendingMessages.delete(username);
+    this.updateFriendMessageIndicator(username);
   }
 
-  private updateFriendStatus(username: string, status: string): void {
-    // Find friend in the DOM and update status indicator
+private updateFriendMessageIndicator(username: string): void {
+    const count = this.pendingMessages.get(username) || 0;
     const friendCards = this.container?.querySelectorAll('.friend-card') || [];
+    let foundMatch = false;
+
+    console.log(`Updating message indicator for ${username}: ${count} pending messages`);
 
     friendCards.forEach((card) => {
-      const usernameElement = card.querySelector('.friend-username');
-      const statusCircle = card.querySelector('.status-circle');
+        const usernameElement = card.querySelector('.friend-username');
 
-      if (usernameElement?.textContent?.includes(username)) {
-        if (statusCircle) {
-          // Remove existing status classes
-          statusCircle.classList.remove('bg-green-500', 'bg-red-500', 'bg-gray-500');
+        // Check if this card matches the username
+        if (usernameElement?.textContent?.includes(`@${username}`)) {
+            foundMatch = true;
+            console.log(`Found friend card for ${username}, updating message indicator`);
 
-          // Add new status class
-          switch (status.toLowerCase()) {
-            case 'online':
-              statusCircle.classList.add('bg-green-500');
-              break;
-            case 'offline':
-              statusCircle.classList.add('bg-red-500');
-              break;
-            default:
-              statusCircle.classList.add('bg-gray-500');
-          }
+            // Try to find or create the message indicator
+            let messageIndicator = card.querySelector('.message-indicator');
+            let messageCount = card.querySelector('.message-count');
+
+            if (!messageIndicator) {
+                // Create the indicator if it doesn't exist
+                console.log(`Creating new message indicator for ${username}`);
+                const actionButtons = card.querySelector('.friend-actions');
+                if (actionButtons) {
+                    const indicatorDiv = document.createElement('div');
+                    indicatorDiv.className = 'message-indicator bg-red-500 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center';
+
+                    const countSpan = document.createElement('span');
+                    countSpan.className = 'message-count';
+                    countSpan.textContent = '0';
+
+                    indicatorDiv.appendChild(countSpan);
+                    actionButtons.insertBefore(indicatorDiv, actionButtons.firstChild);
+
+                    messageIndicator = indicatorDiv;
+                    messageCount = countSpan;
+                }
+            }
+
+            if (messageIndicator && messageCount) {
+                if (count > 0) {
+                    // Show indicator with count
+                    messageIndicator.classList.remove('hidden');
+                    messageCount.textContent = count.toString();
+                } else {
+                    // Hide indicator
+                    messageIndicator.classList.add('hidden');
+                }
+            }
         }
-
-        // Update the friends data array
-        const friendIndex = this.friendsData.findIndex(f => f.username === username);
-        if (friendIndex !== -1) {
-          this.friendsData[friendIndex].status = status;
-        }
-      }
     });
-  }
+
+    if (!foundMatch && count > 0) {
+        console.warn(`No friend card found for ${username} but has ${count} pending messages`);
+        // Refresh the list to ensure we show all friends with messages
+        this.loadAndRenderFriends().catch(err => {
+            console.error("Error loading friends after message indicator update:", err);
+        });
+    }
+}
+
+private updateFriendStatus(username: string, status: string): void {
+    console.log(`Updating friend status for ${username} to ${status}`);
+
+    // Find friend in the DOM and update status indicator
+    const friendCards = this.container?.querySelectorAll('.friend-card') || [];
+    let foundMatch = false;
+
+    friendCards.forEach((card) => {
+        const usernameElement = card.querySelector('.friend-username');
+        const statusCircle = card.querySelector('.status-circle');
+
+        // Check if this card matches the username - look for @username format
+        if (usernameElement?.textContent?.includes(`@${username}`)) {
+            foundMatch = true;
+            console.log(`Found matching card for ${username}, updating status to ${status}`);
+
+            if (statusCircle) {
+                // Remove existing status classes
+                statusCircle.classList.remove('bg-green-500', 'bg-red-500', 'bg-gray-500');
+
+                // Add new status class
+                switch (status.toLowerCase()) {
+                    case 'online':
+                        statusCircle.classList.add('bg-green-500');
+                        console.log(`Set ${username} status to online (green)`);
+                        break;
+                    case 'offline':
+                        statusCircle.classList.add('bg-red-500');
+                        console.log(`Set ${username} status to offline (red)`);
+                        break;
+                    default:
+                        statusCircle.classList.add('bg-gray-500');
+                        console.log(`Set ${username} status to unknown (gray)`);
+                }
+            } else {
+                console.warn(`Status circle not found for ${username}`);
+            }
+        }
+    });
+
+    if (!foundMatch) {
+        console.warn(`No matching friend card found for ${username}. Will refresh friends list.`);
+        // If we couldn't find the friend in the DOM, reload the friends list
+        this.loadAndRenderFriends().catch(err => {
+            console.error("Error loading friends after status update:", err);
+        });
+    }
+
+    // Update the friends data array as well
+    const friendIndex = this.friendsData.findIndex(f => f.username === username);
+    if (friendIndex !== -1) {
+        this.friendsData[friendIndex].status = status;
+    } else {
+        console.warn(`Friend ${username} not found in friends data array`);
+    }
+}
 
   private getCurrentUser() {
     try {
@@ -338,6 +461,9 @@ export class FriendsBox {
   private handleChatFriend(friendUsername: string): void {
     console.log(`Opening chat with ${friendUsername}`);
 
+    // Clear pending message count for this friend
+    this.clearPendingMessageCount(friendUsername);
+
     // Close existing chat modal for this user if open
     const existingModal = this.chatModals.get(friendUsername);
     if (existingModal) {
@@ -401,6 +527,13 @@ export class FriendsBox {
 
         // Setup event listeners for dynamically created buttons
         this.setupFriendCardListeners();
+
+        // Update message indicators for any pending messages
+        this.pendingMessages.forEach((count, username) => {
+          if (count > 0) {
+            this.updateFriendMessageIndicator(username);
+          }
+        });
       } else {
         if (emptyEl) {
           emptyEl.style.display = "block";
@@ -452,6 +585,7 @@ export class FriendsBox {
     const displayName = [firstName, lastName].filter(Boolean).join(" ").trim() || username || "Unknown";
     const initials = this.initialsFrom(displayName);
     const isOnline = status === "online";
+    const pendingCount = this.pendingMessages.get(username) || 0;
 
     const color = this.colorFor(username);
 
@@ -491,6 +625,11 @@ export class FriendsBox {
         </div>
 
         <div class="flex items-center gap-3">
+          <!-- Message Indicator (hidden by default, shown when messages are pending) -->
+          <div class="message-indicator ${pendingCount > 0 ? '' : 'hidden'} bg-red-500 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">
+            <span class="message-count">${pendingCount}</span>
+          </div>
+
           <!-- Chat Icon -->
           <button
             class="chat-friend-btn p-1 hover:opacity-70 transition-opacity duration-300"
@@ -558,8 +697,9 @@ export class FriendsBox {
     }
 
     // Remove event listeners
-    window.removeEventListener('friend-status-change', this.handleFriendStatusChange.bind(this));
-    window.removeEventListener('direct-message-received', this.handleDirectMessageReceived.bind(this));
+    window.removeEventListener('friend-status-change', this.boundHandleFriendStatusChange);
+    window.removeEventListener('direct-message-received', this.boundHandleDirectMessageReceived);
+    window.removeEventListener('friends-list-changed', this.boundHandleFriendsListChanged);
 
     // Cleanup request modal
     if (this.requestModal) {
