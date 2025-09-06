@@ -21,12 +21,12 @@ const routes: FastifyPluginAsync = async (app) => {
     }
   }
 
-  // Fetch friends (convert IDs → usernames)
+  // Fetch friends (usernames)
   async function getFriends(userId: number): Promise<string[]> {
     try {
       const res = await fetch(`${app.config.USER_SERVICE_URL}/relation/friends/${userId}`);
       if (!res.ok) return [];
-      const friends = await res.json(); // [{ id: 2 }, { id: 5 }]
+      const friends = await res.json();
 
       const usernames: string[] = [];
       for (const f of friends) {

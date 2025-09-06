@@ -61,6 +61,24 @@ services:
       start_period: 5s
     restart: unless-stopped
 
+  realtime_microservice:
+    build: ./realtime-microservice
+    image: maxplushchreif/realtime_microservice:1.0.0
+    container_name: realtime_microservice
+    environment:
+      - NODE_ENV=production
+      - PORT=4000
+      - AUTH_JWT_SECRET=dev-gateway-secret
+    ports:
+      - "4000:4000"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:4000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
   mailer:
     build: ./mailer-microservice
     image: maxplushchreif/mailer:1.0.0
@@ -127,6 +145,7 @@ services:
       - GAME_SERVICE_URL=http://game_microservice:3000
       - GOOGLE_OAUTH_URL=http://google_oauth2:3000
       - SOCKET_URL=ws://socket_microservice:3005
+      - REALTIME_URL=ws://realtime_microservice:4000
       - MAILER_URL=http://mailer:3000
       - CORS_ORIGIN=*
       - UPSTREAM_TIMEOUT_MS=15000
@@ -141,6 +160,7 @@ services:
       - game_microservice
       - google_oauth2
       - socket_service
+      - realtime_microservice
     healthcheck:
       test: ["CMD-SHELL", "node -e \"fetch('http://localhost:8080/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
       interval: 10s
