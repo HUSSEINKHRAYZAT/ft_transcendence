@@ -17,6 +17,7 @@ import { ApiClient } from "../../api";
 import { markUI } from "../../ui";
 import type { GameConfig, ObstacleShape } from "../../types";
 import type { RemoteMsg } from "../utils/helpers";
+import { GameState } from "./GameState";
 import {
   clamp,
   clampHorizontal,
@@ -34,6 +35,12 @@ import { GameChat, type ChatUser } from "../ui/GameChat";
 import { socketManager } from "../../services/SocketManager";
 import { GameCountdown } from "../ui/GameCountdown";
 import { CameraConfig } from "../config/camconfig";
+
+
+
+
+
+
 export class Pong3D {
   private engine: Engine;
   private scene: Scene;
@@ -65,18 +72,12 @@ export class Pong3D {
   }> = [];
 
   private keys: Record<string, boolean> = {};
-  private control: ("human" | "ai" | "remoteGuest")[] = [];
 
-  private aiError: number[] = [0, 0, 0, 0];
-  private aiErrorRangePerPaddle: number[] = [2, 2, 2, 2];
-  private aiLerpPerPaddle: number[] = [0.08, 0.08, 0.08, 0.08];
-  private aiVel: number[] = [0, 0, 0, 0];
+  // Game state - single source of truth
+  private gameState: GameState;
 
-  private scores = [0, 0, 0, 0];
   private scoreElems: HTMLSpanElement[] = [];
   private nameElems: HTMLSpanElement[] = [];
-  private lastScorer = -1;
-  private isPaused = false;
 
   // Theme system
   private currentGameTheme: GameThemeColors;
@@ -84,9 +85,6 @@ export class Pong3D {
 
   // Chat system
   private gameChat: GameChat | null = null;
-  private lastHitter = -1;
-  private touchedOnce = false;
-  private obstacleAfterHit = false;
 
   private ballRadius = 0.2;
   private speedIncrement = 1.0001;
@@ -104,7 +102,6 @@ export class Pong3D {
   private isGuest = false;
   private requiredGuests = 0; // 1 (2P) or 3 (4P)
   private connectedGuests = 0;
-  private matchReady = true;
   private waitUI?: HTMLDivElement;
 
   // camera “always my paddle on the left”:
@@ -124,6 +121,9 @@ export class Pong3D {
   private toneCtx?: AudioContext;
 
   constructor(private config: GameConfig) {
+    // Initialize game state
+    this.gameState = new GameState(config);
+
     const canvas =
       (document.getElementById("gameCanvas") as HTMLCanvasElement) ||
       (() => {
@@ -208,12 +208,12 @@ export class Pong3D {
     if (this.isHost) {
       this.requiredGuests = this.config.playerCount === 4 ? 3 : 1;
       this.connectedGuests = 0;
-      this.matchReady = this.requiredGuests === 0;
+      this.gameState.matchReady = this.requiredGuests === 0;
       this.showWaitingOverlay(`Waiting for players… 0/${this.requiredGuests}`);
       this.remoteIndex = 0; // host is index 0 (Left)
       this.setViewRotationForIndex(0);
     } else if (this.isGuest) {
-      this.matchReady = false;
+      this.gameState.matchReady = false;
       this.showWaitingOverlay("Connecting to host…");
       // index will be set after "assign"
     }
@@ -301,8 +301,8 @@ export class Pong3D {
   private updateScoreUI() {
     const slots = this.config.playerCount === 4 ? 4 : 2;
     for (let i = 0; i < slots; i++)
-      this.scoreElems[i].textContent = this.scores[i].toString();
-    if (this.lastScorer >= 0) this.pulseScorer(this.lastScorer);
+      this.scoreElems[i].textContent = this.gameState.scores[i].toString();
+    if (this.gameState.lastScorer >= 0) this.pulseScorer(this.gameState.lastScorer);
   }
 
   private showWaitingOverlay(text: string) {
@@ -464,7 +464,7 @@ export class Pong3D {
     // Show countdown before starting the game
     const countdown = new GameCountdown({
       onComplete: () => {
-        this.matchReady = true;
+        this.gameState.matchReady = true;
         this.resetBall(Math.random() < 0.5 ? 1 : -1);
       },
     });
@@ -478,7 +478,7 @@ export class Pong3D {
     // For multiplayer games, show countdown and then start
     const countdown = new GameCountdown({
       onComplete: () => {
-        this.matchReady = true;
+        this.gameState.matchReady = true;
         this.resetBall(Math.random() < 0.5 ? 1 : -1);
         if (this.isHost) {
           this.sendRemoteMessage({ t: "start" } as RemoteMsg);
@@ -695,31 +695,31 @@ export class Pong3D {
     // Control roles
     if (this.config.playerCount === 4) {
       if (this.config.connection === "ai3") {
-        this.control = ["human", "ai", "ai", "ai"];
+        this.gameState.setControl(["human", "ai", "ai", "ai"]);
         this.applyAIDifficulty([1, 2, 3], 10);
         this.setViewRotationForIndex(0);
       } else if (this.config.connection === "remote4Host") {
-        this.control = ["human", "remoteGuest", "remoteGuest", "remoteGuest"];
+        this.gameState.setControl(["human", "remoteGuest", "remoteGuest", "remoteGuest"]);
         this.setViewRotationForIndex(0);
       } else if (this.config.connection === "remote4Guest") {
-        this.control = ["human", "human", "human", "human"]; // render only; your input is sent to host
+        this.gameState.setControl(["human", "human", "human", "human"]); // render only; your input is sent to host
       } else {
-        this.control = ["human", "human", "human", "human"];
+        this.gameState.setControl(["human", "human", "human", "human"]);
         this.setViewRotationForIndex(0);
       }
     } else {
       if (this.config.connection === "ai") {
-        this.control = ["human", "ai"];
+        this.gameState.setControl(["human", "ai"]);
         this.applyAIDifficulty([1], this.config.aiDifficulty ?? 6);
         this.setViewRotationForIndex(0);
       } else if (this.config.connection === "remoteHost") {
-        this.control = ["human", "remoteGuest"];
+        this.gameState.setControl(["human", "remoteGuest"]);
         this.setViewRotationForIndex(0);
       } else if (this.config.connection === "remoteGuest") {
-        this.control = ["human", "human"]; // render only
+        this.gameState.setControl(["human", "human"]); // render only
       } else {
         // Local 2P
-        this.control = ["human", "human"];
+        this.gameState.setControl(["human", "human"]);
         this.camera.alpha = this.baseAlpha;
       }
     }
@@ -727,7 +727,7 @@ export class Pong3D {
     // Obstacles: host/local spawns; guests build from net
     if (!this.isGuest) this.spawnObstacles(width, height);
 
-    if (this.matchReady) {
+    if (this.gameState.matchReady) {
       // For local games, show countdown before starting
       this.startGameWithCountdown();
     } else {
@@ -737,7 +737,7 @@ export class Pong3D {
 
     this.engine.runRenderLoop(() => {
       // Only update game logic if not paused, but always render the scene
-      if (!this.isPaused) {
+      if (!this.gameState.isPaused) {
         this.update(width, height);
       }
       this.scene.render();
@@ -773,8 +773,8 @@ export class Pong3D {
     const lerpAmt = lerp(0.008, 0.35, sg);
 
     idxs.forEach((i) => {
-      this.aiErrorRangePerPaddle[i] = errRange;
-      this.aiLerpPerPaddle[i] = lerpAmt;
+      this.gameState.setAIErrorRange(i, errRange);
+      this.gameState.setAILerp(i, lerpAmt);
     });
   }
 
@@ -921,15 +921,13 @@ export class Pong3D {
       0.07 + Math.random() * 0.05,
       speed * Math.sin(angle)
     );
-    this.control.forEach((c, i) => {
+    this.gameState.setBallVelocity(this.ballVelocity);
+    this.gameState.control.forEach((c, i) => {
       if (c === "ai")
-        this.aiError[i] =
-          (Math.random() * 2 - 1) * this.aiErrorRangePerPaddle[i];
-      this.aiVel[i] = 0;
+        this.gameState.setAIError(i, (Math.random() * 2 - 1) * this.gameState.aiErrorRangePerPaddle[i]);
+      this.gameState.setAIVelocity(i, 0);
     });
-    this.lastHitter = -1;
-    this.touchedOnce = false;
-    this.obstacleAfterHit = false;
+    this.gameState.resetBallState();
   }
 
   // Randomize the rebound direction a bit, then clamp horizontal speed
@@ -1053,8 +1051,8 @@ export class Pong3D {
 
     socketManager.on("game_started", () => {
       console.log("Game started signal received");
-      if (this.isGuest && !this.matchReady) {
-        this.matchReady = true;
+      if (this.isGuest && !this.gameState.matchReady) {
+        this.gameState.matchReady = true;
         this.hideWaitingOverlay();
       }
     });
@@ -1118,12 +1116,11 @@ export class Pong3D {
       this.paddles[i]?.position.set(pp.x, pp.y, pp.z)
     );
 
-    for (let i = 0; i < this.scores.length && i < stateMsg.scores.length; i++)
-      this.scores[i] = stateMsg.scores[i];
+    this.gameState.setScores(stateMsg.scores);
     this.updateScoreUI();
 
-    if (!this.matchReady) {
-      this.matchReady = true;
+    if (!this.gameState.matchReady) {
+      this.gameState.matchReady = true;
       this.hideWaitingOverlay();
     }
   }
@@ -1160,7 +1157,7 @@ export class Pong3D {
           this.updateWaitingOverlay(
             `Waiting for players… ${this.connectedGuests}/${this.requiredGuests}`
           );
-          if (this.connectedGuests >= this.requiredGuests && !this.matchReady) {
+          if (this.connectedGuests >= this.requiredGuests && !this.gameState.matchReady) {
             this.beginMatch(); // Fire and forget for WebSocket flow
           }
           return;
@@ -1170,13 +1167,13 @@ export class Pong3D {
           this.remoteIndex = (msg.idx as 0 | 1 | 2 | 3) ?? 1;
           // Always rotate so *your* paddle is on the left
           this.setViewRotationForIndex(this.remoteIndex);
-          if (!this.matchReady) this.updateWaitingOverlay("Waiting for start…");
+          if (!this.gameState.matchReady) this.updateWaitingOverlay("Waiting for start…");
           return;
         }
 
         if (msg.t === "start" && this.isGuest) {
-          if (!this.matchReady) {
-            this.matchReady = true;
+          if (!this.gameState.matchReady) {
+            this.gameState.matchReady = true;
             this.hideWaitingOverlay();
           }
           return;
@@ -1288,7 +1285,7 @@ export class Pong3D {
         y: p.position.y,
         z: p.position.z,
       })),
-      scores: [...this.scores],
+      scores: [...this.gameState.scores],
       obstacles: this.obstacleInfo.map((o) => ({ ...o })), // includes shape
     };
     this.sendRemoteMessage(msg);
@@ -1298,7 +1295,7 @@ export class Pong3D {
 
   private update(width: number, height: number) {
     const now = performance.now();
-    if (!this.matchReady) {
+    if (!this.gameState.matchReady) {
       if (this.isHost) this.broadcastState(now);
       return;
     }
@@ -1310,7 +1307,7 @@ export class Pong3D {
     // L/R paddles use Up/Down for Z. Bottom uses Left/Right for X. Top uses Right/Left mirrored.
     if (this.config.playerCount === 4) {
       // Left (host or local)
-      if (this.control[0] === "human") {
+      if (this.gameState.control[0] === "human") {
         if (this.keys["arrowup"]) p1.position.z -= move;
         if (this.keys["arrowdown"]) p1.position.z += move;
       }
@@ -1324,7 +1321,7 @@ export class Pong3D {
         if (this.guestInputs[3]?.pos) this.paddles[3].position.x -= move; // top X-
       } else {
         // local 4P (fallback): allow arrow-left/right to move Bottom, arrow-up/down Left
-        if (this.control[2] === "human") {
+        if (this.gameState.control[2] === "human") {
           if (this.keys["arrowleft"]) p3.position.x -= move;
           if (this.keys["arrowright"]) p3.position.x += move;
         }
@@ -1334,7 +1331,7 @@ export class Pong3D {
       [0, 1, 2, 3].forEach((i) => this.runAI(i, width, height, move));
     } else {
       // ---------- 2P ----------
-      if (this.control[1] === "ai") {
+      if (this.gameState.control[1] === "ai") {
         // P1 (you) on Up/Down
         if (this.keys["arrowup"]) p1.position.z -= move;
         if (this.keys["arrowdown"]) p1.position.z += move;
@@ -1453,9 +1450,9 @@ export class Pong3D {
         this.ballVelocity.z += dzNorm * 0.18;
         clampHorizontal(this.ballVelocity, 0.6);
         ensureMinHorizontalSpeed(this.ballVelocity, this.minHorizontalSpeed);
-        this.lastHitter = idx;
-        this.touchedOnce = true;
-        this.obstacleAfterHit = false;
+        this.gameState.lastHitter = idx;
+        this.gameState.touchedOnce = true;
+        this.gameState.obstacleAfterHit = false;
         flashPaddle(p);
         this.playHit("paddle"); // SOUND
       }
@@ -1479,9 +1476,9 @@ export class Pong3D {
         this.ballVelocity.x += dxNorm * 0.18;
         clampHorizontal(this.ballVelocity, 0.6);
         ensureMinHorizontalSpeed(this.ballVelocity, this.minHorizontalSpeed);
-        this.lastHitter = idx;
-        this.touchedOnce = true;
-        this.obstacleAfterHit = false;
+        this.gameState.lastHitter = idx;
+        this.gameState.touchedOnce = true;
+        this.gameState.obstacleAfterHit = false;
         flashPaddle(p);
         this.playHit("paddle"); // SOUND
       }
@@ -1507,8 +1504,8 @@ export class Pong3D {
         this.ballVelocity.x *= 1.02;
         this.ballVelocity.z *= 1.02;
         ensureMinHorizontalSpeed(this.ballVelocity, this.minHorizontalSpeed);
-        if (this.lastHitter >= 0 && this.touchedOnce)
-          this.obstacleAfterHit = true;
+        if (this.gameState.lastHitter >= 0 && this.gameState.touchedOnce)
+          this.gameState.obstacleAfterHit = true;
 
         // Splash/flash like paddles
         flashPaddle(o);
@@ -1523,64 +1520,64 @@ export class Pong3D {
     // Scoring + penalty
     const halfW = width / 2 - this.ballRadius;
     const halfH = height / 2 - this.ballRadius;
-    const target = this.config.winScore ?? 10;
 
     const applyPenaltyIfNeeded = (idx: number) => {
-      if (this.obstacleAfterHit && this.lastHitter === idx) {
-        this.scores[idx] -= 1;
-        this.lastScorer = idx;
+      if (this.gameState.obstacleAfterHit && this.gameState.lastHitter === idx) {
+        this.gameState.subtractScore(idx);
+        this.gameState.lastScorer = idx;
         this.updateScoreUI();
       }
-      this.obstacleAfterHit = false;
+      this.gameState.obstacleAfterHit = false;
     };
 
     if (this.config.playerCount === 4) {
       const outX = Math.abs(this.ball.position.x) > halfW;
       const outZ = Math.abs(this.ball.position.z) > halfH;
       if (outX || outZ) {
-        if (this.touchedOnce && this.lastHitter >= 0) {
+        if (this.gameState.touchedOnce && this.gameState.lastHitter >= 0) {
           if (this.ball.position.x < -halfW) applyPenaltyIfNeeded(0);
           if (this.ball.position.x > +halfW) applyPenaltyIfNeeded(1);
           if (this.ball.position.z > +halfH) applyPenaltyIfNeeded(2);
           if (this.ball.position.z < -halfH) applyPenaltyIfNeeded(3);
 
-          this.scores[this.lastHitter]++;
-          this.lastScorer = this.lastHitter;
+          this.gameState.addScore(this.gameState.lastHitter);
+          this.gameState.lastScorer = this.gameState.lastHitter;
           this.updateScoreUI();
 
           // Add chat notification for scoring
           if (this.gameChat) {
-            const playerName = this.getPlayerName(this.lastHitter);
+            const playerName = this.getPlayerName(this.gameState.lastHitter);
             this.gameChat.addSystemMessage(
               `🎯 ${playerName} scores! Current score: ${
-                this.scores[this.lastHitter]
+                this.gameState.scores[this.gameState.lastHitter]
               }`
             );
           }
 
-          if (this.scores[this.lastHitter] >= target) {
-            this.finishAndReport(this.lastHitter);
+          const winResult = this.gameState.isWinConditionMet();
+          if (winResult.hasWinner) {
+            this.finishAndReport(winResult.winner);
             return;
           }
           this.resetBall(
-            this.lastHitter === 0
+            this.gameState.lastHitter === 0
               ? 1
-              : this.lastHitter === 1
+              : this.gameState.lastHitter === 1
               ? -1
               : (undefined as any)
           );
         } else {
-          this.lastScorer = -1;
+          this.gameState.lastScorer = -1;
           this.updateScoreUI();
           this.resetBall();
         }
       }
     } else {
       if (this.ball.position.x > halfW) {
-        if (this.touchedOnce) {
+        if (this.gameState.touchedOnce) {
           applyPenaltyIfNeeded(1);
-          this.scores[1]++;
-          this.lastScorer = 1;
+          this.gameState.addScore(1);
+          this.gameState.lastScorer = 1;
           // Add damage to right wall where ball hit
           this.addWallDamage(
             "right",
@@ -1588,17 +1585,18 @@ export class Pong3D {
             this.ball.position.z
           );
           this.updateScoreUI();
-          if (this.scores[1] >= target) {
-            this.finishAndReport(1);
+          const winResult = this.gameState.isWinConditionMet();
+          if (winResult.hasWinner) {
+            this.finishAndReport(winResult.winner);
             return;
           }
         }
         this.resetBall(-1);
       } else if (this.ball.position.x < -halfW) {
-        if (this.touchedOnce) {
+        if (this.gameState.touchedOnce) {
           applyPenaltyIfNeeded(0);
-          this.scores[0]++;
-          this.lastScorer = 0;
+          this.gameState.addScore(0);
+          this.gameState.lastScorer = 0;
           // Add damage to left wall where ball hit
           this.addWallDamage(
             "left",
@@ -1606,8 +1604,9 @@ export class Pong3D {
             this.ball.position.z
           );
           this.updateScoreUI();
-          if (this.scores[0] >= target) {
-            this.finishAndReport(0);
+          const winResult = this.gameState.isWinConditionMet();
+          if (winResult.hasWinner) {
+            this.finishAndReport(winResult.winner);
             return;
           }
         }
@@ -1759,9 +1758,9 @@ export class Pong3D {
   }
 
   private togglePause() {
-    this.isPaused = !this.isPaused;
+    this.gameState.isPaused = !this.gameState.isPaused;
 
-    if (this.isPaused) {
+    if (this.gameState.isPaused) {
       // Show pause overlay
       this.showPauseOverlay();
       console.log("⏸️ Game paused");
@@ -1799,9 +1798,9 @@ export class Pong3D {
   }
 
   private runAI(i: number, width: number, height: number, maxStep: number) {
-    if (this.control[i] !== "ai") return;
-    const lerpAmt = this.aiLerpPerPaddle[i];
-    const err = this.aiError[i];
+    if (this.gameState.control[i] !== "ai") return;
+    const lerpAmt = this.gameState.aiLerpPerPaddle[i];
+    const err = this.gameState.aiError[i];
 
     const isLR = i < 2; // paddles 0,1 are left/right (move in Z), paddles 2,3 are bottom/top (move in X)
     const ballPos = this.ball.position.clone();
@@ -1870,9 +1869,9 @@ export class Pong3D {
     const responsiveness = lerpAmt * (1.0 + urgency * 0.5); // boost response when far from target
 
     const accel = delta * responsiveness;
-    this.aiVel[i] = this.aiVel[i] * 0.82 + accel * 0.18; // slightly more responsive interpolation
+    this.gameState.setAIVelocity(i, this.gameState.aiVel[i] * 0.82 + accel * 0.18); // slightly more responsive interpolation
 
-    let step = this.aiVel[i];
+    let step = this.gameState.aiVel[i];
 
     // Clamp step size
     if (step > maxStep) step = maxStep;
@@ -1887,7 +1886,7 @@ export class Pong3D {
   }
 
   private async finishAndReport(winnerIdx: number) {
-    this.matchReady = false;
+    this.gameState.matchReady = false;
     const text =
       this.config.playerCount === 4
         ? `Player ${["L", "R", "B", "T"][winnerIdx]} wins!`
@@ -1903,7 +1902,7 @@ export class Pong3D {
         `🏆 Game Over! ${winnerName} wins the match!`
       );
       this.gameChat.addSystemMessage(
-        `Final Score: ${this.scores
+        `Final Score: ${this.gameState.scores
           .slice(0, this.config.playerCount === 4 ? 4 : 2)
           .join(" - ")}`
       );
@@ -1914,7 +1913,7 @@ export class Pong3D {
 
     // Post to DB if this is an online match or tournament. Host does the reporting.
     if (this.isHost) {
-      const scores = [...this.scores];
+      const scores = [...this.gameState.scores];
       try {
         if (this.config.tournament) {
           const t = this.config.tournament;
