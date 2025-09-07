@@ -14,7 +14,6 @@ import { Sound } from "@babylonjs/core/Audio/sound";
 import "@babylonjs/core/Audio/audioEngine";
 
 import { ApiClient } from "../../api";
-import { markUI } from "../../ui";
 import type { GameConfig, ObstacleShape } from "../../types";
 import type { RemoteMsg } from "../utils/helpers";
 import { GameState } from "./GameState";
@@ -31,10 +30,11 @@ import {
 } from "../utils/helpers";
 import { SHAPES, SHAPE_WEIGHTS } from "../config/constants";
 import { themeBridge, type GameThemeColors } from "../utils/ThemeBridge";
-import { GameChat, type ChatUser } from "../ui/GameChat";
+import { GameChat } from "../ui/GameChat";
 import { socketManager } from "../../services/SocketManager";
 import { GameCountdown } from "../ui/GameCountdown";
 import { CameraConfig } from "../config/camconfig";
+import * as Frontend from "./Pong3D.frontend";
 
 
 
@@ -123,6 +123,10 @@ export class Pong3D {
   constructor(private config: GameConfig) {
     // Initialize game state
     this.gameState = new GameState(config);
+  // These arrays are populated/used by the frontend helpers module (Pong3D.frontend).
+  // Keep harmless reads here so TypeScript doesn't flag them as unused.
+  void this.scoreElems;
+  void this.nameElems;
 
     const canvas =
       (document.getElementById("gameCanvas") as HTMLCanvasElement) ||
@@ -227,215 +231,36 @@ export class Pong3D {
   /* ---------------- UI ---------------- */
 
   private createScoreUI() {
-    const hud = markUI(document.createElement("div"));
-    hud.className =
-      "absolute top-20 left-1/2 -translate-x-1/2 text-white font-bold z-10 flex gap-4 items-center px-6 py-4 rounded-3xl bg-gradient-to-br from-gray-800/95 to-gray-900/95 border border-lime-500/30 shadow-2xl backdrop-blur-xl";
-    hud.style.fontFamily = "'Orbitron', system-ui, sans-serif";
-    hud.style.boxShadow =
-      "0 25px 50px rgba(0,0,0,0.4), 0 0 0 1px rgba(132, 204, 22, 0.1), inset 0 1px 0 rgba(255,255,255,0.1)";
-
-    const slots = this.config.playerCount === 4 ? 4 : 2;
-    const colors = ["lime-500", "blue-500", "purple-500", "red-500"];
-    const hexColors = ["#84cc16", "#3b82f6", "#a855f7", "#ef4444"];
-
-    for (let i = 0; i < slots; i++) {
-      const badge = document.createElement("div");
-      badge.className = `flex items-center gap-2 px-4 py-2.5 rounded-xl border transition-all duration-300 min-w-20 justify-center bg-gradient-to-br from-${colors[i]}/10 to-${colors[i]}/5 border-${colors[i]}/25`;
-      badge.style.boxShadow = `0 4px 12px ${hexColors[i]}20, inset 0 1px 0 rgba(255,255,255,0.1)`;
-
-      const dot = document.createElement("span");
-      dot.className = `w-3 h-3 rounded-full inline-block flex-shrink-0 bg-gradient-to-br from-${colors[i]} to-${colors[i]}/80`;
-      dot.style.boxShadow = `0 0 12px ${hexColors[i]}60, inset 0 1px 0 rgba(255,255,255,0.3)`;
-
-      const playerInfo = document.createElement("div");
-      playerInfo.className = "flex flex-col items-center gap-0.5";
-
-      const label = document.createElement("span");
-      label.className = `text-xs font-semibold text-${colors[i]} tracking-wider uppercase`;
-      label.textContent = ["Player 1", "Player 2", "Player 3", "Player 4"][i];
-
-      const name = document.createElement("span");
-      name.className = "text-xs opacity-70 text-zinc-400";
-      name.textContent =
-        (this.config.displayNames && this.config.displayNames[i]) || "";
-
-      const score = document.createElement("span");
-      score.className = `font-black text-2xl min-w-8 text-center text-${colors[i]} leading-none`;
-      score.style.textShadow = `0 2px 8px ${hexColors[i]}40`;
-      score.textContent = "0";
-
-      // Assemble the player info
-      if (name.textContent) {
-        playerInfo.append(label, name);
-      } else {
-        playerInfo.append(label);
-      }
-
-      badge.append(dot, playerInfo, score);
-      hud.appendChild(badge);
-      this.nameElems.push(name);
-      this.scoreElems.push(score);
-    }
-    document.body.appendChild(hud);
+  Frontend.createScoreUI(this);
   }
   private updateNamesUI() {
-    const slots = this.config.playerCount === 4 ? 4 : 2;
-    for (let i = 0; i < slots; i++) {
-      if (!this.nameElems[i]) continue;
-      this.nameElems[i].textContent =
-        (this.config.displayNames && this.config.displayNames[i]) || "";
-    }
+  Frontend.updateNamesUI(this);
   }
-  private pulseScorer(idx: number) {
-    if (idx < 0) return;
-    const badge = this.scoreElems[idx].parentElement as HTMLDivElement;
-    if (!badge) return;
-    badge.style.boxShadow =
-      "inset 0 0 0 1px rgba(255,255,255,.12), 0 0 16px rgba(255,255,255,.25)";
-    badge.style.transform = "scale(1.05)";
-    setTimeout(() => {
-      badge.style.boxShadow = "inset 0 0 0 1px rgba(255,255,255,.08)";
-      badge.style.transform = "scale(1.0)";
-    }, 180);
-  }
+  
   private updateScoreUI() {
-    const slots = this.config.playerCount === 4 ? 4 : 2;
-    for (let i = 0; i < slots; i++)
-      this.scoreElems[i].textContent = this.gameState.scores[i].toString();
-    if (this.gameState.lastScorer >= 0) this.pulseScorer(this.gameState.lastScorer);
+  Frontend.updateScoreUI(this);
   }
 
   private showWaitingOverlay(text: string) {
-    const d = markUI(document.createElement("div"));
-    d.className =
-      "fixed inset-0 grid place-items-center bg-black/65 text-white z-[9999] font-sans";
-    d.innerHTML = `<div class="px-5 py-4 bg-gray-900 rounded-xl shadow-2xl border border-lime-500/20">
-      <div id="waitText" class="text-lg text-center">${text}</div>
-    </div>`;
-    document.body.appendChild(d);
-    this.waitUI = d as HTMLDivElement;
+  Frontend.showWaitingOverlay(this, text);
   }
   private updateWaitingOverlay(text: string) {
-    if (!this.waitUI) return;
-    const el = this.waitUI.querySelector<HTMLDivElement>("#waitText");
-    if (el) el.textContent = text;
+  Frontend.updateWaitingOverlay(this, text);
   }
   private hideWaitingOverlay() {
-    this.waitUI?.remove();
-    this.waitUI = undefined;
+  Frontend.hideWaitingOverlay(this);
   }
 
   private updateGameTheme(newTheme: GameThemeColors) {
-    console.log("🎮 Updating game colors for new theme");
-
-    this.currentGameTheme = newTheme;
-
-    // Update scene background
-    this.scene.clearColor = newTheme.background;
-
-    // Update ball color
-    if (this.ball && this.ball.material) {
-      const ballMat = this.ball.material as StandardMaterial;
-      if (ballMat.emissiveColor) {
-        ballMat.emissiveColor = newTheme.ball.scale(0.3);
-      }
-    }
-
-    // Update paddle colors
-    this.paddles.forEach((paddle, index) => {
-      if (paddle.material) {
-        const paddleMat = paddle.material as StandardMaterial;
-        const newColor = themeBridge.getPaddleColor(index);
-
-        // Update the material colors
-        if (paddleMat.diffuseColor) {
-          paddleMat.diffuseColor = newColor;
-        }
-        if (paddleMat.emissiveColor) {
-          paddleMat.emissiveColor = newColor.scale(0.6);
-        }
-      }
-    });
-
-    // Update obstacle colors
-    this.obstacles.forEach((obstacle, index) => {
-      if (obstacle.material) {
-        const obstacleMat = obstacle.material as StandardMaterial;
-        const newColor = themeBridge.getObstacleColor(index);
-
-        if (obstacleMat.diffuseColor) {
-          obstacleMat.diffuseColor = newColor;
-        }
-        if (obstacleMat.emissiveColor) {
-          obstacleMat.emissiveColor = newColor.scale(0.3);
-        }
-      }
-    });
-
-    console.log("✅ Game colors updated successfully");
+  Frontend.updateGameTheme(this, newTheme);
   }
 
   private initializeChat() {
-    // Skip chat for AI mode (single player vs AI)
-    if (this.config.connection === "ai" || this.config.connection === "ai3" ||this.config.connection === "local") {
-      console.log("💬 Chat disabled for AI mode");
-      return;
-    }
-
-    // Get current user info from localStorage (set by frontend auth)
-    let currentUser: ChatUser = {
-      id: "player-" + Date.now(),
-      name: "Player",
-      isConnected: true,
-    };
-
-    try {
-      const userData = localStorage.getItem("ft_pong_user_data");
-      if (userData) {
-        const user = JSON.parse(userData);
-        currentUser = {
-          id: user.id || currentUser.id,
-          name: user.firstName
-            ? `${user.firstName} ${user.lastName || ""}`.trim()
-            : user.userName || user.email || "Player",
-          isConnected: true,
-        };
-      }
-    } catch (error) {
-      console.warn("Could not load user data for chat:", error);
-    }
-
-    // Get game container for chat
-    const gameContainer =
-      document.querySelector("#gameContainer") || document.body;
-
-    // Initialize chat with WebSocket if available
-    this.gameChat = new GameChat(
-      gameContainer as HTMLElement,
-      currentUser,
-      this.ws || undefined
-    );
-
-    // Show welcome message
-    this.gameChat.addSystemMessage(
-      `Welcome to the game, ${currentUser.name}! 🎮`
-    );
-
-    // Add game-specific system messages
-    if (this.config.playerCount > 1) {
-      this.gameChat.addSystemMessage(
-        "Chat with other players during the game!"
-      );
-    }
-
-    console.log("💬 Game chat initialized for user:", currentUser.name);
+  Frontend.initializeChat(this);
   }
 
   private getPlayerName(playerIndex: number): string {
-    if (this.config.displayNames && this.config.displayNames[playerIndex]) {
-      return this.config.displayNames[playerIndex];
-    }
-    return `Player ${playerIndex + 1}`;
+  return Frontend.getPlayerName(this, playerIndex);
   }
 
   // Cleanup method for theme and chat subscription
@@ -1772,29 +1597,11 @@ export class Pong3D {
   }
 
   private showPauseOverlay() {
-    // Remove existing pause overlay if any
-    this.hidePauseOverlay();
-
-    const overlay = document.createElement("div");
-    overlay.id = "pause-overlay";
-    overlay.className =
-      "fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50";
-    overlay.innerHTML = `
-      <div class="bg-gray-800 rounded-lg p-8 text-center border-2 border-lime-500">
-        <div class="text-6xl mb-4">⏸️</div>
-        <div class="text-2xl font-bold text-lime-500 mb-2">PAUSED</div>
-        <div class="text-gray-300">Press P to resume</div>
-      </div>
-    `;
-
-    document.body.appendChild(overlay);
+  Frontend.showPauseOverlay(this);
   }
 
   private hidePauseOverlay() {
-    const overlay = document.getElementById("pause-overlay");
-    if (overlay) {
-      overlay.remove();
-    }
+  Frontend.hidePauseOverlay(this);
   }
 
   private runAI(i: number, width: number, height: number, maxStep: number) {
@@ -1943,13 +1750,7 @@ export class Pong3D {
   }
 
   private endAndToast(text: string) {
-    const t = markUI(document.createElement("div"));
-    t.className =
-      "fixed top-5 left-1/2 -translate-x-1/2 bg-black/70 text-white px-4 py-3 rounded-xl z-[10001] font-sans shadow-2xl border border-lime-500/20";
-    t.innerHTML = `${text} &nbsp; <button id="re" class="ml-2 bg-lime-500 hover:bg-lime-600 text-black px-3 py-1 rounded-lg font-semibold transition-colors">Play again</button>`;
-    document.body.appendChild(t);
-    (t.querySelector("#re") as HTMLButtonElement).onclick = () =>
-      location.reload();
+  Frontend.endAndToast(this, text);
   }
 
   /* ---------------- AUDIO ---------------- */
