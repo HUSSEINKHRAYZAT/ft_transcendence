@@ -444,5 +444,17 @@
   "Verify & Login": "Vérifier et se connecter",
   "Search friends...": "Rechercher des amis...",
   "Loading friends...": "Chargement des amis...",
-  "Email cannot be changed": "L'e-mail ne peut pas être modifié"
+  "Email cannot be changed": "L'e-mail ne peut pas être modifié",
+  "Apply Changes": "Appliquer les modifications",
+  "Type your message...": "Tapez votre message...",
+  "Send": "Envoyer",
+  "View Statistics": "Voir les statistiques",
+  "Chat": "Discuter",
+  "All changes have been applied successfully!": "Tous les changements ont été appliqués avec succès !",
+  "Are you sure you want to remove": "Êtes-vous sûr de vouloir supprimer",
+  "Refresh": "Actualiser",
+  "🔒 Cybersecurity [ 2 / 2.5 ]": "🔒 Cybersécurité [ 2 / 2.5 ]",
+  "⚙️ DevOps [ 2 / 2.5 ]": "⚙️ DevOps [ 2 / 2.5 ]",
+  "Add accessibility features for visually impaired users": "Ajouter des fonctionnalités d'accessibilité pour les utilisateurs malvoyants",
+  "Server-Side Rendering (SSR) integration.": "Intégration du rendu côté serveur (SSR)."
 }

@@ -1110,6 +1110,55 @@ export class AuthService {
 		}
 	}
 
+	// Add this method to fetch friend statistics
+async getFriendStatistics(friendId: string): Promise<UserStats | null> {
+    console.log('DEBUG: getFriendStatistics called with ID:', friendId); // DEBUG LINE
+
+    if (!this.state.token) {
+        console.error('No authentication token available');
+        return null;
+    }
+
+    try {
+        const url = `${API_BASE_URL}/statistics/${friendId}`;
+        console.log('DEBUG: Making request to:', url); // DEBUG LINE
+
+        const res = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${this.state.token}`,
+                'Content-Type': 'application/json',
+            },
+        });
+
+        console.log('DEBUG: Response status:', res.status); // DEBUG LINE
+
+        if (!res.ok) {
+            console.error('Failed to fetch friend statistics:', res.status);
+            const errorText = await res.text();
+            console.error('Error response:', errorText); // DEBUG LINE
+            return null;
+        }
+
+        const data = await res.json();
+        console.log('DEBUG: Received data:', data); // DEBUG LINE
+
+        const stats: UserStats = {
+            winCount: data.winCount ?? 0,
+            lossCount: data.lossCount ?? 0,
+            tournamentWinCount: data.tournamentWinCount ?? 0,
+            tournamentCount: data.tournamentCount ?? 0,
+            totalGames: data.totalGames ?? 0,
+        };
+
+        console.log('Friend statistics fetched successfully:', stats);
+        return stats;
+    } catch (err) {
+        console.error('Error fetching friend statistics:', err);
+        return null;
+    }
+}
+
 	private validateProfileUpdateData(data: UpdateProfileData): { isValid: boolean; message?: string } {
 		if (!data.firstName.trim()) {
 			return { isValid: false, message: 'First name is required' };

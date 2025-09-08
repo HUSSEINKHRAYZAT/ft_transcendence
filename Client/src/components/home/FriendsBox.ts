@@ -18,6 +18,8 @@ export class FriendsBox {
     private requestModal: RequestModal;
     private friendsData: any[] = [];
     private pendingMessages: Map<string, number> = new Map();
+    private notificationContainer: HTMLElement | null = null;
+
 
     // Chat state management
     private activeChatUser: string | null = null;
@@ -129,13 +131,16 @@ export class FriendsBox {
             this.renderChatMessages();
         }
 
-        // Refresh friends list if friend is not in list
+        // Check if friend exists before refreshing list
         const friendExists = this.friendsData.some(f => f.username === from);
         if (!friendExists) {
             console.log(`Received message from ${from} who is not in friends list. Refreshing list.`);
             this.loadAndRenderFriends().catch(err => {
                 console.error("Error refreshing friends list after message:", err);
             });
+        } else {
+            // Friend exists, just remove any potential duplicates
+            this.removeDuplicateFriendCards();
         }
     }
 
@@ -258,8 +263,20 @@ export class FriendsBox {
     private updateFriendStatus(username: string, status: string): void {
         console.log(`Updating friend status for ${username} to ${status}`);
 
-        const friendCards = this.container?.querySelectorAll('.friend-card') || [];
+        // Check if friend already exists in friendsData to prevent duplicates
+        const friendIndex = this.friendsData.findIndex(f => f.username === username);
+        if (friendIndex !== -1) {
+            // Friend exists, just update status
+            this.friendsData[friendIndex].status = status;
+        } else {
+            // Friend doesn't exist in our data, don't add them here
+            // Let the friends list refresh handle adding new friends
+            console.log(`Friend ${username} not found in current friends list`);
+            return;
+        }
 
+        // Update UI for existing friend cards
+        const friendCards = this.container?.querySelectorAll('.friend-card') || [];
         friendCards.forEach((card) => {
             const usernameElement = card.querySelector('.friend-username');
             const statusCircle = card.querySelector('.status-circle');
@@ -281,12 +298,8 @@ export class FriendsBox {
                 }
             }
         });
-
-        const friendIndex = this.friendsData.findIndex(f => f.username === username);
-        if (friendIndex !== -1) {
-            this.friendsData[friendIndex].status = status;
-        }
     }
+
 
     private getCurrentUser() {
         try {
@@ -329,72 +342,102 @@ export class FriendsBox {
         }
     }
 
-    private getAuthenticatedContent(): string {
-        return `
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-xl font-bold text-lime-500">Friends</h3>
-                <div class="flex items-center gap-2">
-                    <button id="add-friend" class="p-2 bg-gray-700 hover:bg-gray-600 rounded-full transition-all duration-300" title="${t('Add Friend')}">
-                        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-                        </svg>
-                    </button>
-                    <button id="friend-requests" class="p-2 bg-gray-700 hover:bg-gray-600 rounded-full transition-all duration-300" title="${t('Requests')}">
-                        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2M4 13h2m13-8l-4 4-2-2-4 4"></path>
-                        </svg>
-                    </button>
-                </div>
+private getAuthenticatedContent(): string {
+    return `
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-xl font-bold text-lime-500">Friends</h3>
+            <div class="flex items-center gap-2">
+                <button id="friend-requests" class="p-2 bg-gray-700 hover:bg-gray-600 rounded-full transition-all duration-300" title="${t('Requests')}">
+                    <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2M4 13h2m13-8l-4 4-2-2-4 4"></path>
+                    </svg>
+                </button>
             </div>
+        </div>
 
-            <div class="mb-4">
+        <!-- Notification Container -->
+        <div id="notification-container" class="mb-4"></div>
+
+        <div class="mb-4 space-y-3">
+            <!-- Add Friend Input -->
+            <form id="add-friend-form" class="flex gap-2">
                 <input
-                    id="friends-search"
+                    id="add-friend-input"
                     type="text"
-                    placeholder="${t('Search friends...')}"
-                    class="w-full bg-gray-700 text-white px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-lime-500"
+                    placeholder="${t('Add friend by username...')}"
+                    class="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:border-lime-500 focus:ring-1 focus:ring-lime-500"
                 >
+                <button
+                    type="submit"
+                    id="add-friend-submit"
+                    class="bg-lime-500 hover:bg-lime-600 text-white font-bold px-4 py-2 rounded transition-all duration-300"
+                >
+                    ${t('Add')}
+                </button>
+            </form>
+
+            <!-- Search Friends Input -->
+            <input
+                id="friends-search"
+                type="text"
+                placeholder="${t('Search friends...')}"
+                class="w-full bg-gray-700 text-white px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-lime-500"
+            >
+        </div>
+
+        <div id="friends-list" class="space-y-3">
+            <div id="friends-empty" class="text-sm text-gray-400">
+                ${t('Loading friends...')}
+            </div>
+        </div>
+
+        <!-- Chat Interface -->
+        <div id="chat-interface" class="hidden mt-4 border-t border-gray-600 pt-4">
+            <div class="flex items-center justify-between mb-3">
+                <h4 id="chat-header" class="text-lg font-semibold text-lime-500"></h4>
+                <button id="close-chat" class="text-gray-400 hover:text-white">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
             </div>
 
-            <div id="friends-list" class="space-y-3">
-                <div id="friends-empty" class="text-sm text-gray-400">
-                    ${t('Loading friends...')}
-                </div>
+            <div id="chat-messages" class="bg-gray-800 border border-gray-600 rounded-lg p-3 h-48 overflow-y-auto mb-3">
+                <div class="text-gray-400 text-center text-sm">No messages yet</div>
             </div>
 
-            <!-- Chat Interface -->
-            <div id="chat-interface" class="hidden mt-4 border-t border-gray-600 pt-4">
-                <div class="flex items-center justify-between mb-3">
-                    <h4 id="chat-header" class="text-lg font-semibold text-lime-500"></h4>
-                    <button id="close-chat" class="text-gray-400 hover:text-white">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                        </svg>
-                    </button>
-                </div>
+            <form id="chat-form" class="flex gap-2">
+                <input
+                    id="chat-input"
+                    type="text"
+                    placeholder="${t('Type your message...')}"
+                    class="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:border-lime-500 focus:ring-1 focus:ring-lime-500"
+                    maxlength="500"
+                >
+                <button
+                    type="submit"
+                    class="bg-lime-500 hover:bg-lime-600 text-white font-bold px-4 py-2 rounded transition-all duration-300"
+                >
+                    ${t('Send')}
+                </button>
+            </form>
+        </div>
+    `;
+}
 
-                <div id="chat-messages" class="bg-gray-800 border border-gray-600 rounded-lg p-3 h-48 overflow-y-auto mb-3">
-                    <div class="text-gray-400 text-center text-sm">No messages yet</div>
-                </div>
+    private handleViewFriendStats(friendId: string, friendUsername: string): void {
+    console.warn(`Viewing statistics for friend: ${friendUsername} (ID: ${friendId})`);
+    console.warn('Friend ID type:', typeof friendId, 'Value:', friendId);
 
-                <form id="chat-form" class="flex gap-2">
-                    <input
-                        id="chat-input"
-                        type="text"
-                        placeholder="${t('Type your message...')}"
-                        class="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:border-lime-500 focus:ring-1 focus:ring-lime-500"
-                        maxlength="500"
-                    >
-                    <button
-                        type="submit"
-                        class="bg-lime-500 hover:bg-lime-600 text-white font-bold px-4 py-2 rounded transition-all duration-300"
-                    >
-                        ${t('Send')}
-                    </button>
-                </form>
-            </div>
-        `;
+    // Import and show statistics modal for friend
+    if ((window as any).StatisticsModal) {
+        (window as any).StatisticsModal.showForFriend(friendId, friendUsername);
+    } else {
+        console.error("StatisticsModal not available");
+        alert('Statistics modal not loaded');
     }
+    }
+
 
     private getUnauthenticatedContent(): string {
         return `
@@ -406,38 +449,127 @@ export class FriendsBox {
         `;
     }
 
-    private setupEventListeners(): void {
-        const signinBtn = document.getElementById("friends-signin");
-        const addFriendBtn = document.getElementById("add-friend");
-        const requestsBtn = document.getElementById("friend-requests");
-        const searchInput = document.getElementById("friends-search") as HTMLInputElement;
-        const chatForm = document.getElementById("chat-form") as HTMLFormElement;
-        const closeChatBtn = document.getElementById("close-chat");
+private setupEventListeners(): void {
+    const signinBtn = document.getElementById("friends-signin");
+    const requestsBtn = document.getElementById("friend-requests");
+    const searchInput = document.getElementById("friends-search") as HTMLInputElement;
+    const chatForm = document.getElementById("chat-form") as HTMLFormElement;
+    const closeChatBtn = document.getElementById("close-chat");
+    const addFriendForm = document.getElementById("add-friend-form") as HTMLFormElement;
 
-        if (signinBtn) {
-            signinBtn.addEventListener("click", () => this.showLoginModal());
-        }
+    // Initialize notification container
+    this.notificationContainer = document.getElementById("notification-container");
 
-        if (addFriendBtn) {
-            addFriendBtn.addEventListener("click", () => this.showAddFriendModal());
-        }
-
-        if (requestsBtn) {
-            requestsBtn.addEventListener("click", () => this.showRequestsModal());
-        }
-
-        if (searchInput) {
-            searchInput.addEventListener("input", (e) => this.handleSearch((e.target as HTMLInputElement).value));
-        }
-
-        if (chatForm) {
-            chatForm.addEventListener("submit", (e) => this.handleSendMessage(e));
-        }
-
-        if (closeChatBtn) {
-            closeChatBtn.addEventListener("click", () => this.closeChatInterface());
-        }
+    if (signinBtn) {
+        signinBtn.addEventListener("click", () => this.showLoginModal());
     }
+
+    if (requestsBtn) {
+        requestsBtn.addEventListener("click", () => this.showRequestsModal());
+    }
+
+    if (searchInput) {
+        searchInput.addEventListener("input", (e) => this.handleSearch((e.target as HTMLInputElement).value));
+    }
+
+    if (chatForm) {
+        chatForm.addEventListener("submit", (e) => this.handleSendMessage(e));
+    }
+
+    if (closeChatBtn) {
+        closeChatBtn.addEventListener("click", () => this.closeChatInterface());
+    }
+
+    if (addFriendForm) {
+        addFriendForm.addEventListener("submit", (e) => this.handleAddFriendSubmit(e));
+    }
+}
+
+private async handleAddFriendSubmit(event: Event): Promise<void> {
+    event.preventDefault();
+
+    const me = this.getCurrentUser();
+    if (!me?.userName) {
+        this.showNotification(t('Please sign in first.'), 'error');
+        return;
+    }
+
+    const input = document.getElementById("add-friend-input") as HTMLInputElement;
+    const submitBtn = document.getElementById("add-friend-submit") as HTMLButtonElement;
+
+    if (!input || !submitBtn) return;
+
+    const friendUsername = input.value.trim();
+    if (!friendUsername) {
+        this.showNotification(t('Please enter a username'), 'error');
+        return;
+    }
+
+    if (friendUsername === me.userName) {
+        this.showNotification(t('You cannot add yourself'), 'error');
+        return;
+    }
+
+    // Disable form while processing
+    submitBtn.disabled = true;
+    submitBtn.textContent = t('Sending...');
+    input.disabled = true;
+
+    try {
+        const response = await authService.sendFriendRequest(me.userName, friendUsername);
+
+        if (response.success) {
+            this.showNotification(t('Friend request sent!'), 'success');
+            input.value = ""; // Clear input on success
+        } else {
+            let errorMessage = t('Could not send request');
+            if (response.message?.includes('404')) {
+                errorMessage = t('User not found');
+            } else if (response.message?.includes('409')) {
+                errorMessage = t('Friend request already exists or user is already your friend');
+            } else if (response.message) {
+                errorMessage = response.message;
+            }
+            this.showNotification(errorMessage, 'error');
+        }
+    } catch (err: any) {
+        console.error('Error sending friend request:', err);
+        this.showNotification(t('Could not send request') + ': ' + err.message, 'error');
+    } finally {
+        // Re-enable form
+        submitBtn.disabled = false;
+        submitBtn.textContent = t('Add');
+        input.disabled = false;
+    }
+}
+
+private showNotification(message: string, type: 'success' | 'error' | 'info' = 'info'): void {
+    if (!this.notificationContainer) return;
+
+    const notificationId = `notification-${Date.now()}`;
+    const bgColor = type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-blue-500';
+
+    const notificationHtml = `
+        <div id="${notificationId}" class="${bgColor} text-white px-4 py-3 rounded-lg mb-2 flex items-center justify-between animate-fade-in">
+            <span class="text-sm">${this.escape(message)}</span>
+            <button onclick="document.getElementById('${notificationId}').remove()" class="ml-3 text-white hover:text-gray-200">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+    `;
+
+    this.notificationContainer.insertAdjacentHTML('beforeend', notificationHtml);
+
+    // Auto-remove notification after 5 seconds
+    setTimeout(() => {
+        const notification = document.getElementById(notificationId);
+        if (notification) {
+            notification.remove();
+        }
+    }, 5000);
+}
 
     private handleSearch(query: string): void {
         const friendCards = this.container?.querySelectorAll('.friend-card') || [];
@@ -497,7 +629,53 @@ export class FriendsBox {
         }
     }
 
+private removeDuplicateFriendCards(): void {
+    const friendCards = this.container?.querySelectorAll('.friend-card') || [];
+    const seenUsernames = new Set<string>();
+
+    friendCards.forEach((card) => {
+        const usernameElement = card.querySelector('.friend-username');
+        if (usernameElement) {
+            const usernameText = usernameElement.textContent;
+            if (usernameText) {
+                // Extract username (remove @ symbol)
+                const username = usernameText.replace('@', '');
+
+                if (seenUsernames.has(username)) {
+                    // This is a duplicate, remove it
+                    console.log(`🔍 Removing duplicate friend card for ${username}`);
+                    card.remove();
+                } else {
+                    seenUsernames.add(username);
+                }
+            }
+        }
+    });
+}
+
+
     private closeChatInterface(): void {
+        if (this.activeChatUser) {
+            // Clear messages for the current active chat user
+            console.log(`🗑️ Clearing messages for ${this.activeChatUser}`);
+            this.chatMessages.delete(this.activeChatUser);
+
+            // Clear processed message IDs for this user
+            const userMessageIds = Array.from(this.processedMessageIds).filter(id =>
+                id.includes(this.activeChatUser!) || id.startsWith(`${this.activeChatUser}_`)
+            );
+            userMessageIds.forEach(id => this.processedMessageIds.delete(id));
+
+            // Clear last message content for this user
+            this.lastMessageContent.delete(`${this.activeChatUser}_received`);
+            this.lastMessageContent.delete(`${this.activeChatUser}_sent`);
+
+            // Save the updated state to storage
+            this.saveMessagesToStorage();
+
+            console.log(`✅ Messages cleared for ${this.activeChatUser}`);
+        }
+
         this.activeChatUser = null;
 
         const chatInterface = document.getElementById('chat-interface');
@@ -653,40 +831,13 @@ export class FriendsBox {
         }
     }
 
-    private async showAddFriendModal(): Promise<void> {
-        const me = this.getCurrentUser();
-        if (!me?.userName) {
-            alert(t('Please sign in first.'));
-            return;
-        }
-
-        const friendUsername = prompt(t('Enter friends username:'));
-        if (!friendUsername) return;
-
-        if (friendUsername === me.userName) {
-            alert(t('You cannot add yourself'));
-            return;
-        }
-
-        try {
-            const response = await authService.sendFriendRequest(me.userName, friendUsername);
-
-            if (response.success) {
-                alert(t('Friend request sent!'));
-            } else {
-                if (response.message?.includes('404')) {
-                    alert(t('User not found'));
-                } else if (response.message?.includes('409')) {
-                    alert(t('Friend request already exists or user is already your friend'));
-                } else {
-                    alert(t('Could not send request:') + ' ' + response.message);
-                }
-            }
-        } catch (err: any) {
-            console.error('Error sending friend request:', err);
-            alert(t('Could not send request:') + ' ' + err.message);
-        }
+private async showAddFriendModal(): Promise<void> {
+    // This method is no longer needed, but kept for backward compatibility
+    const input = document.getElementById("add-friend-input") as HTMLInputElement;
+    if (input) {
+        input.focus();
     }
+}
 
     private async showRequestsModal(): Promise<void> {
         const me = this.getCurrentUser();
@@ -751,9 +902,15 @@ export class FriendsBox {
 
             if (response.success && response.data) {
                 const friends = Array.isArray(response.data) ? response.data : [];
-                this.friendsData = friends;
 
-                if (friends.length === 0) {
+                // Remove duplicates based on username before storing
+                const uniqueFriends = friends.filter((friend, index, self) =>
+                    index === self.findIndex(f => f.username === friend.username)
+                );
+
+                this.friendsData = uniqueFriends;
+
+                if (uniqueFriends.length === 0) {
                     if (emptyEl) {
                         emptyEl.style.display = "block";
                         emptyEl.textContent = t('No friends yet.');
@@ -763,7 +920,7 @@ export class FriendsBox {
 
                 if (emptyEl) emptyEl.style.display = "none";
 
-                for (const friend of friends) {
+                for (const friend of uniqueFriends) {
                     const card = this.renderFriendCard(friend);
                     listEl.insertAdjacentHTML("beforeend", card);
                 }
@@ -815,10 +972,24 @@ export class FriendsBox {
                 }
             });
         });
+
+        // Setup statistics listeners
+        const statsButtons = this.container?.querySelectorAll('.stats-friend-btn') || [];
+        statsButtons.forEach((btn) => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                const friendId = btn.getAttribute('data-friend-id');
+                const friendUsername = btn.getAttribute('data-username');
+                if (friendId && friendUsername) {
+                    this.handleViewFriendStats(friendId, friendUsername);
+                }
+            });
+        });
     }
 
     private renderFriendCard(friend: any): string {
         const username = (friend.username || "").toString();
+        const friendId = (friend.id || friend.userId || "").toString(); // Get friend ID
         const firstName = (friend.firstName || "").toString();
         const lastName = (friend.lastName || "").toString();
         const profilePath = friend.profilePath;
@@ -838,9 +1009,9 @@ export class FriendsBox {
             const fullAvatarPath = profilePath.startsWith('avatars/') ? profilePath : `avatars/${profilePath}`;
             avatarHtml = `
                 <img src="${this.escape(fullAvatarPath)}"
-                     alt="${this.escape(displayName)}"
-                     class="w-8 h-8 rounded-full object-cover"
-                     onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                    alt="${this.escape(displayName)}"
+                    class="w-8 h-8 rounded-full object-cover"
+                    onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
                 <div class="w-8 h-8 ${color} rounded-full flex items-center justify-center text-white font-bold text-sm" style="display: none;">
                     ${initials}
                 </div>
@@ -864,12 +1035,23 @@ export class FriendsBox {
                     </div>
                 </div>
 
-                <div class="friend-actions flex items-center gap-3">
+                <div class="friend-actions flex items-center gap-2">
                     ${pendingCount > 0 ? `
                         <div class="message-indicator bg-red-500 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">
                             ${pendingCount}
                         </div>
                     ` : ''}
+
+                    <button
+                        class="stats-friend-btn p-1 hover:opacity-70 transition-opacity duration-300 text-purple-400"
+                        data-friend-id="${this.escape(friendId)}"
+                        data-username="${this.escape(username)}"
+                        title="${t('View Statistics')}"
+                    >
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                        </svg>
+                    </button>
 
                     <button
                         class="chat-friend-btn p-1 hover:opacity-70 transition-opacity duration-300 ${isChatActive ? 'text-lime-400' : 'text-blue-400'}"

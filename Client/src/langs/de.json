@@ -438,5 +438,17 @@
   "Verify & Login": "Überprüfen & Einloggen",
   "Search friends...": "Freunde suchen...",
   "Loading friends...": "Freunde werden geladen...",
-  "Email cannot be changed": "E-Mail kann nicht geändert werden"
+  "Email cannot be changed": "E-Mail kann nicht geändert werden",
+  "Apply Changes": "Änderungen übernehmen",
+  "Type your message...": "Geben Sie Ihre Nachricht ein...",
+  "Send": "Senden",
+  "View Statistics": "Statistiken anzeigen",
+  "Chat": "Chatten",
+  "All changes have been applied successfully!": "Alle Änderungen wurden erfolgreich übernommen!",
+  "Are you sure you want to remove": "Sind Sie sicher, dass Sie entfernen möchten",
+  "Refresh": "Aktualisieren",
+  "🔒 Cybersecurity [ 2 / 2.5 ]": "🔒 Cybersicherheit [ 2 / 2.5 ]",
+  "⚙️ DevOps [ 2 / 2.5 ]": "⚙️ DevOps [ 2 / 2.5 ]",
+  "Add accessibility features for visually impaired users": "Barrierefreiheitsfunktionen für sehbehinderte Benutzer hinzufügen",
+  "Server-Side Rendering (SSR) integration.": "Server-Side Rendering (SSR) Integration."
 }
