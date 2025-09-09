@@ -1,6 +1,9 @@
 import { languageManager, t } from '../../langs/LanguageManager';
 import { RequestModal } from '../modals/RequestModal';
 import { authService } from '../../services/AuthService';
+import { BlockedUsersModal } from '../modals/BlockedUsersModal';
+
+
 
 interface ChatMessage {
     id: string;
@@ -13,6 +16,7 @@ interface ChatMessage {
 
 export class FriendsBox {
     private container: HTMLElement | null = null;
+    private blockedUsersModal: BlockedUsersModal; // this is for blocked users
     private isRendered: boolean = false;
     private unsubscribeLanguageChange?: () => void;
     private requestModal: RequestModal;
@@ -20,14 +24,11 @@ export class FriendsBox {
     private pendingMessages: Map<string, number> = new Map();
     private notificationContainer: HTMLElement | null = null;
 
-
-    // Chat state management
     private activeChatUser: string | null = null;
     private chatMessages: Map<string, ChatMessage[]> = new Map();
     private processedMessageIds: Set<string> = new Set();
     private lastMessageContent: Map<string, string> = new Map();
 
-    // Store bound event handlers
     private boundHandleFriendStatusChange!: (event: Event) => void;
     private boundHandleDirectMessageReceived!: (event: Event) => void;
     private boundHandleDirectMessageSent!: (event: Event) => void;
@@ -37,6 +38,7 @@ export class FriendsBox {
     constructor() {
         this.container = document.getElementById("friends-box");
         this.requestModal = new RequestModal();
+        this.blockedUsersModal = new BlockedUsersModal();
         this.boundHandleThemeChange = this.handleThemeChange.bind(this);
         window.addEventListener('theme-changed', this.boundHandleThemeChange);
 
@@ -57,19 +59,16 @@ export class FriendsBox {
             }
         });
 
-        // Listen for events
         window.addEventListener('friends-list-changed', this.boundHandleFriendsListChanged);
         window.addEventListener('friend-status-change', this.boundHandleFriendStatusChange);
         window.addEventListener('direct-message-received', this.boundHandleDirectMessageReceived);
         window.addEventListener('direct-message-sent', this.boundHandleDirectMessageSent);
 
-        // Load messages on initialization
         this.loadMessagesFromStorage();
     }
 
     private handleThemeChange(): void {
     if (this.activeChatUser) {
-        // Re-render chat messages when theme changes
         this.renderChatMessages();
     }
     }
@@ -96,12 +95,10 @@ export class FriendsBox {
 
         console.log(`📨 Message received from: ${from} - "${text}"`);
 
-        // Enhanced duplicate detection
         const msgId = messageId || `${from}_${text}_${Date.now()}`;
         const messageKey = `${from}_received`;
         const lastMessage = this.lastMessageContent.get(messageKey);
 
-        // Check for duplicate messages
         if (this.processedMessageIds.has(msgId) || lastMessage === text) {
             console.log('📨 Duplicate message detected, ignoring');
             return;
@@ -110,7 +107,6 @@ export class FriendsBox {
         this.processedMessageIds.add(msgId);
         this.lastMessageContent.set(messageKey, text);
 
-        // Add message to chat history
         const message: ChatMessage = {
             id: msgId,
             from: from,
@@ -122,16 +118,13 @@ export class FriendsBox {
 
         this.addMessageToChat(from, message);
 
-        // Update pending message count if chat is not active for this user
         if (this.activeChatUser !== from) {
             this.incrementPendingMessageCount(from);
             this.updateFriendMessageIndicator(from);
         } else {
-            // If chat is active, display the message immediately
             this.renderChatMessages();
         }
 
-        // Check if friend exists before refreshing list
         const friendExists = this.friendsData.some(f => f.username === from);
         if (!friendExists) {
             console.log(`Received message from ${from} who is not in friends list. Refreshing list.`);
@@ -139,7 +132,6 @@ export class FriendsBox {
                 console.error("Error refreshing friends list after message:", err);
             });
         } else {
-            // Friend exists, just remove any potential duplicates
             this.removeDuplicateFriendCards();
         }
     }
@@ -300,7 +292,6 @@ export class FriendsBox {
         });
     }
 
-
     private getCurrentUser() {
         try {
             const raw = localStorage.getItem("ft_pong_user_data");
@@ -342,88 +333,95 @@ export class FriendsBox {
         }
     }
 
-private getAuthenticatedContent(): string {
-    return `
-        <div class="flex items-center justify-between mb-4">
-            <h3 class="text-xl font-bold text-lime-500">Friends</h3>
-            <div class="flex items-center gap-2">
-                <button id="friend-requests" class="p-2 bg-gray-700 hover:bg-gray-600 rounded-full transition-all duration-300" title="${t('Requests')}">
-                    <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2M4 13h2m13-8l-4 4-2-2-4 4"></path>
-                    </svg>
-                </button>
+    private getAuthenticatedContent(): string {
+        return `
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-xl font-bold text-lime-500">Friends</h3>
+                <div class="flex items-center gap-2">
+                    <button id="blocked-users" class="p-2 bg-gray-700 hover:bg-gray-600 rounded-full transition-all duration-300" title="${t('Blocked Users')}">
+                        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m0 0v2m0-2h2m-2 0H10m2-7a2 2 0 100-4 2 2 0 000 4zM7 19H5a2 2 0 01-2-2V7a2 2 0 012-2h2m10 0h2a2 2 0 012 2v10a2 2 0 01-2 2h-2"></path>
+                        </svg>
+                    </button>
+                    <button id="friend-requests" class="p-2 bg-gray-700 hover:bg-gray-600 rounded-full transition-all duration-300" title="${t('Requests')}">
+                        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2M4 13h2m13-8l-4 4-2-2-4 4"></path>
+                        </svg>
+                    </button>
+                </div>
             </div>
-        </div>
 
-        <!-- Notification Container -->
-        <div id="notification-container" class="mb-4"></div>
+            <!-- Rest of the content remains the same -->
+            <!-- Notification Container -->
+            <div id="notification-container" class="mb-4"></div>
 
-        <div class="mb-4 space-y-3">
-            <!-- Add Friend Input -->
-            <form id="add-friend-form" class="flex gap-2">
+            <div class="mb-4 space-y-3">
+                <!-- Add Friend Input -->
+                <form id="add-friend-form" class="flex gap-2">
+                    <input
+                        id="add-friend-input"
+                        type="text"
+                        placeholder="${t('Add friend by username...')}"
+                        class="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:border-lime-500 focus:ring-1 focus:ring-lime-500"
+                    >
+                    <button
+                        type="submit"
+                        id="add-friend-submit"
+                        class="bg-lime-500 hover:bg-lime-600 text-white font-bold px-4 py-2 rounded transition-all duration-300"
+                    >
+                        ${t('Add')}
+                    </button>
+                </form>
+
+                <!-- Search Friends Input -->
                 <input
-                    id="add-friend-input"
+                    id="friends-search"
                     type="text"
-                    placeholder="${t('Add friend by username...')}"
-                    class="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:border-lime-500 focus:ring-1 focus:ring-lime-500"
+                    placeholder="${t('Search friends...')}"
+                    class="w-full bg-gray-700 text-white px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-lime-500"
                 >
-                <button
-                    type="submit"
-                    id="add-friend-submit"
-                    class="bg-lime-500 hover:bg-lime-600 text-white font-bold px-4 py-2 rounded transition-all duration-300"
-                >
-                    ${t('Add')}
-                </button>
-            </form>
-
-            <!-- Search Friends Input -->
-            <input
-                id="friends-search"
-                type="text"
-                placeholder="${t('Search friends...')}"
-                class="w-full bg-gray-700 text-white px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-lime-500"
-            >
-        </div>
-
-        <div id="friends-list" class="space-y-3">
-            <div id="friends-empty" class="text-sm text-gray-400">
-                ${t('Loading friends...')}
-            </div>
-        </div>
-
-        <!-- Chat Interface -->
-        <div id="chat-interface" class="hidden mt-4 border-t border-gray-600 pt-4">
-            <div class="flex items-center justify-between mb-3">
-                <h4 id="chat-header" class="text-lg font-semibold text-lime-500"></h4>
-                <button id="close-chat" class="text-gray-400 hover:text-white">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                    </svg>
-                </button>
             </div>
 
-            <div id="chat-messages" class="bg-gray-800 border border-gray-600 rounded-lg p-3 h-48 overflow-y-auto mb-3">
-                <div class="text-gray-400 text-center text-sm">No messages yet</div>
+            <div id="friends-list" class="space-y-3">
+                <div id="friends-empty" class="text-sm text-gray-400">
+                    ${t('Loading friends...')}
+                </div>
             </div>
 
-            <form id="chat-form" class="flex gap-2">
-                <input
-                    id="chat-input"
-                    type="text"
-                    placeholder="${t('Type your message...')}"
-                    class="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:border-lime-500 focus:ring-1 focus:ring-lime-500"
-                    maxlength="500"
-                >
-                <button
-                    type="submit"
-                    class="bg-lime-500 hover:bg-lime-600 text-white font-bold px-4 py-2 rounded transition-all duration-300"
-                >
-                    ${t('Send')}
-                </button>
-            </form>
-        </div>
-    `;
-}
+            <!-- Chat Interface -->
+            <div id="chat-interface" class="hidden mt-4 border-t border-gray-600 pt-4">
+                <div class="flex items-center justify-between mb-3">
+                    <h4 id="chat-header" class="text-lg font-semibold text-lime-500"></h4>
+                    <button id="close-chat" class="text-gray-400 hover:text-white">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+
+                <div id="chat-messages" class="bg-gray-800 border border-gray-600 rounded-lg p-3 h-48 overflow-y-auto mb-3">
+                    <div class="text-gray-400 text-center text-sm">No messages yet</div>
+                </div>
+
+                <form id="chat-form" class="flex gap-2">
+                    <input
+                        id="chat-input"
+                        type="text"
+                        placeholder="${t('Type your message...')}"
+                        class="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:border-lime-500 focus:ring-1 focus:ring-lime-500"
+                        maxlength="500"
+                    >
+                    <button
+                        type="submit"
+                        class="bg-lime-500 hover:bg-lime-600 text-white font-bold px-4 py-2 rounded transition-all duration-300"
+                    >
+                        ${t('Send')}
+                    </button>
+                </form>
+            </div>
+        `;
+    }
+
 
     private handleViewFriendStats(friendId: string, friendUsername: string): void {
     console.warn(`Viewing statistics for friend: ${friendUsername} (ID: ${friendId})`);
@@ -438,7 +436,6 @@ private getAuthenticatedContent(): string {
     }
     }
 
-
     private getUnauthenticatedContent(): string {
         return `
             <h3 class="text-xl font-bold mb-4 text-lime-500">Friends</h3>
@@ -449,127 +446,143 @@ private getAuthenticatedContent(): string {
         `;
     }
 
-private setupEventListeners(): void {
-    const signinBtn = document.getElementById("friends-signin");
-    const requestsBtn = document.getElementById("friend-requests");
-    const searchInput = document.getElementById("friends-search") as HTMLInputElement;
-    const chatForm = document.getElementById("chat-form") as HTMLFormElement;
-    const closeChatBtn = document.getElementById("close-chat");
-    const addFriendForm = document.getElementById("add-friend-form") as HTMLFormElement;
+    private setupEventListeners(): void {
+        const signinBtn = document.getElementById("friends-signin");
+        const requestsBtn = document.getElementById("friend-requests");
+        const blockedUsersBtn = document.getElementById("blocked-users"); // Add this line
+        const searchInput = document.getElementById("friends-search") as HTMLInputElement;
+        const chatForm = document.getElementById("chat-form") as HTMLFormElement;
+        const closeChatBtn = document.getElementById("close-chat");
+        const addFriendForm = document.getElementById("add-friend-form") as HTMLFormElement;
 
-    // Initialize notification container
-    this.notificationContainer = document.getElementById("notification-container");
+        // Initialize notification container
+        this.notificationContainer = document.getElementById("notification-container");
 
-    if (signinBtn) {
-        signinBtn.addEventListener("click", () => this.showLoginModal());
+        if (signinBtn) {
+            signinBtn.addEventListener("click", () => this.showLoginModal());
+        }
+
+        if (requestsBtn) {
+            requestsBtn.addEventListener("click", () => this.showRequestsModal());
+        }
+
+        // Add this block for blocked users button
+        if (blockedUsersBtn) {
+            blockedUsersBtn.addEventListener("click", () => this.showBlockedUsersModal());
+        }
+
+        if (searchInput) {
+            searchInput.addEventListener("input", (e) => this.handleSearch((e.target as HTMLInputElement).value));
+        }
+
+        if (chatForm) {
+            chatForm.addEventListener("submit", (e) => this.handleSendMessage(e));
+        }
+
+        if (closeChatBtn) {
+            closeChatBtn.addEventListener("click", () => this.closeChatInterface());
+        }
+
+        if (addFriendForm) {
+            addFriendForm.addEventListener("submit", (e) => this.handleAddFriendSubmit(e));
+        }
     }
 
-    if (requestsBtn) {
-        requestsBtn.addEventListener("click", () => this.showRequestsModal());
+    private async showBlockedUsersModal(): Promise<void> {
+        const me = this.getCurrentUser();
+        if (!me?.userName) {
+            alert(t('Please sign in first.'));
+            return;
+        }
+
+        await this.blockedUsersModal.showBlockedUsers();
     }
 
-    if (searchInput) {
-        searchInput.addEventListener("input", (e) => this.handleSearch((e.target as HTMLInputElement).value));
-    }
+    private async handleAddFriendSubmit(event: Event): Promise<void> {
+        event.preventDefault();
 
-    if (chatForm) {
-        chatForm.addEventListener("submit", (e) => this.handleSendMessage(e));
-    }
+        const me = this.getCurrentUser();
+        if (!me?.userName)
+        {
+            this.showNotification(t('Please sign in first.'), 'error');
+            return;
+        }
 
-    if (closeChatBtn) {
-        closeChatBtn.addEventListener("click", () => this.closeChatInterface());
-    }
+        const input = document.getElementById("add-friend-input") as HTMLInputElement;
+        const submitBtn = document.getElementById("add-friend-submit") as HTMLButtonElement;
 
-    if (addFriendForm) {
-        addFriendForm.addEventListener("submit", (e) => this.handleAddFriendSubmit(e));
-    }
-}
+        if (!input || !submitBtn) return;
 
-private async handleAddFriendSubmit(event: Event): Promise<void> {
-    event.preventDefault();
+        const friendUsername = input.value.trim();
+        if (!friendUsername) {
+            this.showNotification(t('Please enter a username'), 'error');
+            return;
+        }
 
-    const me = this.getCurrentUser();
-    if (!me?.userName) {
-        this.showNotification(t('Please sign in first.'), 'error');
-        return;
-    }
+        if (friendUsername === me.userName) {
+            this.showNotification(t('You cannot add yourself'), 'error');
+            return;
+        }
 
-    const input = document.getElementById("add-friend-input") as HTMLInputElement;
-    const submitBtn = document.getElementById("add-friend-submit") as HTMLButtonElement;
+        submitBtn.disabled = true;
+        submitBtn.textContent = t('Sending...');
+        input.disabled = true;
 
-    if (!input || !submitBtn) return;
+        try {
+            const response = await authService.sendFriendRequest(me.userName, friendUsername);
 
-    const friendUsername = input.value.trim();
-    if (!friendUsername) {
-        this.showNotification(t('Please enter a username'), 'error');
-        return;
-    }
-
-    if (friendUsername === me.userName) {
-        this.showNotification(t('You cannot add yourself'), 'error');
-        return;
-    }
-
-    // Disable form while processing
-    submitBtn.disabled = true;
-    submitBtn.textContent = t('Sending...');
-    input.disabled = true;
-
-    try {
-        const response = await authService.sendFriendRequest(me.userName, friendUsername);
-
-        if (response.success) {
-            this.showNotification(t('Friend request sent!'), 'success');
-            input.value = ""; // Clear input on success
-        } else {
-            let errorMessage = t('Could not send request');
-            if (response.message?.includes('404')) {
-                errorMessage = t('User not found');
-            } else if (response.message?.includes('409')) {
-                errorMessage = t('Friend request already exists or user is already your friend');
-            } else if (response.message) {
-                errorMessage = response.message;
+            if (response.success) {
+                this.showNotification(t('Friend request sent!'), 'success');
+                input.value = "";
+            } else {
+                let errorMessage = t('Could not send request');
+                if (response.message?.includes('404')) {
+                    errorMessage = t('User not found');
+                } else if (response.message?.includes('409')) {
+                    errorMessage = t('Friend request already exists or user is already your friend');
+                } else if (response.message) {
+                    errorMessage = response.message;
+                }
+                this.showNotification(errorMessage, 'error');
             }
-            this.showNotification(errorMessage, 'error');
+        } catch (err: any) {
+            console.error('Error sending friend request:', err);
+            this.showNotification(t('Could not send request') + ': ' + err.message, 'error');
+        } finally {
+            // Re-enable form
+            submitBtn.disabled = false;
+            submitBtn.textContent = t('Add');
+            input.disabled = false;
         }
-    } catch (err: any) {
-        console.error('Error sending friend request:', err);
-        this.showNotification(t('Could not send request') + ': ' + err.message, 'error');
-    } finally {
-        // Re-enable form
-        submitBtn.disabled = false;
-        submitBtn.textContent = t('Add');
-        input.disabled = false;
     }
-}
 
-private showNotification(message: string, type: 'success' | 'error' | 'info' = 'info'): void {
-    if (!this.notificationContainer) return;
+    private showNotification(message: string, type: 'success' | 'error' | 'info' = 'info'): void {
+        if (!this.notificationContainer) return;
 
-    const notificationId = `notification-${Date.now()}`;
-    const bgColor = type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-blue-500';
+        const notificationId = `notification-${Date.now()}`;
+        const bgColor = type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-blue-500';
 
-    const notificationHtml = `
-        <div id="${notificationId}" class="${bgColor} text-white px-4 py-3 rounded-lg mb-2 flex items-center justify-between animate-fade-in">
-            <span class="text-sm">${this.escape(message)}</span>
-            <button onclick="document.getElementById('${notificationId}').remove()" class="ml-3 text-white hover:text-gray-200">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                </svg>
-            </button>
-        </div>
-    `;
+        const notificationHtml = `
+            <div id="${notificationId}" class="${bgColor} text-white px-4 py-3 rounded-lg mb-2 flex items-center justify-between animate-fade-in">
+                <span class="text-sm">${this.escape(message)}</span>
+                <button onclick="document.getElementById('${notificationId}').remove()" class="ml-3 text-white hover:text-gray-200">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+        `;
 
-    this.notificationContainer.insertAdjacentHTML('beforeend', notificationHtml);
+        this.notificationContainer.insertAdjacentHTML('beforeend', notificationHtml);
 
-    // Auto-remove notification after 5 seconds
-    setTimeout(() => {
-        const notification = document.getElementById(notificationId);
-        if (notification) {
-            notification.remove();
-        }
-    }, 5000);
-}
+        // Auto-remove notification after 5 seconds
+        setTimeout(() => {
+            const notification = document.getElementById(notificationId);
+            if (notification) {
+                notification.remove();
+            }
+        }, 5000);
+    }
 
     private handleSearch(query: string): void {
         const friendCards = this.container?.querySelectorAll('.friend-card') || [];
@@ -629,30 +642,29 @@ private showNotification(message: string, type: 'success' | 'error' | 'info' = '
         }
     }
 
-private removeDuplicateFriendCards(): void {
-    const friendCards = this.container?.querySelectorAll('.friend-card') || [];
-    const seenUsernames = new Set<string>();
+    private removeDuplicateFriendCards(): void {
+        const friendCards = this.container?.querySelectorAll('.friend-card') || [];
+        const seenUsernames = new Set<string>();
 
-    friendCards.forEach((card) => {
-        const usernameElement = card.querySelector('.friend-username');
-        if (usernameElement) {
-            const usernameText = usernameElement.textContent;
-            if (usernameText) {
-                // Extract username (remove @ symbol)
-                const username = usernameText.replace('@', '');
+        friendCards.forEach((card) => {
+            const usernameElement = card.querySelector('.friend-username');
+            if (usernameElement) {
+                const usernameText = usernameElement.textContent;
+                if (usernameText) {
+                    // Extract username (remove @ symbol)
+                    const username = usernameText.replace('@', '');
 
-                if (seenUsernames.has(username)) {
-                    // This is a duplicate, remove it
-                    console.log(`🔍 Removing duplicate friend card for ${username}`);
-                    card.remove();
-                } else {
-                    seenUsernames.add(username);
+                    if (seenUsernames.has(username)) {
+                        // This is a duplicate, remove it
+                        console.log(`🔍 Removing duplicate friend card for ${username}`);
+                        card.remove();
+                    } else {
+                        seenUsernames.add(username);
+                    }
                 }
             }
-        }
-    });
-}
-
+        });
+    }
 
     private closeChatInterface(): void {
         if (this.activeChatUser) {
@@ -830,14 +842,6 @@ private removeDuplicateFriendCards(): void {
             alert(t('Login - Modal service not loaded'));
         }
     }
-
-private async showAddFriendModal(): Promise<void> {
-    // This method is no longer needed, but kept for backward compatibility
-    const input = document.getElementById("add-friend-input") as HTMLInputElement;
-    if (input) {
-        input.focus();
-    }
-}
 
     private async showRequestsModal(): Promise<void> {
         const me = this.getCurrentUser();
@@ -1116,34 +1120,39 @@ private async showAddFriendModal(): Promise<void> {
         return div.innerHTML;
     }
 
-    destroy(): void {
-        // Unsubscribe from language changes
-        if (this.unsubscribeLanguageChange) {
-            this.unsubscribeLanguageChange();
-        }
-
-        // Remove event listeners
-        window.removeEventListener('friend-status-change', this.boundHandleFriendStatusChange);
-        window.removeEventListener('direct-message-received', this.boundHandleDirectMessageReceived);
-        window.removeEventListener('direct-message-sent', this.boundHandleDirectMessageSent);
-        window.removeEventListener('friends-list-changed', this.boundHandleFriendsListChanged);
-        window.removeEventListener('theme-changed', this.boundHandleThemeChange);
-
-        // Cleanup request modal
-        if (this.requestModal) {
-            this.requestModal.destroy();
-        }
-
-        // Clear chat state
-        this.activeChatUser = null;
-        this.chatMessages.clear();
-        this.pendingMessages.clear();
-        this.processedMessageIds.clear();
-
-        if (this.container) {
-            this.container.innerHTML = "";
-        }
-        this.isRendered = false;
-        console.log("FriendsBox component destroyed");
+destroy(): void {
+    // Unsubscribe from language changes
+    if (this.unsubscribeLanguageChange) {
+        this.unsubscribeLanguageChange();
     }
+
+    // Remove event listeners
+    window.removeEventListener('friend-status-change', this.boundHandleFriendStatusChange);
+    window.removeEventListener('direct-message-received', this.boundHandleDirectMessageReceived);
+    window.removeEventListener('direct-message-sent', this.boundHandleDirectMessageSent);
+    window.removeEventListener('friends-list-changed', this.boundHandleFriendsListChanged);
+    window.removeEventListener('theme-changed', this.boundHandleThemeChange);
+
+    // Cleanup request modal
+    if (this.requestModal) {
+        this.requestModal.destroy();
+    }
+
+    // Cleanup blocked users modal
+    if (this.blockedUsersModal) {
+        this.blockedUsersModal.destroy();
+    }
+
+    // Clear chat state
+    this.activeChatUser = null;
+    this.chatMessages.clear();
+    this.pendingMessages.clear();
+    this.processedMessageIds.clear();
+
+    if (this.container) {
+        this.container.innerHTML = "";
+    }
+    this.isRendered = false;
+    console.log("FriendsBox component destroyed");
+}
 }

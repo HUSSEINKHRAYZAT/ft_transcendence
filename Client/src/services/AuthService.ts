@@ -1692,6 +1692,33 @@ async getFriendStatistics(friendId: string): Promise<UserStats | null> {
 		}
 	}
 
+	async getBlockedUsers(userId: string): Promise<AuthResponse> {
+    try {
+        const response = await fetch(`${API_BASE_URL}/relation/blocked/${userId}`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${this.state.token}`,
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            return { success: true, data };
+        } else {
+            const errorData = await response.json().catch(() => ({}));
+            return {
+                success: false,
+                message: errorData.message || 'Failed to load blocked users',
+                statusCode: response.status
+            };
+        }
+    } catch (error) {
+        console.error('Error loading blocked users:', error);
+        return { success: false, message: ERROR_MESSAGES.NETWORK_ERROR };
+    }
+}
+
 	public async routineStatistics(): Promise<UserStats | null> {
     if (!this.state.user) return null;
 

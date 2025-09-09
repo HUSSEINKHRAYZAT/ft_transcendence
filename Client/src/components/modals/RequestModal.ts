@@ -14,6 +14,7 @@ export class RequestModal extends BaseModal {
     return t('Friend Requests');
   }
 
+
   protected getModalContent(): string {
     if (this.requests.length === 0) {
       return `
@@ -40,18 +41,27 @@ export class RequestModal extends BaseModal {
               <p class="text-gray-400 text-sm">${t('Friend request')}</p>
             </div>
           </div>
-          <div class="flex gap-2">
+          <div class="flex gap-3">
             <button
               data-username="${this.escapeHtml(request.username)}"
-              class="accept-request bg-lime-600 hover:bg-lime-700 text-white px-3 py-1 rounded text-sm font-medium transition-colors"
+              class="accept-request text-green-500 hover:text-green-400 text-2xl font-bold transition-colors"
+              title="${t('Accept')}"
             >
-              ${t('Accept')}
+              ✓
             </button>
             <button
               data-username="${this.escapeHtml(request.username)}"
-              class="block-request bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm font-medium transition-colors"
+              class="reject-request text-red-500 hover:text-red-400 text-2xl font-bold transition-colors"
+              title="${t('Reject')}"
             >
-              ${t('Block')}
+              ✕
+            </button>
+            <button
+              data-username="${this.escapeHtml(request.username)}"
+              class="block-request text-yellow-500 hover:text-yellow-400 text-2xl font-bold transition-colors"
+              title="${t('Block')}"
+            >
+              🚫
             </button>
           </div>
         </div>
@@ -87,6 +97,15 @@ export class RequestModal extends BaseModal {
       });
     });
 
+    document.querySelectorAll('.reject-request').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const username = (e.target as HTMLElement).getAttribute('data-username');
+        if (username) {
+          await this.rejectRequest(username);
+        }
+      });
+    });
+
     document.querySelectorAll('.block-request').forEach(btn => {
       btn.addEventListener('click', async (e) => {
         const username = (e.target as HTMLElement).getAttribute('data-username');
@@ -96,6 +115,35 @@ export class RequestModal extends BaseModal {
       });
     });
   }
+
+
+private async rejectRequest(username: string): Promise<void> {
+  if (!this.currentUser?.userName) {
+    this.showToast('error', 'Error', 'User not authenticated');
+    return;
+  }
+
+  try {
+    const response = await authService.removeFriend(this.currentUser.userName, username);
+
+    if (response.success) {
+      this.showToast('success', 'Success', `Friend request from ${username} rejected`);
+
+      this.requests = this.requests.filter(req => req.username !== username);
+
+      this.updateContent();
+      this.setupEventListeners();
+
+      this.triggerFriendsRefresh();
+    } else {
+      this.showToast('error', 'Error', response.message || 'Failed to reject friend request');
+    }
+  } catch (error) {
+    console.error('Error rejecting request:', error);
+    this.showToast('error', 'Error', 'Network error while rejecting request');
+  }
+}
+
 
   async showRequests(): Promise<void> {
     this.currentUser = this.getCurrentUser();
@@ -151,11 +199,6 @@ export class RequestModal extends BaseModal {
         this.setupEventListeners();
 
         this.triggerFriendsRefresh();
-
-        // Close modal if no more requests
-        if (this.requests.length === 0) {
-          setTimeout(() => this.close(), 1500);
-        }
       } else {
         this.showToast('error', 'Error', response.message || 'Failed to accept friend request');
       }
@@ -165,34 +208,30 @@ export class RequestModal extends BaseModal {
     }
   }
 
-  private async blockRequest(username: string): Promise<void> {
-    if (!this.currentUser?.userName) {
-      this.showToast('error', 'Error', 'User not authenticated');
-      return;
-    }
-
-    try {
-      const response = await authService.blockUserFromRequest(username, this.currentUser.userName);
-
-      if (response.success) {
-        this.showToast('success', 'Success', `User ${username} has been blocked`);
-
-        this.requests = this.requests.filter(req => req.username !== username);
-
-        this.updateContent();
-        this.setupEventListeners();
-
-        if (this.requests.length === 0) {
-          setTimeout(() => this.close(), 1500);
-        }
-      } else {
-        this.showToast('error', 'Error', response.message || 'Failed to block user');
-      }
-    } catch (error) {
-      console.error('Error blocking user:', error);
-      this.showToast('error', 'Error', 'Network error while blocking user');
-    }
+private async blockRequest(username: string): Promise<void> {
+  if (!this.currentUser?.userName) {
+    this.showToast('error', 'Error', 'User not authenticated');
+    return;
   }
+
+  try {
+    const response = await authService.blockUserFromRequest(username, this.currentUser.userName);
+
+    if (response.success) {
+      this.showToast('success', 'Success', `User ${username} has been blocked`);
+
+      this.requests = this.requests.filter(req => req.username !== username);
+
+      this.updateContent();
+      this.setupEventListeners();
+    } else {
+      this.showToast('error', 'Error', response.message || 'Failed to block user');
+    }
+  } catch (error) {
+    console.error('Error blocking user:', error);
+    this.showToast('error', 'Error', 'Network error while blocking user');
+  }
+}
 
   private getInitials(username: string): string {
     if (!username) return '?';
