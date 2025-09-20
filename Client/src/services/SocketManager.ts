@@ -27,9 +27,10 @@ export interface SocketEvents {
   'player_left': (playerId: string) => void;
 
   // Game events
-  'game_started': () => void;
+  'game_started': (data?: { players: any[]; gameState: any }) => void;
+  'game_ready': (data: { hostPlayer: any; joinerPlayer: any; gameMode: string }) => void;
   'game_state': (state: any) => void;
-  'player_input': (data: { playerId: string; input: any }) => void;
+  'player_input': (data: { playerId: string; playerIndex?: number; input: any }) => void;
 
   // Chat events
   'chat_message': (message: any) => void;
@@ -45,7 +46,7 @@ export class SocketManager {
   private eventHandlers: Map<keyof SocketEvents, Function[]> = new Map();
 
   // Socket.IO server URL - can be configured via environment
-  private readonly SERVER_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
+  private readonly SERVER_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3020';
 
   constructor() {
     this.setupEventHandlers();
@@ -159,9 +160,14 @@ export class SocketManager {
     });
 
     // Game events
-    this.socket.on('game_started', () => {
-      console.log('🎮 Game started!');
-      this.emit('game_started');
+    this.socket.on('game_started', (data?: { players: any[]; gameState: any }) => {
+      console.log('🎮 Game started!', data);
+      this.emit('game_started', data);
+    });
+
+    this.socket.on('game_ready', (data: { hostPlayer: any; joinerPlayer: any; gameMode: string }) => {
+      console.log('🎮 Game ready:', data);
+      this.emit('game_ready', data);
     });
 
     this.socket.on('game_state', (state: any) => {
@@ -390,7 +396,7 @@ export class SocketManager {
    * Check if Socket.IO server is available
    */
   public static async checkServerAvailability(serverUrl?: string): Promise<boolean> {
-    const url = serverUrl || import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
+    const url = serverUrl || import.meta.env.VITE_SOCKET_URL || 'http://localhost:3020';
 
     try {
       const response = await fetch(`${url.replace('/socket.io', '')}/health`, {

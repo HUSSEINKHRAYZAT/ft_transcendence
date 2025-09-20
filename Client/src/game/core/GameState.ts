@@ -98,6 +98,18 @@ export class GameState {
     }
   }
 
+  public setAIErrorRange(index: number, range: number): void {
+    if (index >= 0 && index < this._aiErrorRangePerPaddle.length) {
+      this._aiErrorRangePerPaddle[index] = range;
+    }
+  }
+
+  public setAILerp(index: number, lerp: number): void {
+    if (index >= 0 && index < this._aiLerpPerPaddle.length) {
+      this._aiLerpPerPaddle[index] = lerp;
+    }
+  }
+
   public isWinConditionMet(): { winner: number; hasWinner: boolean } {
     const target = this.config.winScore ?? 10;
     for (let i = 0; i < this._scores.length; i++) {

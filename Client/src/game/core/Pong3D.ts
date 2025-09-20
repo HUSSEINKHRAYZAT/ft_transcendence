@@ -14,9 +14,9 @@ import { Sound } from "@babylonjs/core/Audio/sound";
 import "@babylonjs/core/Audio/audioEngine";
 
 import { ApiClient } from "../../api";
-import { markUI } from "../../ui";
 import type { GameConfig, ObstacleShape } from "../../types";
 import type { RemoteMsg } from "../utils/helpers";
+import { GameState } from "./GameState";
 import {
   clamp,
   clampHorizontal,
@@ -30,10 +30,17 @@ import {
 } from "../utils/helpers";
 import { SHAPES, SHAPE_WEIGHTS } from "../config/constants";
 import { themeBridge, type GameThemeColors } from "../utils/ThemeBridge";
-import { GameChat, type ChatUser } from "../ui/GameChat";
+import { GameChat } from "../ui/GameChat";
 import { socketManager } from "../../services/SocketManager";
 import { GameCountdown } from "../ui/GameCountdown";
 import { CameraConfig } from "../config/camconfig";
+import * as Frontend from "./Pong3D.frontend";
+
+
+
+
+
+
 export class Pong3D {
   private engine: Engine;
   private scene: Scene;
@@ -65,18 +72,12 @@ export class Pong3D {
   }> = [];
 
   private keys: Record<string, boolean> = {};
-  private control: ("human" | "ai" | "remoteGuest")[] = [];
 
-  private aiError: number[] = [0, 0, 0, 0];
-  private aiErrorRangePerPaddle: number[] = [2, 2, 2, 2];
-  private aiLerpPerPaddle: number[] = [0.08, 0.08, 0.08, 0.08];
-  private aiVel: number[] = [0, 0, 0, 0];
+  // Game state - single source of truth
+  private gameState: GameState;
 
-  private scores = [0, 0, 0, 0];
   private scoreElems: HTMLSpanElement[] = [];
   private nameElems: HTMLSpanElement[] = [];
-  private lastScorer = -1;
-  private isPaused = false;
 
   // Theme system
   private currentGameTheme: GameThemeColors;
@@ -84,9 +85,6 @@ export class Pong3D {
 
   // Chat system
   private gameChat: GameChat | null = null;
-  private lastHitter = -1;
-  private touchedOnce = false;
-  private obstacleAfterHit = false;
 
   private ballRadius = 0.2;
   private speedIncrement = 1.0001;
@@ -98,13 +96,14 @@ export class Pong3D {
   private usingSocketIO = false; // Track if using Socket.IO vs raw WebSocket
   private remoteIndex: 0 | 1 | 2 | 3 = 0; // your assigned index online
   private guestInputs: Record<number, { neg: boolean; pos: boolean }> = {};
+  private lastGuestInputKey: string = "";
+  private lastGameEndAudioTime: number = 0;
   private lastStateSent = 0;
 
   private isHost = false;
   private isGuest = false;
   private requiredGuests = 0; // 1 (2P) or 3 (4P)
   private connectedGuests = 0;
-  private matchReady = true;
   private waitUI?: HTMLDivElement;
 
   // camera “always my paddle on the left”:
@@ -124,6 +123,13 @@ export class Pong3D {
   private toneCtx?: AudioContext;
 
   constructor(private config: GameConfig) {
+    // Initialize game state
+    this.gameState = new GameState(config);
+  // These arrays are populated/used by the frontend helpers module (Pong3D.frontend).
+  // Keep harmless reads here so TypeScript doesn't flag them as unused.
+  void this.scoreElems;
+  void this.nameElems;
+
     const canvas =
       (document.getElementById("gameCanvas") as HTMLCanvasElement) ||
       (() => {
@@ -208,12 +214,12 @@ export class Pong3D {
     if (this.isHost) {
       this.requiredGuests = this.config.playerCount === 4 ? 3 : 1;
       this.connectedGuests = 0;
-      this.matchReady = this.requiredGuests === 0;
+      this.gameState.matchReady = this.requiredGuests === 0;
       this.showWaitingOverlay(`Waiting for players… 0/${this.requiredGuests}`);
       this.remoteIndex = 0; // host is index 0 (Left)
       this.setViewRotationForIndex(0);
     } else if (this.isGuest) {
-      this.matchReady = false;
+      this.gameState.matchReady = false;
       this.showWaitingOverlay("Connecting to host…");
       // index will be set after "assign"
     }
@@ -227,215 +233,36 @@ export class Pong3D {
   /* ---------------- UI ---------------- */
 
   private createScoreUI() {
-    const hud = markUI(document.createElement("div"));
-    hud.className =
-      "absolute top-20 left-1/2 -translate-x-1/2 text-white font-bold z-10 flex gap-4 items-center px-6 py-4 rounded-3xl bg-gradient-to-br from-gray-800/95 to-gray-900/95 border border-lime-500/30 shadow-2xl backdrop-blur-xl";
-    hud.style.fontFamily = "'Orbitron', system-ui, sans-serif";
-    hud.style.boxShadow =
-      "0 25px 50px rgba(0,0,0,0.4), 0 0 0 1px rgba(132, 204, 22, 0.1), inset 0 1px 0 rgba(255,255,255,0.1)";
-
-    const slots = this.config.playerCount === 4 ? 4 : 2;
-    const colors = ["lime-500", "blue-500", "purple-500", "red-500"];
-    const hexColors = ["#84cc16", "#3b82f6", "#a855f7", "#ef4444"];
-
-    for (let i = 0; i < slots; i++) {
-      const badge = document.createElement("div");
-      badge.className = `flex items-center gap-2 px-4 py-2.5 rounded-xl border transition-all duration-300 min-w-20 justify-center bg-gradient-to-br from-${colors[i]}/10 to-${colors[i]}/5 border-${colors[i]}/25`;
-      badge.style.boxShadow = `0 4px 12px ${hexColors[i]}20, inset 0 1px 0 rgba(255,255,255,0.1)`;
-
-      const dot = document.createElement("span");
-      dot.className = `w-3 h-3 rounded-full inline-block flex-shrink-0 bg-gradient-to-br from-${colors[i]} to-${colors[i]}/80`;
-      dot.style.boxShadow = `0 0 12px ${hexColors[i]}60, inset 0 1px 0 rgba(255,255,255,0.3)`;
-
-      const playerInfo = document.createElement("div");
-      playerInfo.className = "flex flex-col items-center gap-0.5";
-
-      const label = document.createElement("span");
-      label.className = `text-xs font-semibold text-${colors[i]} tracking-wider uppercase`;
-      label.textContent = ["Player 1", "Player 2", "Player 3", "Player 4"][i];
-
-      const name = document.createElement("span");
-      name.className = "text-xs opacity-70 text-zinc-400";
-      name.textContent =
-        (this.config.displayNames && this.config.displayNames[i]) || "";
-
-      const score = document.createElement("span");
-      score.className = `font-black text-2xl min-w-8 text-center text-${colors[i]} leading-none`;
-      score.style.textShadow = `0 2px 8px ${hexColors[i]}40`;
-      score.textContent = "0";
-
-      // Assemble the player info
-      if (name.textContent) {
-        playerInfo.append(label, name);
-      } else {
-        playerInfo.append(label);
-      }
-
-      badge.append(dot, playerInfo, score);
-      hud.appendChild(badge);
-      this.nameElems.push(name);
-      this.scoreElems.push(score);
-    }
-    document.body.appendChild(hud);
+  Frontend.createScoreUI(this);
   }
   private updateNamesUI() {
-    const slots = this.config.playerCount === 4 ? 4 : 2;
-    for (let i = 0; i < slots; i++) {
-      if (!this.nameElems[i]) continue;
-      this.nameElems[i].textContent =
-        (this.config.displayNames && this.config.displayNames[i]) || "";
-    }
+  Frontend.updateNamesUI(this);
   }
-  private pulseScorer(idx: number) {
-    if (idx < 0) return;
-    const badge = this.scoreElems[idx].parentElement as HTMLDivElement;
-    if (!badge) return;
-    badge.style.boxShadow =
-      "inset 0 0 0 1px rgba(255,255,255,.12), 0 0 16px rgba(255,255,255,.25)";
-    badge.style.transform = "scale(1.05)";
-    setTimeout(() => {
-      badge.style.boxShadow = "inset 0 0 0 1px rgba(255,255,255,.08)";
-      badge.style.transform = "scale(1.0)";
-    }, 180);
-  }
+  
   private updateScoreUI() {
-    const slots = this.config.playerCount === 4 ? 4 : 2;
-    for (let i = 0; i < slots; i++)
-      this.scoreElems[i].textContent = this.scores[i].toString();
-    if (this.lastScorer >= 0) this.pulseScorer(this.lastScorer);
+  Frontend.updateScoreUI(this);
   }
 
   private showWaitingOverlay(text: string) {
-    const d = markUI(document.createElement("div"));
-    d.className =
-      "fixed inset-0 grid place-items-center bg-black/65 text-white z-[9999] font-sans";
-    d.innerHTML = `<div class="px-5 py-4 bg-gray-900 rounded-xl shadow-2xl border border-lime-500/20">
-      <div id="waitText" class="text-lg text-center">${text}</div>
-    </div>`;
-    document.body.appendChild(d);
-    this.waitUI = d as HTMLDivElement;
+  Frontend.showWaitingOverlay(this, text);
   }
   private updateWaitingOverlay(text: string) {
-    if (!this.waitUI) return;
-    const el = this.waitUI.querySelector<HTMLDivElement>("#waitText");
-    if (el) el.textContent = text;
+  Frontend.updateWaitingOverlay(this, text);
   }
   private hideWaitingOverlay() {
-    this.waitUI?.remove();
-    this.waitUI = undefined;
+  Frontend.hideWaitingOverlay(this);
   }
 
   private updateGameTheme(newTheme: GameThemeColors) {
-    console.log("🎮 Updating game colors for new theme");
-
-    this.currentGameTheme = newTheme;
-
-    // Update scene background
-    this.scene.clearColor = newTheme.background;
-
-    // Update ball color
-    if (this.ball && this.ball.material) {
-      const ballMat = this.ball.material as StandardMaterial;
-      if (ballMat.emissiveColor) {
-        ballMat.emissiveColor = newTheme.ball.scale(0.3);
-      }
-    }
-
-    // Update paddle colors
-    this.paddles.forEach((paddle, index) => {
-      if (paddle.material) {
-        const paddleMat = paddle.material as StandardMaterial;
-        const newColor = themeBridge.getPaddleColor(index);
-
-        // Update the material colors
-        if (paddleMat.diffuseColor) {
-          paddleMat.diffuseColor = newColor;
-        }
-        if (paddleMat.emissiveColor) {
-          paddleMat.emissiveColor = newColor.scale(0.6);
-        }
-      }
-    });
-
-    // Update obstacle colors
-    this.obstacles.forEach((obstacle, index) => {
-      if (obstacle.material) {
-        const obstacleMat = obstacle.material as StandardMaterial;
-        const newColor = themeBridge.getObstacleColor(index);
-
-        if (obstacleMat.diffuseColor) {
-          obstacleMat.diffuseColor = newColor;
-        }
-        if (obstacleMat.emissiveColor) {
-          obstacleMat.emissiveColor = newColor.scale(0.3);
-        }
-      }
-    });
-
-    console.log("✅ Game colors updated successfully");
+  Frontend.updateGameTheme(this, newTheme);
   }
 
   private initializeChat() {
-    // Skip chat for AI mode (single player vs AI)
-    if (this.config.connection === "ai" || this.config.connection === "ai3" ||this.config.connection === "local") {
-      console.log("💬 Chat disabled for AI mode");
-      return;
-    }
-
-    // Get current user info from localStorage (set by frontend auth)
-    let currentUser: ChatUser = {
-      id: "player-" + Date.now(),
-      name: "Player",
-      isConnected: true,
-    };
-
-    try {
-      const userData = localStorage.getItem("ft_pong_user_data");
-      if (userData) {
-        const user = JSON.parse(userData);
-        currentUser = {
-          id: user.id || currentUser.id,
-          name: user.firstName
-            ? `${user.firstName} ${user.lastName || ""}`.trim()
-            : user.userName || user.email || "Player",
-          isConnected: true,
-        };
-      }
-    } catch (error) {
-      console.warn("Could not load user data for chat:", error);
-    }
-
-    // Get game container for chat
-    const gameContainer =
-      document.querySelector("#gameContainer") || document.body;
-
-    // Initialize chat with WebSocket if available
-    this.gameChat = new GameChat(
-      gameContainer as HTMLElement,
-      currentUser,
-      this.ws || undefined
-    );
-
-    // Show welcome message
-    this.gameChat.addSystemMessage(
-      `Welcome to the game, ${currentUser.name}! 🎮`
-    );
-
-    // Add game-specific system messages
-    if (this.config.playerCount > 1) {
-      this.gameChat.addSystemMessage(
-        "Chat with other players during the game!"
-      );
-    }
-
-    console.log("💬 Game chat initialized for user:", currentUser.name);
+  Frontend.initializeChat(this);
   }
 
   private getPlayerName(playerIndex: number): string {
-    if (this.config.displayNames && this.config.displayNames[playerIndex]) {
-      return this.config.displayNames[playerIndex];
-    }
-    return `Player ${playerIndex + 1}`;
+  return Frontend.getPlayerName(this, playerIndex);
   }
 
   // Cleanup method for theme and chat subscription
@@ -464,7 +291,7 @@ export class Pong3D {
     // Show countdown before starting the game
     const countdown = new GameCountdown({
       onComplete: () => {
-        this.matchReady = true;
+        this.gameState.matchReady = true;
         this.resetBall(Math.random() < 0.5 ? 1 : -1);
       },
     });
@@ -478,7 +305,7 @@ export class Pong3D {
     // For multiplayer games, show countdown and then start
     const countdown = new GameCountdown({
       onComplete: () => {
-        this.matchReady = true;
+        this.gameState.matchReady = true;
         this.resetBall(Math.random() < 0.5 ? 1 : -1);
         if (this.isHost) {
           this.sendRemoteMessage({ t: "start" } as RemoteMsg);
@@ -695,31 +522,32 @@ export class Pong3D {
     // Control roles
     if (this.config.playerCount === 4) {
       if (this.config.connection === "ai3") {
-        this.control = ["human", "ai", "ai", "ai"];
+        this.gameState.setControl(["human", "ai", "ai", "ai"]);
         this.applyAIDifficulty([1, 2, 3], 10);
         this.setViewRotationForIndex(0);
       } else if (this.config.connection === "remote4Host") {
-        this.control = ["human", "remoteGuest", "remoteGuest", "remoteGuest"];
+        this.gameState.setControl(["human", "remoteGuest", "remoteGuest", "remoteGuest"]);
         this.setViewRotationForIndex(0);
       } else if (this.config.connection === "remote4Guest") {
-        this.control = ["human", "human", "human", "human"]; // render only; your input is sent to host
+        this.gameState.setControl(["human", "human", "human", "human"]); // render only; your input is sent to host
       } else {
-        this.control = ["human", "human", "human", "human"];
+        this.gameState.setControl(["human", "human", "human", "human"]);
         this.setViewRotationForIndex(0);
       }
     } else {
       if (this.config.connection === "ai") {
-        this.control = ["human", "ai"];
+        this.gameState.setControl(["human", "ai"]);
         this.applyAIDifficulty([1], this.config.aiDifficulty ?? 6);
         this.setViewRotationForIndex(0);
       } else if (this.config.connection === "remoteHost") {
-        this.control = ["human", "remoteGuest"];
+        this.gameState.setControl(["human", "remoteGuest"]);
         this.setViewRotationForIndex(0);
       } else if (this.config.connection === "remoteGuest") {
-        this.control = ["human", "human"]; // render only
+        this.gameState.setControl(["human", "human"]); // render only, receive state from host
+        this.setViewRotationForIndex(1); // Guest is player 1 (right side)
       } else {
         // Local 2P
-        this.control = ["human", "human"];
+        this.gameState.setControl(["human", "human"]);
         this.camera.alpha = this.baseAlpha;
       }
     }
@@ -727,7 +555,7 @@ export class Pong3D {
     // Obstacles: host/local spawns; guests build from net
     if (!this.isGuest) this.spawnObstacles(width, height);
 
-    if (this.matchReady) {
+    if (this.gameState.matchReady) {
       // For local games, show countdown before starting
       this.startGameWithCountdown();
     } else {
@@ -737,7 +565,7 @@ export class Pong3D {
 
     this.engine.runRenderLoop(() => {
       // Only update game logic if not paused, but always render the scene
-      if (!this.isPaused) {
+      if (!this.gameState.isPaused) {
         this.update(width, height);
       }
       this.scene.render();
@@ -773,8 +601,8 @@ export class Pong3D {
     const lerpAmt = lerp(0.008, 0.35, sg);
 
     idxs.forEach((i) => {
-      this.aiErrorRangePerPaddle[i] = errRange;
-      this.aiLerpPerPaddle[i] = lerpAmt;
+      this.gameState.setAIErrorRange(i, errRange);
+      this.gameState.setAILerp(i, lerpAmt);
     });
   }
 
@@ -921,15 +749,13 @@ export class Pong3D {
       0.07 + Math.random() * 0.05,
       speed * Math.sin(angle)
     );
-    this.control.forEach((c, i) => {
+    this.gameState.setBallVelocity(this.ballVelocity);
+    this.gameState.control.forEach((c, i) => {
       if (c === "ai")
-        this.aiError[i] =
-          (Math.random() * 2 - 1) * this.aiErrorRangePerPaddle[i];
-      this.aiVel[i] = 0;
+        this.gameState.setAIError(i, (Math.random() * 2 - 1) * this.gameState.aiErrorRangePerPaddle[i]);
+      this.gameState.setAIVelocity(i, 0);
     });
-    this.lastHitter = -1;
-    this.touchedOnce = false;
-    this.obstacleAfterHit = false;
+    this.gameState.resetBallState();
   }
 
   // Randomize the rebound direction a bit, then clamp horizontal speed
@@ -999,7 +825,12 @@ export class Pong3D {
     socketManager.on("player_input", (data) => {
       if (this.isHost && data.playerId !== socketManager.id) {
         // Convert Socket.IO input format to our internal format
-        this.guestInputs[data.input.idx] = {
+        console.log("Host received guest input:", data);
+        
+        // Use playerIndex if available, fallback to input.idx
+        const playerIdx = data.playerIndex !== undefined ? data.playerIndex : data.input.idx;
+        
+        this.guestInputs[playerIdx] = {
           neg: data.input.neg,
           pos: data.input.pos,
         };
@@ -1051,11 +882,64 @@ export class Pong3D {
       }
     });
 
-    socketManager.on("game_started", () => {
-      console.log("Game started signal received");
-      if (this.isGuest && !this.matchReady) {
-        this.matchReady = true;
+    socketManager.on("game_started", (data) => {
+      console.log("Game started signal received", data);
+      
+      // Update player assignments if provided
+      if (data && data.players) {
+        const myPlayer = data.players.find((p: any) => p.id === socketManager.id);
+        if (myPlayer) {
+          this.remoteIndex = myPlayer.playerIndex;
+          console.log(`My player index: ${this.remoteIndex}`);
+          
+          // Update display names with correct order
+          if (this.config.displayNames && data.players.length >= 2) {
+            this.config.displayNames[0] = data.players[0].name; // Host
+            this.config.displayNames[1] = data.players[1].name; // Joiner
+          }
+          
+          this.updateNamesUI();
+        }
+      }
+      
+      if (this.isGuest && !this.gameState.matchReady) {
+        this.gameState.matchReady = true;
         this.hideWaitingOverlay();
+      }
+    });
+
+    socketManager.on("game_ready", (data) => {
+      console.log("Game ready signal received:", data);
+      
+      // Update display names based on proper player positions
+      if (this.config.displayNames) {
+        this.config.displayNames[0] = data.hostPlayer.name;
+        this.config.displayNames[1] = data.joinerPlayer.name;
+      }
+      
+      // Determine if this client is host or joiner and set remote index accordingly
+      if (socketManager.id === data.hostPlayer.id) {
+        this.remoteIndex = 0; // Host is always player 0
+        console.log("This client is the host (player 0)");
+      } else if (socketManager.id === data.joinerPlayer.id) {
+        this.remoteIndex = 1; // Joiner is always player 1 (second score)
+        console.log("This client is the joiner (player 1)");
+        
+        // For guests, set game as ready so they can start rendering
+        if (this.isGuest) {
+          this.gameState.matchReady = true;
+          this.hideWaitingOverlay();
+          this.setViewRotationForIndex(this.remoteIndex);
+        }
+      }
+      
+      // Update UI with correct names and positions
+      this.updateNamesUI();
+      this.updateScoreUI();
+      
+      // If both players are ready, allow game to start
+      if (this.isHost && this.connectedGuests >= this.requiredGuests) {
+        this.checkMatchReady();
       }
     });
 
@@ -1097,7 +981,61 @@ export class Pong3D {
   }
 
   private handleRemoteState(stateMsg: any) {
-    // Handle state updates from Socket.IO or WebSocket
+    // Handle game end message
+    if (stateMsg.gameEnd) {
+      this.gameState.matchReady = false;
+      
+      // Determine the appropriate message for this player
+      const isLocalWinner = this.getLocalControlledIndices().includes(stateMsg.winnerIdx);
+      const text = isLocalWinner ? "You win!" : "You lose!";
+      
+      this.endAndToast(text);
+
+      // Add chat notification for game end
+      if (this.gameChat) {
+        this.gameChat.addSystemMessage(
+          `🏆 Game Over! ${stateMsg.winnerName} wins the match!`
+        );
+        this.gameChat.addSystemMessage(
+          `Final Score: ${stateMsg.finalScores
+            .slice(0, this.config.playerCount === 4 ? 4 : 2)
+            .join(" - ")}`
+        );
+      }
+
+      // Play correct win/lose cue from local perspective
+      // Only play audio if this is a joiner receiving the message, not the host
+      if (!this.isHost) {
+        this.handleGameEndAudio(stateMsg.winnerIdx);
+      }
+      return;
+    }
+
+    // Handle pause toggle message
+    if (stateMsg.pauseToggle) {
+      this.gameState.isPaused = stateMsg.isPaused;
+      
+      if (this.gameState.isPaused) {
+        this.showPauseOverlay();
+        console.log(`⏸️ Game paused by ${stateMsg.pausedBy}`);
+        
+        // Add chat notification for pause
+        if (this.gameChat) {
+          this.gameChat.addSystemMessage(`⏸️ Game paused by ${stateMsg.pausedBy}`);
+        }
+      } else {
+        this.hidePauseOverlay();
+        console.log(`▶️ Game resumed by ${stateMsg.pausedBy}`);
+        
+        // Add chat notification for resume
+        if (this.gameChat) {
+          this.gameChat.addSystemMessage(`▶️ Game resumed by ${stateMsg.pausedBy}`);
+        }
+      }
+      return;
+    }
+
+    // Handle regular state updates from Socket.IO or WebSocket
     this.ball.position.set(stateMsg.ball.x, stateMsg.ball.y, stateMsg.ball.z);
     this.ballVelocity.set(stateMsg.ball.vx, stateMsg.ball.vy, stateMsg.ball.vz);
 
@@ -1118,12 +1056,11 @@ export class Pong3D {
       this.paddles[i]?.position.set(pp.x, pp.y, pp.z)
     );
 
-    for (let i = 0; i < this.scores.length && i < stateMsg.scores.length; i++)
-      this.scores[i] = stateMsg.scores[i];
+    this.gameState.setScores(stateMsg.scores);
     this.updateScoreUI();
 
-    if (!this.matchReady) {
-      this.matchReady = true;
+    if (!this.gameState.matchReady) {
+      this.gameState.matchReady = true;
       this.hideWaitingOverlay();
     }
   }
@@ -1160,7 +1097,7 @@ export class Pong3D {
           this.updateWaitingOverlay(
             `Waiting for players… ${this.connectedGuests}/${this.requiredGuests}`
           );
-          if (this.connectedGuests >= this.requiredGuests && !this.matchReady) {
+          if (this.connectedGuests >= this.requiredGuests && !this.gameState.matchReady) {
             this.beginMatch(); // Fire and forget for WebSocket flow
           }
           return;
@@ -1170,13 +1107,13 @@ export class Pong3D {
           this.remoteIndex = (msg.idx as 0 | 1 | 2 | 3) ?? 1;
           // Always rotate so *your* paddle is on the left
           this.setViewRotationForIndex(this.remoteIndex);
-          if (!this.matchReady) this.updateWaitingOverlay("Waiting for start…");
+          if (!this.gameState.matchReady) this.updateWaitingOverlay("Waiting for start…");
           return;
         }
 
         if (msg.t === "start" && this.isGuest) {
-          if (!this.matchReady) {
-            this.matchReady = true;
+          if (!this.gameState.matchReady) {
+            this.gameState.matchReady = true;
             this.hideWaitingOverlay();
           }
           return;
@@ -1238,7 +1175,13 @@ export class Pong3D {
           let neg = false,
             pos = false;
           const idx = this.remoteIndex;
-          if (idx === 0 || idx === 1) {
+          
+          // For 2P games, guest is always index 1 (right paddle)
+          if (this.config.playerCount === 2) {
+            // Right paddle in 2P → move Z (neg=up, pos=down)
+            neg = !!this.keys["arrowup"];
+            pos = !!this.keys["arrowdown"];
+          } else if (idx === 0 || idx === 1) {
             // L/R → move Z (neg=up, pos=down)
             neg = !!this.keys["arrowup"];
             pos = !!this.keys["arrowdown"];
@@ -1252,14 +1195,26 @@ export class Pong3D {
             pos = !!this.keys["arrowleft"];
           }
 
-          const pkt: RemoteMsg = {
-            t: "input",
+          const inputData = {
             idx,
             neg,
             pos,
-            sid: this.config.sessionId || undefined,
           };
-          this.sendRemoteMessage(pkt);
+          
+          // For Socket.IO connections, use socketManager
+          if (socketManager.connected) {
+            socketManager.sendPlayerInput(inputData);
+          } else if (this.ws) {
+            // For WebSocket connections, use the original method
+            const pkt: RemoteMsg = {
+              t: "input",
+              idx,
+              neg,
+              pos,
+              sid: this.config.sessionId || undefined,
+            };
+            this.sendRemoteMessage(pkt);
+          }
           requestAnimationFrame(sendInputs);
         };
         requestAnimationFrame(sendInputs);
@@ -1270,11 +1225,11 @@ export class Pong3D {
   }
 
   private broadcastState(now: number) {
-    if (!this.ws || !this.isHost) return;
+    if (!this.isHost) return;
     if (now - this.lastStateSent < 33) return; // ~30Hz
     this.lastStateSent = now;
-    const msg: RemoteMsg = {
-      t: "state",
+    
+    const gameState = {
       ball: {
         x: this.ball.position.x,
         y: this.ball.position.y,
@@ -1288,17 +1243,28 @@ export class Pong3D {
         y: p.position.y,
         z: p.position.z,
       })),
-      scores: [...this.scores],
+      scores: [...this.gameState.scores],
       obstacles: this.obstacleInfo.map((o) => ({ ...o })), // includes shape
     };
-    this.sendRemoteMessage(msg);
+    
+    // For Socket.IO connections, use socketManager
+    if (socketManager.connected) {
+      socketManager.sendGameState(gameState);
+    } else if (this.ws) {
+      // For WebSocket connections, use the original method
+      const msg: RemoteMsg = {
+        t: "state",
+        ...gameState
+      };
+      this.sendRemoteMessage(msg);
+    }
   }
 
   /* ---------------- Tick ---------------- */
 
   private update(width: number, height: number) {
     const now = performance.now();
-    if (!this.matchReady) {
+    if (!this.gameState.matchReady) {
       if (this.isHost) this.broadcastState(now);
       return;
     }
@@ -1310,7 +1276,7 @@ export class Pong3D {
     // L/R paddles use Up/Down for Z. Bottom uses Left/Right for X. Top uses Right/Left mirrored.
     if (this.config.playerCount === 4) {
       // Left (host or local)
-      if (this.control[0] === "human") {
+      if (this.gameState.control[0] === "human") {
         if (this.keys["arrowup"]) p1.position.z -= move;
         if (this.keys["arrowdown"]) p1.position.z += move;
       }
@@ -1324,7 +1290,7 @@ export class Pong3D {
         if (this.guestInputs[3]?.pos) this.paddles[3].position.x -= move; // top X-
       } else {
         // local 4P (fallback): allow arrow-left/right to move Bottom, arrow-up/down Left
-        if (this.control[2] === "human") {
+        if (this.gameState.control[2] === "human") {
           if (this.keys["arrowleft"]) p3.position.x -= move;
           if (this.keys["arrowright"]) p3.position.x += move;
         }
@@ -1334,7 +1300,7 @@ export class Pong3D {
       [0, 1, 2, 3].forEach((i) => this.runAI(i, width, height, move));
     } else {
       // ---------- 2P ----------
-      if (this.control[1] === "ai") {
+      if (this.gameState.control[1] === "ai") {
         // P1 (you) on Up/Down
         if (this.keys["arrowup"]) p1.position.z -= move;
         if (this.keys["arrowdown"]) p1.position.z += move;
@@ -1348,7 +1314,37 @@ export class Pong3D {
         if (this.guestInputs[1]?.neg) p2.position.z -= move;
         if (this.guestInputs[1]?.pos) p2.position.z += move;
       } else if (this.config.connection === "remoteGuest") {
-        // Guest renders only; inputs are sent in initRemote()
+        // Guest can send input for their paddle (player 1, right side)
+        // Send arrow key inputs to the host for paddle 1 (right paddle)
+        const guestInputState = {
+          neg: !!this.keys["arrowup"],
+          pos: !!this.keys["arrowdown"]
+        };
+        
+        // Only send if input has changed to avoid spamming
+        const currentInputKey = `${guestInputState.neg}-${guestInputState.pos}`;
+        if (this.lastGuestInputKey !== currentInputKey) {
+          this.lastGuestInputKey = currentInputKey;
+          
+          if (socketManager.connected) {
+            socketManager.sendPlayerInput({
+              playerIndex: 1,
+              neg: guestInputState.neg,
+              pos: guestInputState.pos
+            });
+          } else if (this.ws) {
+            this.sendRemoteMessage({
+              t: "input",
+              idx: 1,
+              neg: guestInputState.neg,
+              pos: guestInputState.pos,
+              sid: this.config.sessionId || undefined,
+            });
+          }
+        }
+        
+        // Guest renders only; the actual game state comes from the host via handleRemoteState()
+        // Don't run any game logic here, just render what we receive from the host
       } else {
         // ---- LOCAL 2P ----
         // Left paddle (p1) = Arrow Up/Down
@@ -1453,9 +1449,9 @@ export class Pong3D {
         this.ballVelocity.z += dzNorm * 0.18;
         clampHorizontal(this.ballVelocity, 0.6);
         ensureMinHorizontalSpeed(this.ballVelocity, this.minHorizontalSpeed);
-        this.lastHitter = idx;
-        this.touchedOnce = true;
-        this.obstacleAfterHit = false;
+        this.gameState.lastHitter = idx;
+        this.gameState.touchedOnce = true;
+        this.gameState.obstacleAfterHit = false;
         flashPaddle(p);
         this.playHit("paddle"); // SOUND
       }
@@ -1479,9 +1475,9 @@ export class Pong3D {
         this.ballVelocity.x += dxNorm * 0.18;
         clampHorizontal(this.ballVelocity, 0.6);
         ensureMinHorizontalSpeed(this.ballVelocity, this.minHorizontalSpeed);
-        this.lastHitter = idx;
-        this.touchedOnce = true;
-        this.obstacleAfterHit = false;
+        this.gameState.lastHitter = idx;
+        this.gameState.touchedOnce = true;
+        this.gameState.obstacleAfterHit = false;
         flashPaddle(p);
         this.playHit("paddle"); // SOUND
       }
@@ -1507,8 +1503,8 @@ export class Pong3D {
         this.ballVelocity.x *= 1.02;
         this.ballVelocity.z *= 1.02;
         ensureMinHorizontalSpeed(this.ballVelocity, this.minHorizontalSpeed);
-        if (this.lastHitter >= 0 && this.touchedOnce)
-          this.obstacleAfterHit = true;
+        if (this.gameState.lastHitter >= 0 && this.gameState.touchedOnce)
+          this.gameState.obstacleAfterHit = true;
 
         // Splash/flash like paddles
         flashPaddle(o);
@@ -1523,64 +1519,64 @@ export class Pong3D {
     // Scoring + penalty
     const halfW = width / 2 - this.ballRadius;
     const halfH = height / 2 - this.ballRadius;
-    const target = this.config.winScore ?? 10;
 
     const applyPenaltyIfNeeded = (idx: number) => {
-      if (this.obstacleAfterHit && this.lastHitter === idx) {
-        this.scores[idx] -= 1;
-        this.lastScorer = idx;
+      if (this.gameState.obstacleAfterHit && this.gameState.lastHitter === idx) {
+        this.gameState.subtractScore(idx);
+        this.gameState.lastScorer = idx;
         this.updateScoreUI();
       }
-      this.obstacleAfterHit = false;
+      this.gameState.obstacleAfterHit = false;
     };
 
     if (this.config.playerCount === 4) {
       const outX = Math.abs(this.ball.position.x) > halfW;
       const outZ = Math.abs(this.ball.position.z) > halfH;
       if (outX || outZ) {
-        if (this.touchedOnce && this.lastHitter >= 0) {
+        if (this.gameState.touchedOnce && this.gameState.lastHitter >= 0) {
           if (this.ball.position.x < -halfW) applyPenaltyIfNeeded(0);
           if (this.ball.position.x > +halfW) applyPenaltyIfNeeded(1);
           if (this.ball.position.z > +halfH) applyPenaltyIfNeeded(2);
           if (this.ball.position.z < -halfH) applyPenaltyIfNeeded(3);
 
-          this.scores[this.lastHitter]++;
-          this.lastScorer = this.lastHitter;
+          this.gameState.addScore(this.gameState.lastHitter);
+          this.gameState.lastScorer = this.gameState.lastHitter;
           this.updateScoreUI();
 
           // Add chat notification for scoring
           if (this.gameChat) {
-            const playerName = this.getPlayerName(this.lastHitter);
+            const playerName = this.getPlayerName(this.gameState.lastHitter);
             this.gameChat.addSystemMessage(
               `🎯 ${playerName} scores! Current score: ${
-                this.scores[this.lastHitter]
+                this.gameState.scores[this.gameState.lastHitter]
               }`
             );
           }
 
-          if (this.scores[this.lastHitter] >= target) {
-            this.finishAndReport(this.lastHitter);
+          const winResult = this.gameState.isWinConditionMet();
+          if (winResult.hasWinner) {
+            this.finishAndReport(winResult.winner);
             return;
           }
           this.resetBall(
-            this.lastHitter === 0
+            this.gameState.lastHitter === 0
               ? 1
-              : this.lastHitter === 1
+              : this.gameState.lastHitter === 1
               ? -1
               : (undefined as any)
           );
         } else {
-          this.lastScorer = -1;
+          this.gameState.lastScorer = -1;
           this.updateScoreUI();
           this.resetBall();
         }
       }
     } else {
       if (this.ball.position.x > halfW) {
-        if (this.touchedOnce) {
+        if (this.gameState.touchedOnce) {
           applyPenaltyIfNeeded(1);
-          this.scores[1]++;
-          this.lastScorer = 1;
+          this.gameState.addScore(1);
+          this.gameState.lastScorer = 1;
           // Add damage to right wall where ball hit
           this.addWallDamage(
             "right",
@@ -1588,17 +1584,18 @@ export class Pong3D {
             this.ball.position.z
           );
           this.updateScoreUI();
-          if (this.scores[1] >= target) {
-            this.finishAndReport(1);
+          const winResult = this.gameState.isWinConditionMet();
+          if (winResult.hasWinner) {
+            this.finishAndReport(winResult.winner);
             return;
           }
         }
         this.resetBall(-1);
       } else if (this.ball.position.x < -halfW) {
-        if (this.touchedOnce) {
+        if (this.gameState.touchedOnce) {
           applyPenaltyIfNeeded(0);
-          this.scores[0]++;
-          this.lastScorer = 0;
+          this.gameState.addScore(0);
+          this.gameState.lastScorer = 0;
           // Add damage to left wall where ball hit
           this.addWallDamage(
             "left",
@@ -1606,8 +1603,9 @@ export class Pong3D {
             this.ball.position.z
           );
           this.updateScoreUI();
-          if (this.scores[0] >= target) {
-            this.finishAndReport(0);
+          const winResult = this.gameState.isWinConditionMet();
+          if (winResult.hasWinner) {
+            this.finishAndReport(winResult.winner);
             return;
           }
         }
@@ -1759,9 +1757,31 @@ export class Pong3D {
   }
 
   private togglePause() {
-    this.isPaused = !this.isPaused;
+    this.gameState.isPaused = !this.gameState.isPaused;
 
-    if (this.isPaused) {
+    // For multiplayer games, broadcast pause state to all players
+    if (socketManager.connected || this.ws) {
+      const pauseData = {
+        isPaused: this.gameState.isPaused,
+        pausedBy: this.getPlayerName(this.getLocalControlledIndices()[0] || 0)
+      };
+      
+      if (socketManager.connected) {
+        // Broadcast via Socket.IO
+        socketManager.sendGameState({
+          pauseToggle: true,
+          ...pauseData
+        });
+      } else if (this.ws) {
+        // Broadcast via WebSocket
+        this.sendRemoteMessage({
+          t: "pauseToggle",
+          ...pauseData
+        } as any);
+      }
+    }
+
+    if (this.gameState.isPaused) {
       // Show pause overlay
       this.showPauseOverlay();
       console.log("⏸️ Game paused");
@@ -1773,35 +1793,17 @@ export class Pong3D {
   }
 
   private showPauseOverlay() {
-    // Remove existing pause overlay if any
-    this.hidePauseOverlay();
-
-    const overlay = document.createElement("div");
-    overlay.id = "pause-overlay";
-    overlay.className =
-      "fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50";
-    overlay.innerHTML = `
-      <div class="bg-gray-800 rounded-lg p-8 text-center border-2 border-lime-500">
-        <div class="text-6xl mb-4">⏸️</div>
-        <div class="text-2xl font-bold text-lime-500 mb-2">PAUSED</div>
-        <div class="text-gray-300">Press P to resume</div>
-      </div>
-    `;
-
-    document.body.appendChild(overlay);
+  Frontend.showPauseOverlay(this);
   }
 
   private hidePauseOverlay() {
-    const overlay = document.getElementById("pause-overlay");
-    if (overlay) {
-      overlay.remove();
-    }
+  Frontend.hidePauseOverlay(this);
   }
 
   private runAI(i: number, width: number, height: number, maxStep: number) {
-    if (this.control[i] !== "ai") return;
-    const lerpAmt = this.aiLerpPerPaddle[i];
-    const err = this.aiError[i];
+    if (this.gameState.control[i] !== "ai") return;
+    const lerpAmt = this.gameState.aiLerpPerPaddle[i];
+    const err = this.gameState.aiError[i];
 
     const isLR = i < 2; // paddles 0,1 are left/right (move in Z), paddles 2,3 are bottom/top (move in X)
     const ballPos = this.ball.position.clone();
@@ -1870,9 +1872,9 @@ export class Pong3D {
     const responsiveness = lerpAmt * (1.0 + urgency * 0.5); // boost response when far from target
 
     const accel = delta * responsiveness;
-    this.aiVel[i] = this.aiVel[i] * 0.82 + accel * 0.18; // slightly more responsive interpolation
+    this.gameState.setAIVelocity(i, this.gameState.aiVel[i] * 0.82 + accel * 0.18); // slightly more responsive interpolation
 
-    let step = this.aiVel[i];
+    let step = this.gameState.aiVel[i];
 
     // Clamp step size
     if (step > maxStep) step = maxStep;
@@ -1887,7 +1889,7 @@ export class Pong3D {
   }
 
   private async finishAndReport(winnerIdx: number) {
-    this.matchReady = false;
+    this.gameState.matchReady = false;
     const text =
       this.config.playerCount === 4
         ? `Player ${["L", "R", "B", "T"][winnerIdx]} wins!`
@@ -1896,6 +1898,30 @@ export class Pong3D {
         : (this.config.displayNames?.[1] || "Right") + " wins!";
     this.endAndToast(text);
 
+    // For multiplayer games, broadcast game end to all players
+    if (this.isHost && (socketManager.connected || this.ws)) {
+      const gameEndData = {
+        winnerIdx,
+        winnerName: this.getPlayerName(winnerIdx),
+        finalScores: [...this.gameState.scores],
+        displayNames: [...(this.config.displayNames || [])]
+      };
+      
+      if (socketManager.connected) {
+        // Broadcast via Socket.IO
+        socketManager.sendGameState({
+          gameEnd: true,
+          ...gameEndData
+        });
+      } else if (this.ws) {
+        // Broadcast via WebSocket
+        this.sendRemoteMessage({
+          t: "gameEnd",
+          ...gameEndData
+        } as any);
+      }
+    }
+
     // Add chat notification for game end
     if (this.gameChat) {
       const winnerName = this.getPlayerName(winnerIdx);
@@ -1903,7 +1929,7 @@ export class Pong3D {
         `🏆 Game Over! ${winnerName} wins the match!`
       );
       this.gameChat.addSystemMessage(
-        `Final Score: ${this.scores
+        `Final Score: ${this.gameState.scores
           .slice(0, this.config.playerCount === 4 ? 4 : 2)
           .join(" - ")}`
       );
@@ -1914,7 +1940,7 @@ export class Pong3D {
 
     // Post to DB if this is an online match or tournament. Host does the reporting.
     if (this.isHost) {
-      const scores = [...this.scores];
+      const scores = [...this.gameState.scores];
       try {
         if (this.config.tournament) {
           const t = this.config.tournament;
@@ -1944,13 +1970,7 @@ export class Pong3D {
   }
 
   private endAndToast(text: string) {
-    const t = markUI(document.createElement("div"));
-    t.className =
-      "fixed top-5 left-1/2 -translate-x-1/2 bg-black/70 text-white px-4 py-3 rounded-xl z-[10001] font-sans shadow-2xl border border-lime-500/20";
-    t.innerHTML = `${text} &nbsp; <button id="re" class="ml-2 bg-lime-500 hover:bg-lime-600 text-black px-3 py-1 rounded-lg font-semibold transition-colors">Play again</button>`;
-    document.body.appendChild(t);
-    (t.querySelector("#re") as HTMLButtonElement).onclick = () =>
-      location.reload();
+  Frontend.endAndToast(this, text);
   }
 
   /* ---------------- AUDIO ---------------- */
@@ -2011,13 +2031,23 @@ export class Pong3D {
   }
 
   private playWin() {
+    console.log("🏆 Playing WIN sound");
     const s = this.sounds.win[0];
     const ready =
       s && ((s as any).isReadyToPlay === true || (s as any).isReady?.());
+    
     if (ready) {
-      (s as any).setPlaybackRate?.(1);
-      s.play();
+      // Check if sound is already playing to prevent overlap
+      const isPlaying = (s as any)._isPlaying || (s as any).isPlaying;
+      if (!isPlaying) {
+        (s as any).setPlaybackRate?.(1);
+        s.play();
+        console.log("🎵 WIN sound started playing");
+      } else {
+        console.log("🔇 WIN sound already playing, skipped");
+      }
     } else {
+      console.log("🔊 WIN sound not ready, using fallback beeps");
       // little triumphant beep fallback
       this.beepFallback(600, 120, 0.06);
       setTimeout(() => this.beepFallback(900, 160, 0.06), 130);
@@ -2025,13 +2055,23 @@ export class Pong3D {
   }
 
   private playLose() {
+    console.log("💔 Playing LOSE sound");
     const s = this.sounds.lose[0];
     const ready =
       s && ((s as any).isReadyToPlay === true || (s as any).isReady?.());
+    
     if (ready) {
-      (s as any).setPlaybackRate?.(1);
-      s.play();
+      // Check if sound is already playing to prevent overlap
+      const isPlaying = (s as any)._isPlaying || (s as any).isPlaying;
+      if (!isPlaying) {
+        (s as any).setPlaybackRate?.(1);
+        s.play();
+        console.log("🎵 LOSE sound started playing");
+      } else {
+        console.log("🔇 LOSE sound already playing, skipped");
+      }
     } else {
+      console.log("🔊 LOSE sound not ready, using fallback beeps");
       // descending tones fallback
       this.beepFallback(700, 90, 0.06);
       setTimeout(() => this.beepFallback(420, 150, 0.06), 100);
@@ -2077,8 +2117,18 @@ export class Pong3D {
   }
 
   private handleGameEndAudio(winnerIdx: number) {
+    // Prevent multiple audio calls within a short time frame (debounce)
+    const now = Date.now();
+    if (now - this.lastGameEndAudioTime < 1000) {
+      console.log("🔇 Game end audio debounced - too soon since last call");
+      return;
+    }
+    this.lastGameEndAudioTime = now;
+
     const locals = this.getLocalControlledIndices();
     const isLocalWinner = locals.includes(winnerIdx);
+
+    console.log(`🔊 Playing game end audio - isLocalWinner: ${isLocalWinner}, winnerIdx: ${winnerIdx}, locals: ${locals}`);
 
     // If both players are on the same machine (local 2P), play both cues
     if (this.config.connection === "local" && locals.length >= 2) {

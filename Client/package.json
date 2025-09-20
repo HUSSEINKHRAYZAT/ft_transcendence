@@ -26,7 +26,7 @@
     "postcss": "^8.x",
     "tailwindcss": "^3.x",
     "typescript": "^5.3.2",
-    "vite": "^5.0.5"
+    "vite": "^5.4.20"
   },
   "dependencies": {
     "@babylonjs/core": "^8.23.1",

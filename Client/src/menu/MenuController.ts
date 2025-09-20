@@ -21,7 +21,7 @@ export class Menu {
     // afayad // the themeRridge ma kenit shaghale aslan.
     const you = getFrontendUser();
     const tb = themeBridge.getInstance(); // ✅ Create singleton instance
-    const theme = tb.getCurrentTheme();   // ✅ Now it works
+    const theme = tb.getCurrentTheme();   
     const primaryHex = tb.color3ToHex(theme.primary);
 
     const { root } = createMenuRoot({ youName: you?.name ?? null });

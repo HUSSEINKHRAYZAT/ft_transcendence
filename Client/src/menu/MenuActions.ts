@@ -117,7 +117,7 @@ export async function createSocketIORoom(gameMode: '2p' | '4p', currentUser: any
           roomId,
           winScore: 10,
           currentUser,
-          displayNames: gameMode === '2p' ? [finalPlayerName || "Host", "Waiting…"] : [finalPlayerName || "Host", "…", "…", "…"],
+          displayNames: gameMode === '2p' ? [currentUser?.name || finalPlayerName || "Host", "Waiting…"] : [currentUser?.name || finalPlayerName || "Host", "…", "…", "…"],
         });
       };
     } catch (error: any) {
@@ -189,7 +189,7 @@ export async function joinSocketIORoom(gameMode: '2p' | '4p', currentUser: any, 
         roomId,
         winScore: 10,
         currentUser,
-        displayNames: gameMode === '2p' ? [finalPlayerName || "Guest", "Host"] : [finalPlayerName || "Guest", "…", "…", "…"],
+        displayNames: gameMode === '2p' ? ["Host", currentUser?.name || finalPlayerName || "Guest"] : ["Host", currentUser?.name || finalPlayerName || "Guest", "…", "…"],
       });
     } catch (error: any) {
       ov.innerHTML = `<div class="card">

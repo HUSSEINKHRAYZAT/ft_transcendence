@@ -1,0 +1,27 @@
+{
+  "name": "ft-transcendence-server",
+  "version": "1.0.0",
+  "description": "Socket.IO server for FT Transcendence multiplayer",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "dependencies": {
+    "socket.io": "^4.7.5",
+    "fastify": "^4.24.3",
+    "@fastify/cors": "^8.4.0",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  },
+  "keywords": [
+    "socket.io",
+    "multiplayer",
+    "pong",
+    "game"
+  ],
+  "author": "FT Transcendence Team",
+  "license": "MIT"
+}
