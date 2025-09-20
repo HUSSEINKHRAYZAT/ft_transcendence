@@ -30,7 +30,6 @@ import {
 } from "../utils/helpers";
 import { SHAPES, SHAPE_WEIGHTS } from "../config/constants";
 import { themeBridge, type GameThemeColors } from "../utils/ThemeBridge";
-import { GameChat } from "../ui/GameChat";
 import { socketManager } from "../../services/SocketManager";
 import { GameCountdown } from "../ui/GameCountdown";
 import { CameraConfig } from "../config/camconfig";
@@ -83,8 +82,7 @@ export class Pong3D {
   private currentGameTheme: GameThemeColors;
   private themeUnsubscribe?: () => void;
 
-  // Chat system
-  private gameChat: GameChat | null = null;
+  // Chat system removed
 
   private ballRadius = 0.2;
   private speedIncrement = 1.0001;
@@ -272,11 +270,7 @@ export class Pong3D {
       this.themeUnsubscribe = undefined;
     }
 
-    // Cleanup chat
-    if (this.gameChat) {
-      this.gameChat.destroy();
-      this.gameChat = null;
-    }
+    // Chat system removed
 
     // Cleanup pause overlay
     this.hidePauseOverlay();
@@ -784,9 +778,7 @@ export class Pong3D {
             sid: msg.sid,
           });
           break;
-        case "chat_message":
-          socketManager.sendChatMessage(msg.message.message);
-          break;
+        // Chat system removed
         case "start":
           socketManager.startGame();
           break;
@@ -837,11 +829,7 @@ export class Pong3D {
       }
     });
 
-    socketManager.on("chat_message", (message) => {
-      if (this.gameChat) {
-        this.gameChat.addMessage(message);
-      }
-    });
+    // Chat system removed
 
     socketManager.on("player_joined", (player) => {
       console.log("Player joined:", player);
@@ -861,6 +849,11 @@ export class Pong3D {
 
     socketManager.on("player_left", (playerId) => {
       console.log("Player left:", playerId);
+      
+      // End the game immediately when any player leaves
+      this.gameState.matchReady = false;
+      this.endAndToast("Game ended - Player disconnected");
+      
       if (this.isHost) {
         this.connectedGuests = Math.max(0, this.connectedGuests - 1);
         // Reset display names
@@ -991,17 +984,7 @@ export class Pong3D {
       
       this.endAndToast(text);
 
-      // Add chat notification for game end
-      if (this.gameChat) {
-        this.gameChat.addSystemMessage(
-          `🏆 Game Over! ${stateMsg.winnerName} wins the match!`
-        );
-        this.gameChat.addSystemMessage(
-          `Final Score: ${stateMsg.finalScores
-            .slice(0, this.config.playerCount === 4 ? 4 : 2)
-            .join(" - ")}`
-        );
-      }
+      // Chat system removed
 
       // Play correct win/lose cue from local perspective
       // Only play audio if this is a joiner receiving the message, not the host
@@ -1019,18 +1002,12 @@ export class Pong3D {
         this.showPauseOverlay();
         console.log(`⏸️ Game paused by ${stateMsg.pausedBy}`);
         
-        // Add chat notification for pause
-        if (this.gameChat) {
-          this.gameChat.addSystemMessage(`⏸️ Game paused by ${stateMsg.pausedBy}`);
-        }
+        // Chat system removed
       } else {
         this.hidePauseOverlay();
         console.log(`▶️ Game resumed by ${stateMsg.pausedBy}`);
         
-        // Add chat notification for resume
-        if (this.gameChat) {
-          this.gameChat.addSystemMessage(`▶️ Game resumed by ${stateMsg.pausedBy}`);
-        }
+        // Chat system removed
       }
       return;
     }
@@ -1124,41 +1101,7 @@ export class Pong3D {
           return;
         }
 
-        // Handle chat messages
-        if (msg.t === "chat_message") {
-          if (this.gameChat) {
-            this.gameChat.addMessage(msg.message);
-          }
-          return;
-        }
-
-        if (msg.t === "user_joined") {
-          if (this.gameChat) {
-            this.gameChat.addMessage({
-              id: Date.now().toString(),
-              playerId: "system",
-              playerName: "System",
-              message: `${msg.user.name} joined the game`,
-              timestamp: Date.now(),
-              type: "join",
-            });
-          }
-          return;
-        }
-
-        if (msg.t === "user_left") {
-          if (this.gameChat) {
-            this.gameChat.addMessage({
-              id: Date.now().toString(),
-              playerId: "system",
-              playerName: "System",
-              message: `Player left the game`,
-              timestamp: Date.now(),
-              type: "leave",
-            });
-          }
-          return;
-        }
+        // Chat system removed
 
         if (msg.t === "input" && this.isHost) {
           this.guestInputs[msg.idx] = {
@@ -1167,6 +1110,22 @@ export class Pong3D {
           };
           return;
         }
+      };
+
+      // Handle WebSocket close (player disconnect)
+      this.ws.onclose = () => {
+        console.log("WebSocket connection closed");
+        // End the game immediately when connection is lost
+        this.gameState.matchReady = false;
+        this.endAndToast("Game ended - Connection lost");
+      };
+
+      // Handle WebSocket errors
+      this.ws.onerror = (error) => {
+        console.error("WebSocket error:", error);
+        // End the game immediately on connection error
+        this.gameState.matchReady = false;
+        this.endAndToast("Game ended - Connection error");
       };
 
       if (this.isGuest) {
@@ -1543,15 +1502,7 @@ export class Pong3D {
           this.gameState.lastScorer = this.gameState.lastHitter;
           this.updateScoreUI();
 
-          // Add chat notification for scoring
-          if (this.gameChat) {
-            const playerName = this.getPlayerName(this.gameState.lastHitter);
-            this.gameChat.addSystemMessage(
-              `🎯 ${playerName} scores! Current score: ${
-                this.gameState.scores[this.gameState.lastHitter]
-              }`
-            );
-          }
+          // Chat system removed
 
           const winResult = this.gameState.isWinConditionMet();
           if (winResult.hasWinner) {
@@ -1922,18 +1873,7 @@ export class Pong3D {
       }
     }
 
-    // Add chat notification for game end
-    if (this.gameChat) {
-      const winnerName = this.getPlayerName(winnerIdx);
-      this.gameChat.addSystemMessage(
-        `🏆 Game Over! ${winnerName} wins the match!`
-      );
-      this.gameChat.addSystemMessage(
-        `Final Score: ${this.gameState.scores
-          .slice(0, this.config.playerCount === 4 ? 4 : 2)
-          .join(" - ")}`
-      );
-    }
+    // Chat system removed
 
     // Play correct win/lose cue from local perspective
     this.handleGameEndAudio(winnerIdx);

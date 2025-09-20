@@ -1,5 +1,4 @@
 import { markUI } from "../../ui";
-import { GameChat, type ChatUser } from "../ui/GameChat";
 import { themeBridge, type GameThemeColors } from "../utils/ThemeBridge";
 import { StandardMaterial } from "@babylonjs/core";
 
@@ -156,45 +155,10 @@ export function updateGameTheme(self: any, newTheme: GameThemeColors) {
   console.log("✅ Game colors updated successfully");
 }
 
-export function initializeChat(self: any) {
-  if (self.config.connection === "ai" || self.config.connection === "ai3" || self.config.connection === "local") {
-    console.log("💬 Chat disabled for AI mode");
-    return;
-  }
-
-  let currentUser: ChatUser = {
-    id: "player-" + Date.now(),
-    name: "Player",
-    isConnected: true,
-  };
-
-  try {
-    const userData = localStorage.getItem("ft_pong_user_data");
-    if (userData) {
-      const user = JSON.parse(userData);
-      currentUser = {
-        id: user.id || currentUser.id,
-        name: user.firstName
-          ? `${user.firstName} ${user.lastName || ""}`.trim()
-          : user.userName || user.email || "Player",
-        isConnected: true,
-      };
-    }
-  } catch (error) {
-    console.warn("Could not load user data for chat:", error);
-  }
-
-  const gameContainer = document.querySelector("#gameContainer") || document.body;
-
-  self.gameChat = new GameChat(gameContainer as HTMLElement, currentUser, self.ws || undefined);
-
-  self.gameChat.addSystemMessage(`Welcome to the game, ${currentUser.name}! 🎮`);
-
-  if (self.config.playerCount > 1) {
-    self.gameChat.addSystemMessage("Chat with other players during the game!");
-  }
-
-  console.log("💬 Game chat initialized for user:", currentUser.name);
+export function initializeChat(_self: any) {
+  // Chat is disabled for all game modes
+  console.log("💬 Chat disabled for all game modes");
+  return;
 }
 
 export function getPlayerName(self: any, playerIndex: number): string {
