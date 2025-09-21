@@ -83,7 +83,8 @@ export function createMenuRoot(ctx: MenuRenderContext) {
               <option value="16">16 Players</option>
             </select>
           </div>
-          <button data-action="tourn" class="w-full mb-3 px-4 py-3 rounded-lg font-semibold transition-all duration-300 flex items-center justify-center gap-2" style="background: #9333ea; color: white;" onmouseover="this.style.background='#7c3aed'; this.style.transform='translateY(-1px)';" onmouseout="this.style.background='#9333ea'; this.style.transform='translateY(0)';">🏆 Create Tournament</button>
+          <button data-action="tourn" class="w-full mb-2 px-4 py-3 rounded-lg font-semibold transition-all duration-300 flex items-center justify-center gap-2" style="background: #9333ea; color: white;" onmouseover="this.style.background='#7c3aed'; this.style.transform='translateY(-1px)';" onmouseout="this.style.background='#9333ea'; this.style.transform='translateY(0)';">🏆 Create Tournament</button>
+          <button data-action="joinTourn" class="w-full mb-3 px-4 py-3 rounded-lg font-semibold transition-all duration-300 flex items-center justify-center gap-2" style="background: #7c3aed; color: white;" onmouseover="this.style.background='#6d28d9'; this.style.transform='translateY(-1px)';" onmouseout="this.style.background='#7c3aed'; this.style.transform='translateY(0)';">🎯 Join Tournament</button>
           <div class="text-xs text-center" style="color: #9333ea;">📊 Results saved to database</div>
         </div>
       </div>

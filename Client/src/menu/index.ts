@@ -10,5 +10,6 @@ export {
   startLocal2P,
   startVsAI,
   startVs3AI,
-  createTournament
+  createTournament,
+  joinTournament
 } from './MenuActions';

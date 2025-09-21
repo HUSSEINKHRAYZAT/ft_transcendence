@@ -51,6 +51,19 @@ export function startVs3AI(aiLevel: number, currentUser: any, onResolve: (cfg: G
 
 // === Socket.IO Only (old host/join removed) ===
 export async function createSocketIORoom(gameMode: '2p' | '4p', currentUser: any, onResolve: (cfg: GameConfig)=>void) {
+  // Check if user can join a new game
+  const sessionCheck = await ApiClient.checkUserCanJoin('game');
+  if (!sessionCheck.canJoin) {
+    overlay(`<div class="card">
+      <div style="font-weight:700; margin-bottom:16px; color:#ef4444; font-size:18px;">⚠️ Cannot Create Game</div>
+      <div style="margin-bottom:16px; color:#d1d5db;">${sessionCheck.reason}</div>
+      <div style="margin-top:20px; text-align:right;">
+        <button class="btn btn-primary" data-close>Got it!</button>
+      </div>
+    </div>`);
+    return;
+  }
+
   const playerCount: PlayerCount = gameMode === '2p' ? 2 : 4;
   const sessionId = Math.random().toString(36).substring(2, 6).toUpperCase();
   const playerNameDefault = currentUser?.name ? `${currentUser.name}_Host` : `Host_${sessionId}`;
@@ -103,23 +116,57 @@ export async function createSocketIORoom(gameMode: '2p' | '4p', currentUser: any
         <div style="margin-bottom:12px; color:#d1d5db;">Share this room ID with other players:</div>
         <div style="font-size:28px; font-weight:800; margin:16px 0; padding:16px; background:rgba(0,0,0,0.4); border-radius:12px; text-align:center; border:2px solid #84cc16; color:#84cc16; letter-spacing:2px; font-family:monospace;">${roomId}</div>
         <div style="margin-bottom:16px; color:#9ca3af; text-align:center;">Other players can join using this code</div>
+        <div id="room-status" style="margin-bottom:16px; color:#f59e0b; text-align:center; font-weight:600;">⏳ Waiting for players to join...</div>
         <div style="display:flex; gap:12px; margin-top:20px;">
           <button class="btn btn-outline" data-close style="flex:1;">Cancel</button>
-          <button class="btn btn-primary" data-start style="flex:1;">Start Game</button>
+          <button class="btn btn-primary" id="start-game-btn" data-start style="flex:1; opacity:0.5;" disabled>Start Game</button>
         </div>
       </div>`;
 
-      (ov.querySelector("[data-start]") as HTMLButtonElement).onclick = () => {
-        ov.remove();
-        onResolve({
-          playerCount,
-          connection: gameMode === '2p' ? "remoteHost" : "remote4Host",
-          roomId,
-          winScore: 10,
-          currentUser,
-          displayNames: gameMode === '2p' ? [currentUser?.name || finalPlayerName || "Host", "Waiting…"] : [currentUser?.name || finalPlayerName || "Host", "…", "…", "…"],
-        });
+      const startBtn = ov.querySelector("#start-game-btn") as HTMLButtonElement;
+      
+      // Track player count to enable/disable start button
+      let connectedPlayers = 1; // Host is already connected
+      const updateStartButton = () => {
+        const statusDiv = ov.querySelector("#room-status");
+        if (connectedPlayers >= (gameMode === '2p' ? 2 : 4)) {
+          startBtn.disabled = false;
+          startBtn.style.opacity = '1';
+          if (statusDiv) statusDiv.textContent = `✅ Ready to start! (${connectedPlayers}/${gameMode === '2p' ? 2 : 4} players)`;
+        } else {
+          startBtn.disabled = true;
+          startBtn.style.opacity = '0.5';
+          if (statusDiv) statusDiv.textContent = `⏳ Waiting for players... (${connectedPlayers}/${gameMode === '2p' ? 2 : 4} players)`;
+        }
       };
+
+      // Listen for players joining
+      socketManager.on('player_joined', (player) => {
+        connectedPlayers++;
+        updateStartButton();
+      });
+
+      socketManager.on('player_left', (playerId) => {
+        connectedPlayers = Math.max(1, connectedPlayers - 1); // Host stays
+        updateStartButton();
+      });
+
+      startBtn.onclick = () => {
+        if (connectedPlayers >= (gameMode === '2p' ? 2 : 4)) {
+          ov.remove();
+          onResolve({
+            playerCount,
+            connection: gameMode === '2p' ? "remoteHost" : "remote4Host",
+            roomId,
+            winScore: 10,
+            currentUser,
+            displayNames: gameMode === '2p' ? [currentUser?.name || finalPlayerName || "Host", "Waiting…"] : [currentUser?.name || finalPlayerName || "Host", "…", "…", "…"],
+          });
+        }
+      };
+      
+      // Initial button state check
+      updateStartButton();
     } catch (error: any) {
       ov.innerHTML = `<div class="card">
         <div style="font-weight:700; margin-bottom:8px;">❌ Connection Failed</div>
@@ -131,6 +178,19 @@ export async function createSocketIORoom(gameMode: '2p' | '4p', currentUser: any
 }
 
 export async function joinSocketIORoom(gameMode: '2p' | '4p', currentUser: any, onResolve: (cfg: GameConfig)=>void) {
+  // Check if user can join a new game
+  const sessionCheck = await ApiClient.checkUserCanJoin('game');
+  if (!sessionCheck.canJoin) {
+    overlay(`<div class="card">
+      <div style="font-weight:700; margin-bottom:16px; color:#ef4444; font-size:18px;">⚠️ Cannot Join Game</div>
+      <div style="margin-bottom:16px; color:#d1d5db;">${sessionCheck.reason}</div>
+      <div style="margin-top:20px; text-align:right;">
+        <button class="btn btn-primary" data-close>Got it!</button>
+      </div>
+    </div>`);
+    return;
+  }
+
   const playerCount: PlayerCount = gameMode === '2p' ? 2 : 4;
   const sessionId = Math.random().toString(36).substring(2, 6).toUpperCase();
   const defaultGuest = currentUser?.name ? `${currentUser.name}_Guest` : `Guest_${sessionId}`;
@@ -201,9 +261,120 @@ export async function joinSocketIORoom(gameMode: '2p' | '4p', currentUser: any, 
   };
 }
 
+export async function joinTournament(onResolveDone?: ()=>void) {
+  // throws if not signed in
+  const { user } = requireLogin(overlay);
+
+  // Check if user can join a tournament
+  const sessionCheck = await ApiClient.checkUserCanJoin('tournament');
+  if (!sessionCheck.canJoin) {
+    overlay(`<div class="card">
+      <div style="font-weight:700; margin-bottom:16px; color:#ef4444; font-size:18px;">⚠️ Cannot Join Tournament</div>
+      <div style="margin-bottom:16px; color:#d1d5db;">${sessionCheck.reason}</div>
+      <div style="margin-top:20px; text-align:right;">
+        <button class="btn btn-primary" data-close>Got it!</button>
+      </div>
+    </div>`);
+    return;
+  }
+
+  const ov = overlay(`<div class="card">
+    <div style="font-weight:700; margin-bottom:16px; color:#7c3aed; font-size:18px;">🎯 Join Tournament</div>
+    <div style="margin-bottom:12px; color:#d1d5db;">Enter the tournament code to join:</div>
+    <div style="margin:16px 0;">
+      <input id="tournamentCode" placeholder="ABC123" style="width:100%; padding:12px; background:rgba(0,0,0,0.4); border:2px solid #374151; border-radius:8px; text-align:center; font-size:20px; font-weight:600; text-transform:uppercase; letter-spacing:2px; color:#84cc16; font-family:monospace;" maxlength="10">
+    </div>
+    <div style="display:flex; gap:12px; margin-top:20px;">
+      <button class="btn btn-outline" data-close style="flex:1;">Cancel</button>
+      <button class="btn btn-primary" id="joinTournBtn" style="flex:1;">Join Tournament</button>
+    </div>
+  </div>`);
+
+  const btn = ov.querySelector("#joinTournBtn") as HTMLButtonElement;
+  const inp = ov.querySelector("#tournamentCode") as HTMLInputElement;
+
+  btn.onclick = async () => {
+    btn.disabled = true;
+    const code = inp.value.trim().toUpperCase();
+
+    if (!code) {
+      alert("Please enter a tournament code.");
+      btn.disabled = false;
+      return;
+    }
+
+    try {
+      ov.innerHTML = `<div class="card">
+        <div style="font-weight:700; margin-bottom:8px;">🔍 Looking for tournament...</div>
+        <div class="muted">Checking tournament code: ${code}</div>
+      </div>`;
+
+      // Call API to join tournament
+      const tournamentInfo = await ApiClient.joinTournament({ code });
+      
+      ov.innerHTML = `<div class="card">
+        <div style="font-weight:700; margin-bottom:16px; color:#10b981; font-size:18px;">✅ Tournament Joined Successfully!</div>
+        
+        <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+          <div style="font-weight: 600; margin-bottom: 8px;">Tournament Details:</div>
+          <div style="color: #d1d5db; margin-bottom: 4px;">📋 Tournament: ${tournamentInfo.name || code}</div>
+          <div style="color: #d1d5db; margin-bottom: 4px;">👥 Players: ${tournamentInfo.currentPlayers}/${tournamentInfo.maxPlayers}</div>
+          <div style="color: #d1d5db;">⏱️ Status: ${tournamentInfo.status || 'Waiting for players'}</div>
+        </div>
+
+        <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 8px; padding: 12px; margin-bottom: 16px;">
+          <div style="font-size: 14px; color: #3b82f6;">
+            <strong>📋 What's Next:</strong><br>
+            • Wait for all players to join<br>
+            • Tournament organizer will start matches<br>
+            • You'll be notified when your match begins<br>
+            • Good luck! 🍀
+          </div>
+        </div>
+
+        <div style="display:flex; gap:12px; margin-top:20px;">
+          <button class="btn btn-primary" data-close style="flex:1;">Got it!</button>
+        </div>
+      </div>`;
+
+      onResolveDone?.();
+    } catch (e: any) {
+      ov.innerHTML = `<div class="card">
+        <div style="font-weight:700; margin-bottom:8px;">❌ Join Failed</div>
+        <div class="muted">${e?.message || "Could not join tournament. Please check the code and try again."}</div>
+        <div style="margin-top:10px; text-align:right;">
+          <button class="btn btn-outline" onclick="location.reload()">Try Again</button>
+          <button class="btn" data-close style="margin-left: 8px;">Close</button>
+        </div>
+      </div>`;
+    }
+  };
+
+  // Allow Enter key to join
+  inp.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      btn.click();
+    }
+  });
+}
+
 export async function createTournament(onResolveDone?: ()=>void) {
   // throws if not signed in
   const { user } = requireLogin(overlay);
+
+  // Check if user can create a tournament
+  const sessionCheck = await ApiClient.checkUserCanJoin('tournament');
+  if (!sessionCheck.canJoin) {
+    overlay(`<div class="card">
+      <div style="font-weight:700; margin-bottom:16px; color:#ef4444; font-size:18px;">⚠️ Cannot Create Tournament</div>
+      <div style="margin-bottom:16px; color:#d1d5db;">${sessionCheck.reason}</div>
+      <div style="margin-top:20px; text-align:right;">
+        <button class="btn btn-primary" data-close>Got it!</button>
+      </div>
+    </div>`);
+    return;
+  }
+
   const sizeSel = document.querySelector<HTMLSelectElement>("#tSize");
   const size = parseInt(sizeSel?.value ?? "8", 10) as 8 | 16;
 
@@ -240,14 +411,62 @@ export async function createTournament(onResolveDone?: ()=>void) {
     const ids = Array.from(ov.querySelectorAll<HTMLInputElement>('input[type="checkbox"]:checked')).map((i) => i.value);
     if (ids.length !== size) { alert(`Please select exactly ${size} players.`); return; }
     try {
-      const { code } = await ApiClient.createTournament({ size, participants: ids });
-      ov.innerHTML = `<div class="card">
-        <div style="font-weight:700; margin-bottom:6px;">Tournament Created</div>
-        <div class="muted">Share this code with participants:</div>
-        <div style="font-size:20px; font-weight:800; margin:6px 0;"><code>${code}</code></div>
-        <div class="muted">When each match starts, results will post to your DB automatically.</div>
-        <div style="margin-top:10px; text-align:right;"><button class="btn" data-close>Done</button></div>
+      const { code, tournamentId } = await ApiClient.createTournament({ size, participants: ids });
+      
+      // Create tournament bracket data
+      const selectedPlayers = players.filter(p => ids.includes(p.id)).map(p => ({
+        id: p.id,
+        name: p.userName || `${p.firstName} ${p.lastName}`.trim() || 'Unknown Player',
+        isOnline: true
+      }));
+      
+      // Show tournament bracket
+      ov.innerHTML = `<div class="card" style="max-width: 900px; width: 90vw;">
+        <div style="font-weight:700; margin-bottom:16px; color:#84cc16; font-size:24px; text-align:center;">🏆 Tournament Created Successfully!</div>
+        
+        <div style="background: rgba(132, 204, 22, 0.1); border: 1px solid rgba(132, 204, 22, 0.3); border-radius: 8px; padding: 16px; margin-bottom: 20px; text-align: center;">
+          <div style="font-weight: 600; margin-bottom: 8px;">Tournament Code:</div>
+          <div style="font-size: 28px; font-weight: 800; color: #84cc16; font-family: monospace; letter-spacing: 2px;">${code}</div>
+          <div style="color: #9ca3af; margin-top: 8px; font-size: 14px;">Share this code with all participants</div>
+        </div>
+
+        <div id="tournament-bracket-container" style="margin: 20px 0;"></div>
+
+        <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 8px; padding: 12px; margin-bottom: 16px;">
+          <div style="font-size: 14px; color: #3b82f6;">
+            <strong>📋 Tournament Rules:</strong><br>
+            • ${size} players, single elimination<br>
+            • ${size === 16 ? 'Round of 16 → ' : ''}Quarterfinals → Semifinals → Final<br>
+            • Winners advance automatically<br>
+            • Match results are saved to database<br>
+          </div>
+        </div>
+
+        <div style="display:flex; gap:12px; margin-top:20px;">
+          <button class="btn btn-outline" data-close style="flex:1;">Close</button>
+          <button class="btn btn-primary" id="start-tournament" style="flex:1;">Start First Round</button>
+        </div>
       </div>`;
+
+      // Import and create the tournament bracket
+      const { TournamentBracket } = await import('../tournament/TournamentBracket');
+      const bracketContainer = ov.querySelector('#tournament-bracket-container') as HTMLElement;
+      
+      if (bracketContainer) {
+        const bracketData = TournamentBracket.generateInitialBracket(tournamentId || 'temp', size, selectedPlayers);
+        new TournamentBracket(bracketContainer, bracketData);
+      }
+
+      // Handle start tournament button
+      const startBtn = ov.querySelector('#start-tournament') as HTMLButtonElement;
+      if (startBtn) {
+        startBtn.onclick = () => {
+          ov.remove();
+          // Could implement tournament match queue here
+          alert(`Tournament "${code}" is ready! Players can now join matches using the tournament system.`);
+        };
+      }
+
       onResolveDone?.();
     } catch (e: any) {
       ov.innerHTML = `<div class="card">

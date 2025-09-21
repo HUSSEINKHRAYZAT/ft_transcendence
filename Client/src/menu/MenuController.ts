@@ -10,6 +10,7 @@ import {
   startLocal2P,
   startVsAI,
   createTournament,
+  joinTournament,
   startVs3AI
 } from "../menu";
 
@@ -99,6 +100,10 @@ export class Menu {
         }
         if (a === "tourn") {
           createTournament();
+          return;
+        }
+        if (a === "joinTourn") {
+          joinTournament();
           return;
         }
       });

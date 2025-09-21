@@ -59,6 +59,7 @@ export type RemoteMsgShort =
   | { t: "user_joined"; user: { id: string; name: string; isConnected: boolean } }
   | { t: "user_left"; userId: string }
   | { t: "join_chat"; user: { id: string; name: string; isConnected: boolean } }
-  | { t: "leave_chat"; userId: string };
+  | { t: "leave_chat"; userId: string }
+  | { t: "gameExit"; gameExit: boolean; exitedBy: string; reason: string; finalScores: number[]; timestamp: number };
 
 export type Match = { a: string; b: string; winner?: string };

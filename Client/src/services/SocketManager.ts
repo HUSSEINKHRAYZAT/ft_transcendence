@@ -30,6 +30,7 @@ export interface SocketEvents {
   'game_started': (data?: { players: any[]; gameState: any }) => void;
   'game_ready': (data: { hostPlayer: any; joinerPlayer: any; gameMode: string }) => void;
   'game_state': (state: any) => void;
+  'game_exit': (data: { exitedBy: string; reason: string; finalScores: number[]; timestamp: number }) => void;
   'player_input': (data: { playerId: string; playerIndex?: number; input: any }) => void;
 
   // Chat events
@@ -46,7 +47,7 @@ export class SocketManager {
   private eventHandlers: Map<keyof SocketEvents, Function[]> = new Map();
 
   // Socket.IO server URL - can be configured via environment
-  private readonly SERVER_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3020';
+  private readonly SERVER_URL = (import.meta as any).env?.VITE_SOCKET_URL || 'http://localhost:3020';
 
   constructor() {
     this.setupEventHandlers();
@@ -87,7 +88,7 @@ export class SocketManager {
         this.socket!.on('connect', () => {
           clearTimeout(timeout);
           this.isConnected = true;
-          this.playerId = this.socket!.id;
+          this.playerId = this.socket!.id || '';
 
           console.log(`✅ Connected to Socket.IO server. Player ID: ${this.playerId}`);
 
@@ -396,7 +397,7 @@ export class SocketManager {
    * Check if Socket.IO server is available
    */
   public static async checkServerAvailability(serverUrl?: string): Promise<boolean> {
-    const url = serverUrl || import.meta.env.VITE_SOCKET_URL || 'http://localhost:3020';
+    const url = serverUrl || (import.meta as any).env?.VITE_SOCKET_URL || 'http://localhost:3020';
 
     try {
       const response = await fetch(`${url.replace('/socket.io', '')}/health`, {

@@ -182,6 +182,13 @@ export class Pong3D {
         return;
       }
 
+      // Handle exit game (only on keydown)
+      if (k === "escape" && v) {
+        this.exitGame();
+        e.preventDefault();
+        return;
+      }
+
       if (
         [
           "arrowup",
@@ -199,6 +206,13 @@ export class Pong3D {
     };
     window.addEventListener("keydown", onKey(true));
     window.addEventListener("keyup", onKey(false));
+
+    // Handle window close/exit - report game results before closing
+    window.addEventListener("beforeunload", this.handleWindowClose.bind(this));
+    window.addEventListener("unload", this.handleWindowClose.bind(this));
+    
+    // Handle visibility change (tab switch/minimize)
+    document.addEventListener("visibilitychange", this.handleVisibilityChange.bind(this));
 
     // Remote role
     this.isHost =
@@ -232,6 +246,44 @@ export class Pong3D {
 
   private createScoreUI() {
   Frontend.createScoreUI(this);
+  this.createControlsHint();
+  }
+
+  private createControlsHint() {
+    // Create a subtle controls hint in the corner
+    const hint = document.createElement('div');
+    hint.className = 'game-controls-hint';
+    hint.innerHTML = `
+      <div style="
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: rgba(0, 0, 0, 0.7);
+        color: #84cc16;
+        padding: 8px 12px;
+        border-radius: 8px;
+        font-size: 12px;
+        font-family: monospace;
+        border: 1px solid rgba(132, 204, 22, 0.3);
+        z-index: 1000;
+        pointer-events: none;
+        opacity: 0.8;
+        transition: opacity 0.3s ease;
+      ">
+        <div style="margin-bottom: 4px;"><strong>CONTROLS:</strong></div>
+        <div>P - Pause/Resume</div>
+        <div style="color: #f59e0b;">ESC - Exit Game</div>
+      </div>
+    `;
+    document.body.appendChild(hint);
+
+    // Auto-hide after 5 seconds
+    setTimeout(() => {
+      hint.style.opacity = '0.3';
+    }, 5000);
+
+    // Store reference for cleanup
+    (this as any).controlsHint = hint;
   }
   private updateNamesUI() {
   Frontend.updateNamesUI(this);
@@ -272,13 +324,39 @@ export class Pong3D {
 
     // Chat system removed
 
+    // Stop all audio to prevent loops
+    this.stopAllAudio();
+
     // Cleanup pause overlay
     this.hidePauseOverlay();
+
+    // Cleanup controls hint
+    const controlsHint = (this as any).controlsHint;
+    if (controlsHint && controlsHint.parentNode) {
+      controlsHint.parentNode.removeChild(controlsHint);
+    }
 
     // Dispose engine and scene
     if (this.engine) {
       this.engine.dispose();
     }
+  }
+
+  private stopAllAudio() {
+    console.log("🔇 Stopping all audio to prevent loops");
+    
+    // Stop all sound categories
+    Object.values(this.sounds).forEach(soundArray => {
+      soundArray.forEach(sound => {
+        try {
+          if (sound && sound.isPlaying) {
+            sound.stop();
+          }
+        } catch (e) {
+          console.log("⚠️ Could not stop sound:", e);
+        }
+      });
+    });
   }
 
   private async startGameWithCountdown() {
@@ -813,6 +891,12 @@ export class Pong3D {
         this.handleRemoteState(state);
       }
     });
+    
+    // Listen for game exit messages via Socket.IO
+    socketManager.on("game_exit", (data) => {
+      console.log("🚪 Received game exit signal via Socket.IO:", data);
+      this.handleRemoteState({ gameExit: true, ...data });
+    });
 
     socketManager.on("player_input", (data) => {
       if (this.isHost && data.playerId !== socketManager.id) {
@@ -850,11 +934,16 @@ export class Pong3D {
     socketManager.on("player_left", (playerId) => {
       console.log("Player left:", playerId);
       
-      // End the game immediately when any player leaves
-      this.gameState.matchReady = false;
-      this.endAndToast("Game ended - Player disconnected");
-      
-      if (this.isHost) {
+      // Only end the active game if it's in progress
+      if (this.gameState.matchReady) {
+        // Report current game state before ending
+        this.reportGameInterruption();
+        
+        // End the game immediately when any player leaves during gameplay
+        this.gameState.matchReady = false;
+        this.endAndToast("Game ended - Player disconnected");
+      } else if (this.isHost) {
+        // If game hasn't started yet, just update the waiting status
         this.connectedGuests = Math.max(0, this.connectedGuests - 1);
         // Reset display names
         if (this.config.displayNames && this.config.displayNames.length > 1) {
@@ -896,8 +985,15 @@ export class Pong3D {
       }
       
       if (this.isGuest && !this.gameState.matchReady) {
-        this.gameState.matchReady = true;
         this.hideWaitingOverlay();
+        // Show countdown for Socket.IO joiner too
+        const countdown = new GameCountdown({
+          onComplete: () => {
+            this.gameState.matchReady = true;
+            this.resetBall(Math.random() < 0.5 ? 1 : -1);
+          },
+        });
+        countdown.start(); // Fire and forget, synchronized with host
       }
     });
 
@@ -974,6 +1070,25 @@ export class Pong3D {
   }
 
   private handleRemoteState(stateMsg: any) {
+    // Handle game exit message
+    if (stateMsg.gameExit) {
+      console.log("🚪 Received game exit signal from:", stateMsg.exitedBy);
+      this.gameState.matchReady = false;
+      this.stopAllAudio();
+      
+      const exitMessage = stateMsg.playerRole === 'Host' 
+        ? `🏠 Game ended by Host - ${stateMsg.exitedBy || 'Host'} left the game` 
+        : `🔗 Game ended by Joiner - ${stateMsg.exitedBy || 'Joiner'} left the game`;
+      
+      this.endAndToast(exitMessage);
+      
+      // Auto-return to menu after a short delay
+      setTimeout(() => {
+        window.location.reload();
+      }, 3000); // Slightly longer delay to read the message
+      return;
+    }
+
     // Handle game end message
     if (stateMsg.gameEnd) {
       this.gameState.matchReady = false;
@@ -1090,13 +1205,25 @@ export class Pong3D {
 
         if (msg.t === "start" && this.isGuest) {
           if (!this.gameState.matchReady) {
-            this.gameState.matchReady = true;
             this.hideWaitingOverlay();
+            // Show countdown for joiner too
+            const countdown = new GameCountdown({
+              onComplete: () => {
+                this.gameState.matchReady = true;
+                this.resetBall(Math.random() < 0.5 ? 1 : -1);
+              },
+            });
+            countdown.start(); // Fire and forget, synchronized with host
           }
           return;
         }
 
         if (msg.t === "state" && this.isGuest) {
+          this.handleRemoteState(msg);
+          return;
+        }
+
+        if (msg.t === "gameExit") {
           this.handleRemoteState(msg);
           return;
         }
@@ -1524,10 +1651,11 @@ export class Pong3D {
       }
     } else {
       if (this.ball.position.x > halfW) {
-        if (this.gameState.touchedOnce) {
+        if (this.gameState.touchedOnce && this.gameState.lastHitter === 0) {
+          // Ball went past right wall and was last hit by player 0 (left paddle) - player 0 scores!
           applyPenaltyIfNeeded(1);
-          this.gameState.addScore(1);
-          this.gameState.lastScorer = 1;
+          this.gameState.addScore(0);
+          this.gameState.lastScorer = 0;
           // Add damage to right wall where ball hit
           this.addWallDamage(
             "right",
@@ -1543,10 +1671,11 @@ export class Pong3D {
         }
         this.resetBall(-1);
       } else if (this.ball.position.x < -halfW) {
-        if (this.gameState.touchedOnce) {
+        if (this.gameState.touchedOnce && this.gameState.lastHitter === 1) {
+          // Ball went past left wall and was last hit by player 1 (right paddle) - player 1 scores!
           applyPenaltyIfNeeded(0);
-          this.gameState.addScore(0);
-          this.gameState.lastScorer = 0;
+          this.gameState.addScore(1);
+          this.gameState.lastScorer = 1;
           // Add damage to left wall where ball hit
           this.addWallDamage(
             "left",
@@ -1741,6 +1870,59 @@ export class Pong3D {
       this.hidePauseOverlay();
       console.log("▶️ Game resumed");
     }
+  }
+
+  private exitGame() {
+    console.log("🚪 Exit game requested by player");
+    
+    // Show confirmation dialog for multiplayer games
+    if (this.isHost || this.isGuest) {
+      const playerName = this.getPlayerName(this.getLocalControlledIndices()[0] || 0);
+      const playerRole = this.isHost ? "Host" : "Joiner";
+      const confirmed = confirm(`Are you sure you want to exit the game?\n\nThis will end the match for all players.`);
+      
+      if (!confirmed) {
+        return; // Player cancelled, don't exit
+      }
+
+      // Broadcast exit game to all players
+      const exitData = {
+        gameExit: true,
+        exitedBy: `${playerName} (${playerRole})`,
+        playerRole: playerRole,
+        reason: `${playerRole} exited the game`,
+        finalScores: [...this.gameState.scores],
+        timestamp: Date.now()
+      };
+
+      if (socketManager.connected) {
+        // Broadcast via Socket.IO
+        socketManager.sendGameState(exitData);
+        console.log("📡 Broadcast game exit via Socket.IO");
+      } else if (this.ws) {
+        // Broadcast via WebSocket
+        this.sendRemoteMessage({
+          t: "gameExit",
+          ...exitData
+        } as any);
+        console.log("📡 Broadcast game exit via WebSocket");
+      }
+
+      // Report current game state before exiting
+      this.reportGameInterruption();
+    }
+
+    // End the game immediately
+    this.gameState.matchReady = false;
+    this.stopAllAudio();
+    
+    // Show exit message and provide option to return to menu
+    this.endAndToast("Game exited - Returning to menu");
+    
+    // Auto-return to menu after a short delay
+    setTimeout(() => {
+      window.location.reload();
+    }, 2000);
   }
 
   private showPauseOverlay() {
@@ -1977,15 +2159,36 @@ export class Pong3D {
       s && ((s as any).isReadyToPlay === true || (s as any).isReady?.());
     
     if (ready) {
-      // Check if sound is already playing to prevent overlap
-      const isPlaying = (s as any)._isPlaying || (s as any).isPlaying;
-      if (!isPlaying) {
-        (s as any).setPlaybackRate?.(1);
-        s.play();
-        console.log("🎵 WIN sound started playing");
-      } else {
-        console.log("🔇 WIN sound already playing, skipped");
+      // Stop any currently playing sound first to prevent overlap
+      try {
+        if ((s as any).isPlaying || (s as any)._isPlaying) {
+          s.stop();
+          console.log("🛑 Stopped existing WIN sound to prevent loop");
+        }
+      } catch (e) {
+        console.log("⚠️ Could not stop existing sound:", e);
       }
+      
+      // Ensure sound doesn't loop
+      (s as any).loop = false;
+      (s as any).setPlaybackRate?.(1);
+      
+      // Play the sound once
+      s.play();
+      console.log("🎵 WIN sound started playing (no loop)");
+      
+      // Automatically stop after expected duration to prevent hanging
+      setTimeout(() => {
+        try {
+          if (s.isPlaying) {
+            s.stop();
+            console.log("� Auto-stopped WIN sound after timeout");
+          }
+        } catch (e) {
+          console.log("⚠️ Could not auto-stop sound:", e);
+        }
+      }, 5000); // 5 second safety timeout
+      
     } else {
       console.log("🔊 WIN sound not ready, using fallback beeps");
       // little triumphant beep fallback
@@ -2001,15 +2204,36 @@ export class Pong3D {
       s && ((s as any).isReadyToPlay === true || (s as any).isReady?.());
     
     if (ready) {
-      // Check if sound is already playing to prevent overlap
-      const isPlaying = (s as any)._isPlaying || (s as any).isPlaying;
-      if (!isPlaying) {
-        (s as any).setPlaybackRate?.(1);
-        s.play();
-        console.log("🎵 LOSE sound started playing");
-      } else {
-        console.log("🔇 LOSE sound already playing, skipped");
+      // Stop any currently playing sound first to prevent overlap
+      try {
+        if ((s as any).isPlaying || (s as any)._isPlaying) {
+          s.stop();
+          console.log("🛑 Stopped existing LOSE sound to prevent loop");
+        }
+      } catch (e) {
+        console.log("⚠️ Could not stop existing sound:", e);
       }
+      
+      // Ensure sound doesn't loop
+      (s as any).loop = false;
+      (s as any).setPlaybackRate?.(1);
+      
+      // Play the sound once
+      s.play();
+      console.log("🎵 LOSE sound started playing (no loop)");
+      
+      // Automatically stop after expected duration to prevent hanging
+      setTimeout(() => {
+        try {
+          if (s.isPlaying) {
+            s.stop();
+            console.log("� Auto-stopped LOSE sound after timeout");
+          }
+        } catch (e) {
+          console.log("⚠️ Could not auto-stop sound:", e);
+        }
+      }, 5000); // 5 second safety timeout
+      
     } else {
       console.log("🔊 LOSE sound not ready, using fallback beeps");
       // descending tones fallback
@@ -2054,6 +2278,110 @@ export class Pong3D {
     if (this.config.connection === "remote4Guest") return [this.remoteIndex];
     if (this.config.connection === "ai3") return [0];
     return [0];
+  }
+
+  private handleWindowClose(event: BeforeUnloadEvent) {
+    // For multiplayer games, notify other players and report results
+    if (this.isHost || this.isGuest) {
+      this.reportGameInterruption();
+      
+      // Set a message for the user
+      event.preventDefault();
+      const message = "Are you sure you want to leave the game? This will end the match for all players.";
+      event.returnValue = message;
+      return message;
+    }
+  }
+
+  private handleVisibilityChange() {
+    // Pause the game when the tab becomes hidden in multiplayer
+    if (document.hidden && (this.isHost || this.isGuest) && this.gameState.matchReady && !this.gameState.isPaused) {
+      console.log("📱 Tab hidden, auto-pausing multiplayer game");
+      this.togglePause();
+    }
+  }
+
+  private async reportGameInterruption() {
+    try {
+      // If this is a host, determine winner based on current scores
+      if (this.isHost && this.gameState.matchReady) {
+        const scores = [...this.gameState.scores];
+        let winnerIdx = -1;
+        
+        // Determine winner by highest score, or -1 if tie
+        if (scores.length >= 2) {
+          if (scores[0] > scores[1]) {
+            winnerIdx = 0;
+          } else if (scores[1] > scores[0]) {
+            winnerIdx = 1;
+          }
+          // If tie, no winner (-1)
+        }
+
+        // Report results to backend if there's a clear winner
+        if (this.config.tournament && winnerIdx >= 0) {
+          const t = this.config.tournament;
+          const leftScore = scores[0] || 0;
+          const rightScore = scores[1] || 0;
+          const winnerUserId = winnerIdx === 0 ? t.leftUserId : t.rightUserId;
+          
+          await ApiClient.reportTournamentMatch({
+            tournamentId: t.tournamentId,
+            round: t.round,
+            matchIndex: t.matchIndex,
+            leftUserId: t.leftUserId,
+            rightUserId: t.rightUserId,
+            leftScore,
+            rightScore,
+            winnerUserId,
+          });
+          
+          console.log("🏆 Tournament match results reported due to game interruption");
+        } else if (this.config.matchId && winnerIdx >= 0) {
+          const winnerUserId = this.config.currentUser?.id || null;
+          await ApiClient.postMatchResult({
+            matchId: this.config.matchId,
+            winnerUserId,
+            scores,
+          });
+          
+          console.log("🎮 Match results reported due to game interruption");
+        }
+
+        // Notify other players that game ended due to disconnection
+        if (socketManager.connected || this.ws) {
+          const gameEndData = {
+            gameEnd: true,
+            interrupted: true,
+            winnerIdx: winnerIdx >= 0 ? winnerIdx : null,
+            winnerName: winnerIdx >= 0 ? this.getPlayerName(winnerIdx) : null,
+            reason: "Player disconnected",
+            finalScores: scores,
+            displayNames: [...(this.config.displayNames || [])]
+          };
+          
+          if (socketManager.connected) {
+            socketManager.sendGameState(gameEndData);
+          } else if (this.ws) {
+            this.sendRemoteMessage({
+              t: "gameEnd",
+              ...gameEndData
+            } as any);
+          }
+        }
+      }
+      
+      // Clean up connections
+      if (socketManager.connected) {
+        socketManager.leaveRoom();
+      }
+      if (this.ws) {
+        this.ws.close();
+      }
+      
+    } catch (error) {
+      console.error("❌ Error reporting game interruption:", error);
+    }
   }
 
   private handleGameEndAudio(winnerIdx: number) {

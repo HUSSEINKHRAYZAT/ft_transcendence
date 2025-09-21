@@ -70,6 +70,56 @@ export class ApiClient {
     return r.json();
   }
 
+  static async joinTournament(params: { code: string }): Promise<{
+    name?: string; currentPlayers: number; maxPlayers: number; status?: string;
+  }> {
+    const r = await fetch("/api/pong/tournaments/join", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(params),
+    });
+    if (!r.ok) throw new Error("Failed to join tournament");
+    return r.json();
+  }
+
+  // ---- Session Management
+  static async getUserActiveSessions(): Promise<{
+    activeGames: string[]; activeTournaments: string[];
+  }> {
+    const r = await fetch("/api/pong/sessions/active", {
+      credentials: "include",
+    });
+    if (!r.ok) return { activeGames: [], activeTournaments: [] };
+    return r.json();
+  }
+
+  static async checkUserCanJoin(type: 'game' | 'tournament'): Promise<{ canJoin: boolean; reason?: string }> {
+    try {
+      const sessions = await this.getUserActiveSessions();
+      
+      if (type === 'game' && sessions.activeGames.length > 0) {
+        return { 
+          canJoin: false, 
+          reason: `You are already in an active game (${sessions.activeGames[0]}). Please finish or exit your current game first.` 
+        };
+      }
+      
+      if (type === 'tournament' && sessions.activeTournaments.length > 0) {
+        return { 
+          canJoin: false, 
+          reason: `You are already in a tournament (${sessions.activeTournaments[0]}). Please finish your current tournament first.` 
+        };
+      }
+      
+      return { canJoin: true };
+    } catch (error) {
+      // If API fails, allow join (graceful degradation)
+      console.warn('Session check failed:', error);
+      return { canJoin: true };
+    }
+  }
+
   static async reportTournamentMatch(params: {
     tournamentId: string; round: number; matchIndex: number;
     leftUserId: string; rightUserId: string; leftScore: number; rightScore: number; winnerUserId: string;

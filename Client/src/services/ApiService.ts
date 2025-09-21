@@ -302,6 +302,39 @@ class FTPongAPI extends ApiService {
     return this.get(API_ENDPOINTS.LANGUAGES.LIST);
   }
 
+  // ===== Tournament =====
+  async createTournament(tournamentData: { 
+    name: string; 
+    size: number; 
+    playerIds: string[];
+  }) {
+    return this.post(API_ENDPOINTS.TOURNAMENT.CREATE, tournamentData);
+  }
+
+  async joinTournament(data: { code: string }) {
+    return this.post(API_ENDPOINTS.TOURNAMENT.JOIN, data);
+  }
+
+  async getTournamentByCode(code: string) {
+    return this.get(API_ENDPOINTS.TOURNAMENT.GET_BY_CODE(code));
+  }
+
+  async getTournamentById(id: string) {
+    return this.get(API_ENDPOINTS.TOURNAMENT.GET_BY_ID(id));
+  }
+
+  async updateTournament(id: string, data: any) {
+    return this.patch(API_ENDPOINTS.TOURNAMENT.UPDATE(id), data);
+  }
+
+  async deleteTournament(id: string) {
+    return this.delete(API_ENDPOINTS.TOURNAMENT.DELETE(id));
+  }
+
+  async listTournaments() {
+    return this.get(API_ENDPOINTS.TOURNAMENT.LIST);
+  }
+
   // ===== Health / Default =====
   async getHealth() {
     return this.get(API_ENDPOINTS.DEFAULT.HEALTH);

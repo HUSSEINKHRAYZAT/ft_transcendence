@@ -86,6 +86,15 @@ export const API_ENDPOINTS = {
   LANGUAGES: {
     LIST: '/languages/',
   },
+  TOURNAMENT: {
+    CREATE: '/tournament/',
+    JOIN: '/tournament/join',
+    LIST: '/tournament/',
+    GET_BY_CODE: (code: string) => `/tournament/code/${code}`,
+    GET_BY_ID: (id: string) => `/tournament/${id}`,
+    UPDATE: (id: string) => `/tournament/${id}`,
+    DELETE: (id: string) => `/tournament/${id}`,
+  },
   DEFAULT: {
     OPENAPI: '/openapi.json',
     HEALTH: '/health',

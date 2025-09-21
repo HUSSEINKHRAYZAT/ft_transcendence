@@ -353,6 +353,31 @@ io.on('connection', (socket) => {
       return;
     }
 
+    // Handle game exit - any player can trigger this
+    if (data.gameExit) {
+      const playerName = player.name || 'Unknown Player';
+      console.log(`🚪 Game exit requested by ${playerName} in room ${player.roomId}`);
+      
+      // Broadcast exit to all players in the room
+      io.to(player.roomId).emit('game_exit', {
+        exitedBy: data.exitedBy || playerName,
+        reason: data.reason || 'Player exited the game',
+        finalScores: data.finalScores || [0, 0],
+        timestamp: data.timestamp || Date.now()
+      });
+      
+      // Also broadcast via game_state for compatibility
+      io.to(player.roomId).emit('game_state', {
+        gameExit: true,
+        exitedBy: data.exitedBy || playerName,
+        reason: data.reason || 'Player exited the game',
+        finalScores: data.finalScores || [0, 0],
+        timestamp: data.timestamp || Date.now()
+      });
+      
+      return;
+    }
+
     if (data.pauseToggle !== undefined) {
       // Pause can be toggled by any player
       const playerName = player.name || 'Unknown';
