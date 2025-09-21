@@ -974,10 +974,26 @@ export class Pong3D {
           this.remoteIndex = myPlayer.playerIndex;
           console.log(`My player index: ${this.remoteIndex}`);
           
-          // Update display names with correct order
-          if (this.config.displayNames && data.players.length >= 2) {
-            this.config.displayNames[0] = data.players[0].name; // Host
-            this.config.displayNames[1] = data.players[1].name; // Joiner
+          // Update display names with correct order for all players
+          if (this.config.displayNames && data.players) {
+            // Clear existing names first
+            for (let i = 0; i < 4; i++) {
+              this.config.displayNames[i] = "";
+            }
+            
+            // Set actual player names
+            data.players.forEach((player: any, index: number) => {
+              if (index < 4 && player.name && this.config.displayNames) {
+                this.config.displayNames[index] = player.name;
+              }
+            });
+            
+            // For any remaining slots without names, set appropriate defaults
+            for (let i = 0; i < 4; i++) {
+              if (this.config.displayNames && !this.config.displayNames[i]) {
+                this.config.displayNames[i] = `Player ${i + 1}`;
+              }
+            }
           }
           
           this.updateNamesUI();
@@ -1082,10 +1098,13 @@ export class Pong3D {
       
       this.endAndToast(exitMessage);
       
-      // Auto-return to menu after a short delay
+      // Auto-return to menu after 3 seconds
       setTimeout(() => {
+        console.log("🕐 3 seconds elapsed - exiting game session automatically");
+        this.gameState.matchReady = false;
+        this.stopAllAudio();
         window.location.reload();
-      }, 3000); // Slightly longer delay to read the message
+      }, 3000);
       return;
     }
 
@@ -1106,6 +1125,14 @@ export class Pong3D {
       if (!this.isHost) {
         this.handleGameEndAudio(stateMsg.winnerIdx);
       }
+
+      // Auto-exit after 3 seconds
+      setTimeout(() => {
+        console.log("🕐 3 seconds elapsed - ending game session automatically");
+        this.gameState.matchReady = false;
+        this.stopAllAudio();
+        window.location.reload();
+      }, 3000);
       return;
     }
 
@@ -2029,6 +2056,8 @@ export class Pong3D {
         : winnerIdx === 0
         ? (this.config.displayNames?.[0] || "Left") + " wins!"
         : (this.config.displayNames?.[1] || "Right") + " wins!";
+    
+    // Show win message immediately
     this.endAndToast(text);
 
     // For multiplayer games, broadcast game end to all players
@@ -2054,6 +2083,14 @@ export class Pong3D {
         } as any);
       }
     }
+
+    // Wait 3 seconds then automatically exit session
+    setTimeout(() => {
+      console.log("🕐 3 seconds elapsed - ending game session automatically");
+      this.gameState.matchReady = false;
+      this.stopAllAudio();
+      window.location.reload();
+    }, 3000);
 
     // Chat system removed
 

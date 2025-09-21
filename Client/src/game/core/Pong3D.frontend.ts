@@ -33,15 +33,23 @@ export function createScoreUI(self: any) {
 
     const name = document.createElement("span");
     name.className = "text-xs opacity-70 text-zinc-400";
-    name.textContent =
-      (self.config.displayNames && self.config.displayNames[i]) || "";
+    // For 4-player mode, show actual player names or fallback appropriately
+    let displayName = "";
+    if (self.config.displayNames && self.config.displayNames[i]) {
+      displayName = self.config.displayNames[i];
+    } else if (slots === 4) {
+      // For 4-player mode, show placeholder for 3rd and 4th players if no name is available
+      displayName = (i < 2) ? `Player ${i + 1}` : `Player ${i + 1}`;
+    }
+    name.textContent = displayName;
 
     const score = document.createElement("span");
     score.className = `font-black text-2xl min-w-8 text-center text-${colors[i]} leading-none`;
     score.style.textShadow = `0 2px 8px ${hexColors[i]}40`;
     score.textContent = "0";
 
-    if (name.textContent) {
+    // Always show the name for 4-player mode, even if empty
+    if (displayName || slots === 4) {
       playerInfo.append(label, name);
     } else {
       playerInfo.append(label);
@@ -59,8 +67,15 @@ export function updateNamesUI(self: any) {
   const slots = self.config.playerCount === 4 ? 4 : 2;
   for (let i = 0; i < slots; i++) {
     if (!self.nameElems[i]) continue;
-    self.nameElems[i].textContent =
-      (self.config.displayNames && self.config.displayNames[i]) || "";
+    
+    let displayName = "";
+    if (self.config.displayNames && self.config.displayNames[i]) {
+      displayName = self.config.displayNames[i];
+    } else if (slots === 4) {
+      // For 4-player mode, show appropriate names for each position
+      displayName = (i < 2) ? `Player ${i + 1}` : `Player ${i + 1}`;
+    }
+    self.nameElems[i].textContent = displayName;
   }
 }
 
@@ -195,7 +210,31 @@ export function endAndToast(self: any, text: string) {
   const t = markUI(document.createElement("div"));
   t.className =
     "fixed top-5 left-1/2 -translate-x-1/2 bg-black/70 text-white px-4 py-3 rounded-xl z-[10001] font-sans shadow-2xl border border-lime-500/20";
-  t.innerHTML = `${text} &nbsp; <button id="re" class="ml-2 bg-lime-500 hover:bg-lime-600 text-black px-3 py-1 rounded-lg font-semibold transition-colors">Play again</button>`;
+  
+  // Create countdown display
+  const countdownSpan = document.createElement("span");
+  countdownSpan.id = "countdown";
+  countdownSpan.className = "text-yellow-400 font-bold";
+  countdownSpan.textContent = "3";
+  
+  t.innerHTML = `${text} &nbsp; <span class="text-gray-300">Auto-exit in:</span> <span id="countdown-placeholder" class="text-yellow-400 font-bold">3</span>s &nbsp; <button id="re" class="ml-2 bg-lime-500 hover:bg-lime-600 text-black px-3 py-1 rounded-lg font-semibold transition-colors">Play again</button>`;
   document.body.appendChild(t);
-  (t.querySelector("#re") as HTMLButtonElement).onclick = () => location.reload();
+  
+  // Set up countdown
+  const countdownElement = t.querySelector("#countdown-placeholder");
+  let timeLeft = 3;
+  const countdownInterval = setInterval(() => {
+    timeLeft--;
+    if (countdownElement) {
+      countdownElement.textContent = timeLeft.toString();
+    }
+    if (timeLeft <= 0) {
+      clearInterval(countdownInterval);
+    }
+  }, 1000);
+  
+  (t.querySelector("#re") as HTMLButtonElement).onclick = () => {
+    clearInterval(countdownInterval);
+    location.reload();
+  };
 }
