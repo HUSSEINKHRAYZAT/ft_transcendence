@@ -677,6 +677,7 @@ export class Pong3D {
       this.gameState.setAILerp(i, lerpAmt);
     });
   }
+//=====================================================================================obstacles
 
   private spawnObstacles(width: number, height: number) {
     const count = 3; // ≤3 obstacles
@@ -734,84 +735,95 @@ export class Pong3D {
 
   // Build obstacle in a specific shape; keep 2D circular collision via metadata.radius
   private buildObstacleMesh(
-    x: number,
-    z: number,
-    radius: number,
-    bodyCol: Color3,
-    _capCol: Color3, // not used for spheres
-    shape?: ObstacleShape
-  ) {
-    const sh = shape || this.fixedObstacleShape || "sphere";
-    let m: import("@babylonjs/core").Mesh;
-    let hitRadius = radius;
+  x: number,
+  z: number,
+  radius: number,
+  bodyCol: Color3,
+  _capCol: Color3, // not used for spheres
+  shape?: ObstacleShape
+) {
+  const sh = shape || this.fixedObstacleShape || "sphere";
+  let m: import("@babylonjs/core").Mesh;
+  let hitRadius = radius;
 
-    if (sh === "sphere") {
-      m = MeshBuilder.CreateSphere(
-        `obs-${x.toFixed(3)}-${z.toFixed(3)}`,
-        { diameter: radius * 2, segments: 20 },
-        this.scene
-      );
-      m.position.set(x, radius, z); // sit on ground
-    } else if (sh === "cylinder") {
-      const height = Math.max(0.8, radius * 1.6);
-      m = MeshBuilder.CreateCylinder(
-        `obs-${x.toFixed(3)}-${z.toFixed(3)}`,
-        { diameter: radius * 2, height, tessellation: 24 },
-        this.scene
-      );
-      m.position.set(x, height / 2, z);
-      hitRadius = radius;
-    } else if (sh === "cone") {
-      const height = Math.max(1.0, radius * 2.2);
-      m = MeshBuilder.CreateCylinder(
-        `obs-${x.toFixed(3)}-${z.toFixed(3)}`,
-        { diameter: radius * 2, diameterTop: 0, height, tessellation: 24 },
-        this.scene
-      );
-      m.position.set(x, height / 2, z);
-      hitRadius = radius;
-    } else if (sh === "capsule") {
-      const height = Math.max(radius * 2.8, 1.2);
-      m = MeshBuilder.CreateCapsule(
-        `obs-${x.toFixed(3)}-${z.toFixed(3)}`,
-        { radius, height, tessellation: 12, capSubdivisions: 6 },
-        this.scene
-      );
-      m.position.set(x, height / 2, z);
-      hitRadius = radius;
-    } else if (sh === "disc") {
-      const height = Math.max(0.1, radius * 0.18);
-      m = MeshBuilder.CreateCylinder(
-        `obs-${x.toFixed(3)}-${z.toFixed(3)}`,
-        { diameter: radius * 2, height, tessellation: 36 },
-        this.scene
-      );
-      m.position.set(x, height / 2, z);
-      hitRadius = radius;
-    } else {
-      // box
-      const width = radius * 2.2;
-      const depth = radius * 2.2;
-      const height = Math.max(0.8, radius * 1.2);
-      m = MeshBuilder.CreateBox(
-        `obs-${x.toFixed(3)}-${z.toFixed(3)}`,
-        { width, depth, height },
-        this.scene
-      );
-      m.position.set(x, height / 2, z);
-      hitRadius = Math.hypot(width / 2, depth / 2); // circular approx for collision
-    }
+  if (sh === "sphere") {
+    m = MeshBuilder.CreateSphere(
+      `obs-${x.toFixed(3)}-${z.toFixed(3)}`,
+      { diameter: radius * 2, segments: 20 },
+      this.scene
+    );
+    m.position.set(x, radius, z);
+  } else if (sh === "cylinder") {
+    const height = Math.max(0.8, radius * 1.6);
+    m = MeshBuilder.CreateCylinder(
+      `obs-${x.toFixed(3)}-${z.toFixed(3)}`,
+      { diameter: radius * 2, height, tessellation: 24 },
+      this.scene
+    );
+    m.position.set(x, height / 2, z);
+    hitRadius = radius;
+  } else if (sh === "cone") {
+    const height = Math.max(1.0, radius * 2.2);
+    m = MeshBuilder.CreateCylinder(
+      `obs-${x.toFixed(3)}-${z.toFixed(3)}`,
+      { diameter: radius * 2, diameterTop: 0, height, tessellation: 24 },
+      this.scene
+    );
+    m.position.set(x, height / 2, z);
+    hitRadius = radius;
+  } else if (sh === "capsule") {
+    const height = Math.max(radius * 2.8, 1.2);
+    m = MeshBuilder.CreateCapsule(
+      `obs-${x.toFixed(3)}-${z.toFixed(3)}`,
+      { radius, height, tessellation: 12, capSubdivisions: 6 },
+      this.scene
+    );
+    m.position.set(x, height / 2, z);
+    hitRadius = radius;
+  } else if (sh === "disc") {
+    const height = Math.max(0.1, radius * 0.18);
+    m = MeshBuilder.CreateCylinder(
+      `obs-${x.toFixed(3)}-${z.toFixed(3)}`,
+      { diameter: radius * 2, height, tessellation: 36 },
+      this.scene
+    );
+    m.position.set(x, height / 2, z);
+    hitRadius = radius;
+  } else {
+    // BOX: apply image texture
+    const width = radius * 2.2;
+    const depth = radius * 2.2;
+    const height = Math.max(0.8, radius * 1.2);
+    m = MeshBuilder.CreateBox(
+      `obs-${x.toFixed(3)}-${z.toFixed(3)}`,
+      { width, depth, height },
+      this.scene
+    );
+    m.position.set(x, height / 2, z);
+    hitRadius = Math.hypot(width / 2, depth / 2);
 
-    m.material = shinyMat(this.scene, bodyCol, 0.7, true);
-    (m as any).metadata = {
-      radius: hitRadius,
-      baseScale: m.scaling.clone(),
-      pulseTimeout: 0 as any,
-      shape: sh,
-    };
-    this.obstacles.push(m);
+    // Create material with texture
+    const mat = new StandardMaterial(`mat-${x.toFixed(3)}-${z.toFixed(3)}`, this.scene);
+    mat.diffuseTexture = new Texture("/textures/42.png", this.scene);
+    mat.backFaceCulling = false;
+    mat.specularColor = new Color3(0.2, 0.2, 0.2); // slight shininess
+    m.material = mat;
   }
 
+  // For non-box shapes, keep the old shinyMat
+  if (sh !== "box") {
+    m.material = shinyMat(this.scene, bodyCol, 0.7, true);
+  }
+
+  (m as any).metadata = {
+    radius: hitRadius,
+    baseScale: m.scaling.clone(),
+    pulseTimeout: 0 as any,
+    shape: sh,
+  };
+  this.obstacles.push(m);
+}
+  //======================================================================================
   private resetBall(dirX = Math.random() < 0.5 ? 1 : -1) {
     this.ball.position.set(0, 0.3, 0);
     const angle = (Math.random() * Math.PI) / 4 - Math.PI / 8;
