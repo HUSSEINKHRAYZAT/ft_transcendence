@@ -1,7 +1,7 @@
 import { languageManager, t, SUPPORTED_LANGUAGES } from '../../langs/LanguageManager';
 import simpleThemeManager from '../../utils/SimpleThemeManager';
 import backgroundThemeManager from '../../utils/BackgroundThemeManager';
-import { AuthService } from '../../services';
+import {authService} from '../../services/AuthService';
 
 export class SettingsBox {
   private container: HTMLElement | null = null;
@@ -313,44 +313,179 @@ export class SettingsBox {
     }
   }
 
-  private applySettings(): void {
-    const settings = this.loadSettings();
-    let changesApplied = false;
+private async applySettings(): Promise<void> {
+        const authToken = localStorage.getItem('ft_pong_auth_token');
+        const userData = localStorage.getItem('ft_pong_user_data');
 
-    // Apply theme if changed
-    if (this.pendingTheme && this.pendingTheme !== simpleThemeManager.getCurrentTheme()) {
-      this.changeTheme(this.pendingTheme);
-      this.saveSettingValue('theme', this.pendingTheme);
-      changesApplied = true;
+        if (authToken && userData) {
+            // Authenticated user - sync with backend
+            await this.applyAuthenticatedSettings();
+        } else {
+            // Unauthenticated user - only local settings
+            this.applyLocalSettings();
+        }
     }
 
-    // Apply background theme if changed
-    if (this.pendingBackgroundTheme && this.pendingBackgroundTheme !== backgroundThemeManager.getCurrentTheme()) {
-      this.changeBackgroundTheme(this.pendingBackgroundTheme);
-      this.saveSettingValue('backgroundTheme', this.pendingBackgroundTheme);
-      changesApplied = true;
+        private async applyAuthenticatedSettings(): Promise<void> {
+        const user = authService.getUser();
+        if (!user) {
+            console.error('No user found for authenticated settings update');
+            return;
+        }
+
+        const settings = this.loadSettings();
+        let changesApplied = false;
+
+        // Prepare backend settings object
+        const backendSettings = {
+            username: user.userName,
+            languageCode: this.pendingLanguage || settings.language,
+            accentColor: this.pendingTheme || settings.theme,
+            backgroundTheme: this.pendingBackgroundTheme || settings.backgroundTheme
+        };
+
+        try {
+            // Update settings on backend
+            const success = await authService.updateUserSettings(backendSettings);
+
+            if (success) {
+                // Apply theme changes locally after successful backend update
+                if (this.pendingTheme && this.pendingTheme !== simpleThemeManager.getCurrentTheme()) {
+                    this.changeTheme(this.pendingTheme);
+                    changesApplied = true;
+                }
+
+                if (this.pendingBackgroundTheme && this.pendingBackgroundTheme !== backgroundThemeManager.getCurrentTheme()) {
+                    this.changeBackgroundTheme(this.pendingBackgroundTheme);
+                    changesApplied = true;
+                }
+
+                if (this.pendingLanguage && this.pendingLanguage !== settings.language) {
+                    this.changeLanguage(this.pendingLanguage);
+                    changesApplied = true;
+                }
+
+                // Clear pending changes
+                this.pendingTheme = null;
+                this.pendingBackgroundTheme = null;
+                this.pendingLanguage = null;
+
+                // Update UI
+                this.updateContent();
+                this.setupEventListeners();
+
+                if (changesApplied) {
+                    const message = t('Settings saved successfully to your account!');
+                    this.showBasicToast('success', message);
+                }
+            } else {
+                const errorMessage = t('Failed to save settings. Please try again.');
+                this.showBasicToast('error', errorMessage);
+            }
+        } catch (error) {
+            console.error('Error updating authenticated settings:', error);
+            const errorMessage = t('Failed to save settings. Please try again.');
+            this.showBasicToast('error', errorMessage);
+        }
     }
 
-    // Apply language if changed
-    if (this.pendingLanguage && this.pendingLanguage !== settings.language) {
-      this.changeLanguage(this.pendingLanguage);
-      changesApplied = true;
+    private applyLocalSettings(): void {
+        const settings = this.loadSettings();
+        let changesApplied = false;
+
+        // Apply theme if changed
+        if (this.pendingTheme && this.pendingTheme !== simpleThemeManager.getCurrentTheme()) {
+            this.changeTheme(this.pendingTheme);
+            this.saveSettingValue('theme', this.pendingTheme);
+            changesApplied = true;
+        }
+
+        // Apply background theme if changed
+        if (this.pendingBackgroundTheme && this.pendingBackgroundTheme !== backgroundThemeManager.getCurrentTheme()) {
+            this.changeBackgroundTheme(this.pendingBackgroundTheme);
+            this.saveSettingValue('backgroundTheme', this.pendingBackgroundTheme);
+            changesApplied = true;
+        }
+
+        // Apply language if changed
+        if (this.pendingLanguage && this.pendingLanguage !== settings.language) {
+            this.changeLanguage(this.pendingLanguage);
+            changesApplied = true;
+        }
+
+        // Clear pending changes
+        this.pendingTheme = null;
+        this.pendingBackgroundTheme = null;
+        this.pendingLanguage = null;
+
+        // Update UI
+        this.updateContent();
+        this.setupEventListeners();
+
+        if (changesApplied) {
+            const message = t('Local settings applied successfully!');
+            this.showBasicToast('success', message);
+        }
     }
 
-    // Clear pending changes
-    this.pendingTheme = null;
-    this.pendingBackgroundTheme = null;
-    this.pendingLanguage = null;
+    private loadSettings(): any {
+        const authState = authService.getState();
 
-    // Update UI
-    this.updateContent();
-    this.setupEventListeners();
+        // If authenticated, prioritize backend settings
+        if (authState.isAuthenticated && authState.settings) {
+            return {
+                language: authState.settings.language,
+                theme: authState.settings.theme,
+                backgroundTheme: authState.settings.backgroundTheme
+            };
+        }
 
-    if (changesApplied) {
-      const message = t('All changes have been applied successfully!');
-      this.showBasicToast('success', message);
+        // Fallback to local settings for unauthenticated users
+        const defaultSettings = {
+            language: languageManager.getCurrentLanguage(),
+            theme: simpleThemeManager.getCurrentTheme(),
+            backgroundTheme: backgroundThemeManager.getCurrentTheme()
+        };
+
+        try {
+            const savedSettings = localStorage.getItem('ft_pong_game_settings');
+            if (savedSettings) {
+                return { ...defaultSettings, ...JSON.parse(savedSettings) };
+            }
+        } catch (error) {
+            console.error('Error loading local settings:', error);
+        }
+
+        return defaultSettings;
     }
-  }
+
+    // Add method to apply settings from backend on auth
+    public applyBackendSettings(settings: any): void {
+        if (!settings) return;
+
+        console.log('Applying backend settings:', settings);
+
+        // Apply theme
+        if (settings.theme && settings.theme !== simpleThemeManager.getCurrentTheme()) {
+            simpleThemeManager.applyTheme(settings.theme);
+        }
+
+        // Apply background theme
+        if (settings.backgroundTheme && settings.backgroundTheme !== backgroundThemeManager.getCurrentTheme()) {
+            backgroundThemeManager.applyBackgroundTheme(settings.backgroundTheme);
+        }
+
+        // Apply language
+        if (settings.language && settings.language !== languageManager.getCurrentLanguage()) {
+            languageManager.setLanguage(settings.language);
+        }
+
+        // Update UI if rendered
+        if (this.isRendered) {
+            this.updateContent();
+            this.setupEventListeners();
+        }
+    }
 
   private cancelChanges(): void {
     // Clear pending changes
@@ -531,24 +666,42 @@ export class SettingsBox {
     }
   }
 
-  private loadSettings(): any {
-    const defaultSettings = {
-      language: languageManager.getCurrentLanguage(),
-      theme: simpleThemeManager.getCurrentTheme(),
-      backgroundTheme: backgroundThemeManager.getCurrentTheme()
-    };
+    updateAuthState(isAuthenticated: boolean, user?: any): void {
+        if (!this.isRendered) return;
 
-    try {
-      const savedSettings = localStorage.getItem('ft_pong_game_settings');
-      if (savedSettings) {
-        return { ...defaultSettings, ...JSON.parse(savedSettings) };
-      }
-    } catch (error) {
-      console.error('Error loading settings:', error);
+        if (isAuthenticated && user) {
+            // Apply backend settings when user logs in
+            const authState = authService.getState();
+            if (authState.settings) {
+                this.applyBackendSettings(authState.settings);
+            }
+        } else {
+            // Reset to defaults when user logs out
+            this.resetToDefaults();
+        }
+
+        this.updateContent();
+        this.setupEventListeners();
     }
 
-    return defaultSettings;
-  }
+    private resetToDefaults(): void {
+        console.log('Resetting settings to defaults...');
+
+        // Clear local storage
+        localStorage.removeItem('ft_pong_game_settings');
+
+        // Reset managers to defaults
+        simpleThemeManager.resetTheme();
+        backgroundThemeManager.resetTheme();
+        languageManager.setLanguage('en');
+
+        // Clear pending changes
+        this.pendingTheme = null;
+        this.pendingBackgroundTheme = null;
+        this.pendingLanguage = null;
+    }
+
+
 
   private saveSettingValue(key: string, value: any): void {
     const settings = this.loadSettings();
@@ -637,11 +790,7 @@ export class SettingsBox {
     }
   }
 
-  updateAuthState(isAuthenticated: boolean): void {
-    if (!this.isRendered) return;
-    this.updateContent();
-    this.setupEventListeners();
-  }
+
 
   getSettings(): any {
     return this.loadSettings();

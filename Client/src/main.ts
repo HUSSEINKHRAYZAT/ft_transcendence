@@ -901,37 +901,38 @@ function setupProfileDropdown(): void {
 };
 
 (window as any).handleLogout = async function() {
-  console.log('👋 Logout clicked...');
+    console.log('Logout clicked...');
 
-  const confirmed = confirm('Are you sure you want to logout?');
-  if (confirmed) {
-    try {
-    	await authService.logout();
-		simpleThemeManager.resetTheme();
-		backgroundThemeManager.resetTheme();
-		languageManager.setLanguage('en');
+    const confirmed = confirm('Are you sure you want to logout?');
+    if (confirmed) {
+        try {
+            await authService.logout();
 
-      if (typeof (window as any).addBasicNavbar === 'function') {
-        (window as any).addBasicNavbar();
-      }
-      if (typeof (window as any).updateJumbotronButton === 'function') {
-        (window as any).updateJumbotronButton();
-      }
+            // Reset settings will be handled by the auth-state-changed event
+            // But we can also do it directly here for immediate feedback
+            resetSettingsToDefaults();
 
-      window.dispatchEvent(new CustomEvent('auth-state-changed', {
-        detail: { isAuthenticated: false, user: null }
-      }));
+            if (typeof (window as any).addBasicNavbar === 'function') {
+                (window as any).addBasicNavbar();
+            }
+            if (typeof (window as any).updateJumbotronButton === 'function') {
+                (window as any).updateJumbotronButton();
+            }
 
-      if (typeof (window as any).showBasicToast === 'function') {
-        (window as any).showBasicToast('success', 'You have been logged out successfully!');
-      }
-    } catch (error) {
-      console.error('❌ Logout error:', error);
-      if (typeof (window as any).showBasicToast === 'function') {
-        (window as any).showBasicToast('error', 'Logout failed');
-      }
+            window.dispatchEvent(new CustomEvent('auth-state-changed', {
+                detail: { isAuthenticated: false, user: null }
+            }));
+
+            if (typeof (window as any).showBasicToast === 'function') {
+                (window as any).showBasicToast('success', 'You have been logged out successfully!');
+            }
+        } catch (error) {
+            console.error('Logout error:', error);
+            if (typeof (window as any).showBasicToast === 'function') {
+                (window as any).showBasicToast('error', 'Logout failed');
+            }
+        }
     }
-  }
 };
 
 (window as any).handleGetStarted = function() {
@@ -1187,34 +1188,34 @@ function addFallbackContent(): void {
 }
 
 function setupAuthListeners(components: Component[]): void {
-	window.addEventListener('auth-state-changed', ((e: CustomEvent) => {
-		console.log('🔄 Auth state changed:', e.detail);
+    window.addEventListener('auth-state-changed', ((e: CustomEvent) => {
+        console.log('Auth state changed:', e.detail);
 
-		console.log('🔍 DEBUG Event detail:', JSON.stringify(e.detail, null, 2));
-		console.log('🔍 DEBUG isAuthenticated:', e.detail.isAuthenticated);
-		console.log('🔍 DEBUG user from event:', JSON.stringify(e.detail.user, null, 2));
+        if (e.detail.isAuthenticated && e.detail.user) {
+            // User logged in - apply backend settings
+            authService.setAuthState(authService.getToken() || 'temp-token', e.detail.user)
+                .then(() => {
+                    const authState = authService.getState();
+                    if (authState.settings) {
+                        // Apply settings from backend
+                        applyBackendSettingsToManagers(authState.settings);
 
-		if (e.detail.isAuthenticated && e.detail.user) {
-			authService['setAuthState'](authService.getToken() || 'temp-token', e.detail.user);
-		}
+                        // Update SettingsBox component if it exists
+                        const settingsComponent = componentInstances.find(c => c.constructor.name === 'SettingsBox');
+                        if (settingsComponent && 'applyBackendSettings' in settingsComponent) {
+                            (settingsComponent as any).applyBackendSettings(authState.settings);
+                        }
+                    }
+                });
+        } else {
+            // User logged out - reset to defaults
+            resetSettingsToDefaults();
+        }
 
-		    window.addEventListener('socket-reconnected', () => {
-        console.log('🔄 Socket reconnected - refreshing components');
-
-        // Find FriendsBox component and handle reconnection
-    components.forEach(component => {
-            if (component.constructor.name === 'FriendsBox' && 'handleReconnection' in component) {
-                (component as any).handleReconnection();
-            }
-        });
-    });
-
-		addBasicNavbar();
-
-		updateJumbotronButton();
-
-		updateAuthState(components);
-	}) as EventListener);
+        addBasicNavbar();
+        updateJumbotronButton();
+        updateAuthState(components);
+    }) as EventListener);
 
 	window.addEventListener('storage', (e) => {
 		if (e.key === 'ft_pong_auth_token' || e.key === 'ft_pong_user_data') {
@@ -1226,6 +1227,24 @@ function setupAuthListeners(components: Component[]): void {
 		console.log('🎮 Game start requested:', e.detail);
 		handleGameStartRequest(e.detail);
 	}) as EventListener);
+}
+
+function resetSettingsToDefaults(): void {
+    console.log('Resetting all settings to defaults...');
+
+    // Clear local storage
+    localStorage.removeItem('ft_pong_game_settings');
+
+    // Reset all managers to defaults
+    simpleThemeManager.resetTheme();
+    backgroundThemeManager.resetTheme();
+    languageManager.setLanguage('en');
+
+    // Update SettingsBox component if it exists
+    const settingsComponent = componentInstances.find(c => c.constructor.name === 'SettingsBox');
+    if (settingsComponent && 'resetToDefaults' in settingsComponent) {
+        (settingsComponent as any).resetToDefaults();
+    }
 }
 
 function handleGameStartRequest(gameData: any): void {
@@ -1259,6 +1278,23 @@ function handleGameStartRequest(gameData: any): void {
 		console.error('Error handling game start request:', error);
 		showBasicToast('error', 'Game Start Failed');
 	}
+}
+
+function applyBackendSettingsToManagers(settings: any): void {
+    console.log('Applying backend settings to managers:', settings);
+
+    // Apply theme settings
+    if (settings.theme && settings.theme !== simpleThemeManager.getCurrentTheme()) {
+        simpleThemeManager.applyTheme(settings.theme);
+    }
+
+    if (settings.backgroundTheme && settings.backgroundTheme !== backgroundThemeManager.getCurrentTheme()) {
+        backgroundThemeManager.applyBackgroundTheme(settings.backgroundTheme);
+    }
+
+    if (settings.language && settings.language !== languageManager.getCurrentLanguage()) {
+        languageManager.setLanguage(settings.language);
+    }
 }
 
 function updateAuthState(components: Component[]): void {

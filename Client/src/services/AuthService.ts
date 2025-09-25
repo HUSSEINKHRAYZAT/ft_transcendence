@@ -141,13 +141,6 @@ export class AuthService {
 					statistics: parsedStats,
 					settings: parsedSettings,
 				};
-
-				// Initialize socket service on session restore
-				if (!this.socketService && parsedUser.id && parsedUser.userName) {
-					console.log("🔄 Restoring socket connection on session restore");
-					this.socketService = new SocketService(token, this);
-					this.socketService.connect(parsedUser.id, parsedUser.userName);
-				}
 			}
 		} catch (err) {
 			console.error("Error loading auth state from storage:", err);
@@ -271,81 +264,82 @@ export class AuthService {
 	}
 
 
-	async createSettingsAPI(username: string): Promise<boolean> {
-		try {
-			const endpoint = `${API_BASE_URL}/settings`;
-			const response = await fetch(endpoint, {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-					'Authorization': this.state.token ? `Bearer ${this.state.token}` : '',
-				},
-				body: JSON.stringify({
-					username: username,
-					languageCode: 'en',
-					accentColor: 'lime',
-					backgroundTheme: 'dark'
-				})
-			});
+async createSettingsAPI(username: string): Promise<boolean> {
+    try {
+        const endpoint = `${API_BASE_URL}/settings`;
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': this.state.token ? `Bearer ${this.state.token}` : '',
+            },
+            body: JSON.stringify({
+                username: username,
+                languageCode: 'en',
+                accentColor: 'lime',
+                backgroundTheme: 'dark'
+            })
+        });
 
-			if (response.ok) {
-				console.log(`✅ Default settings created for user: ${username}`);
+        if (response.ok) {
+            console.log(`Settings created for user: ${username}`);
 
-				const settings = await this.settingsAPI(username);
-				if (settings) {
-					this.state.settings = this.mapBackendSettingsToWebSettings(settings);
-					localStorage.setItem(STORAGE_KEYS.GAME_SETTINGS, JSON.stringify(this.state.settings));
-				}
+            // Fetch the created settings and store locally
+            const settings = await this.settingsAPI(username);
+            if (settings) {
+                this.state.settings = this.mapBackendSettingsToWebSettings(settings);
+                localStorage.setItem(STORAGE_KEYS.GAME_SETTINGS, JSON.stringify(this.state.settings));
+            }
 
-				return true;
-			} else {
-				console.warn(`⚠️ Failed to create settings for user: ${username}, status: ${response.status}`);
-				return false;
-			}
-		} catch (error) {
-			console.error(`❌ Error creating settings for user: ${username}`, error);
-			return false;
-		}
-	}
+            return true;
+        } else {
+            console.warn(`Failed to create settings for user: ${username}, status: ${response.status}`);
+            return false;
+        }
+    } catch (error) {
+        console.error(`Error creating settings for user: ${username}`, error);
+        return false;
+    }
+}
 
-	async updateUserSettings(settings: {
-		username: string;
-		languageCode: string;
-		accentColor: string;
-		backgroundTheme: string;
-	}): Promise<boolean> {
-		try {
-			const endpoint = `${API_BASE_URL}/settings`;
-			const response = await fetch(endpoint, {
-				method: 'PUT', // or 'PATCH' depending on your backend
-				headers: {
-					'Content-Type': 'application/json',
-					'Authorization': this.state.token ? `Bearer ${this.state.token}` : '',
-				},
-				body: JSON.stringify(settings)
-			});
+async updateUserSettings(settings: {
+    username: string;
+    languageCode: string;
+    accentColor: string;
+    backgroundTheme: string;
+}): Promise<boolean> {
+    try {
+        const endpoint = `${API_BASE_URL}/settings`;
+        const response = await fetch(endpoint, {
+            method: 'POST', // Using POST as per your requirement
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': this.state.token ? `Bearer ${this.state.token}` : '',
+            },
+            body: JSON.stringify(settings)
+        });
 
-			if (response.ok) {
-				console.log(`✅ Settings updated for user: ${settings.username}`);
+        if (response.ok) {
+            console.log(`Settings updated for user: ${settings.username}`);
 
-				// Update local state with new settings
-				const updatedSettings = await this.settingsAPI(settings.username);
-				if (updatedSettings) {
-					this.state.settings = this.mapBackendSettingsToWebSettings(updatedSettings);
-					localStorage.setItem(STORAGE_KEYS.GAME_SETTINGS, JSON.stringify(this.state.settings));
-					globalEventManager.emit(AppEvent.SETTINGS_UPDATED, this.state.settings);
-				}
+            // Update local state with new settings
+            const updatedSettings = await this.settingsAPI(settings.username);
+            if (updatedSettings) {
+                this.state.settings = this.mapBackendSettingsToWebSettings(updatedSettings);
+                localStorage.setItem(STORAGE_KEYS.GAME_SETTINGS, JSON.stringify(this.state.settings));
+                globalEventManager.emit(AppEvent.SETTINGS_UPDATED, this.state.settings);
+            }
 
-				return true;
-			} else {
-				console.warn(`⚠️ Failed to update settings for user: ${settings.username}, status: ${response.status}`);
-				return false;
-			}
-		} catch (error) {
-			console.error(`❌ Error updating settings for user: ${settings.username}`, error);
-			return false;
-		}
-	}
+            return true;
+        } else {
+            console.warn(`Failed to update settings for user: ${settings.username}, status: ${response.status}`);
+            return false;
+        }
+    } catch (error) {
+        console.error(`Error updating settings for user: ${settings.username}`, error);
+        return false;
+    }
+}
 
 	getSettings(): WebSettings | null {
 		return this.state.settings;
@@ -444,57 +438,44 @@ export class AuthService {
 		}
 	}
 
-	async setAuthState(token: string, user: User): Promise<void>
-	{
-		this.state.token = token;
-		this.state.user = user;
-		localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, token);
-		localStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(user));
+async setAuthState(token: string, user: User): Promise<void> {
+    this.state.token = token;
+    this.state.user = user;
+    localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, token);
+    localStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(user));
 
-		this.state = {
-			isAuthenticated: true,
-			isLoading: false,
-			token,
-			user,
-			statistics: this.state.statistics ?? await this.setAuthState_statistics(user.id),
-			settings: this.state.settings ?? await this.setAuthState_settings(user.userName)
-		};
+    // Try to get existing settings first
+    let settings = await this.settingsAPI(user.userName);
 
-		if (!this.state.statistics) {
-			const statistics = await this.statisticsAPI(user.id);
-			if (statistics) {
-				this.state.statistics = statistics;
-				localStorage.setItem(STORAGE_KEYS.USER_STATISTICS, JSON.stringify(statistics));
-			}
-		}
-
-		if (!this.state.settings) {
-			const settings = await this.settingsAPI(user.userName);
-			if (settings) {
-				this.state.settings = this.mapBackendSettingsToWebSettings(settings);
-				localStorage.setItem(STORAGE_KEYS.WEB_SETTINGS, JSON.stringify(this.state.settings));
-			}
-		}
-		   console.log("Creating SocketService with token:", token.substring(0, 20) + "...");
-		if (this.socketService) {
-        try
-		{
-            await this.socketService.disconnect(user.id);
-        }
-		catch (e)
-		{
-            console.warn("Error disconnecting existing socket:", e);
-        }
+    // If no settings exist, create default ones
+    if (!settings) {
+        await this.createSettingsAPI(user.userName);
+        settings = await this.settingsAPI(user.userName);
     }
 
-		this.socketService = new SocketService(token, this);
-		if (this.state.user?.id && this.state.user?.userName)
-		{
-			this.socketService.connect(this.state.user.id, this.state.user.userName);
-		}
-		else
-			console.error("failed to connect to the socker from the setAuthState!");
-	}
+    // Get statistics
+    const statistics = await this.statisticsAPI(user.id);
+
+    this.state = {
+        isAuthenticated: true,
+        isLoading: false,
+        token,
+        user,
+        statistics,
+        settings: settings ? this.mapBackendSettingsToWebSettings(settings) : null
+    };
+
+    // Store settings locally
+    if (this.state.settings) {
+        localStorage.setItem(STORAGE_KEYS.GAME_SETTINGS, JSON.stringify(this.state.settings));
+    }
+
+    // Initialize socket service
+    this.socketService = new SocketService(token, this);
+    if (this.state.user?.id && this.state.user?.userName) {
+        this.socketService.connect(this.state.user.id, this.state.user.userName);
+    }
+}
 
 	private async setAuthState_settings(username: string): Promise<WebSettings | null> {
 		const raw = localStorage.getItem(STORAGE_KEYS.WEB_SETTINGS);
@@ -507,7 +488,7 @@ export class AuthService {
 	}
 
 
-	private async settingsAPI(username: string): Promise<any | null> {
+private async settingsAPI(username: string): Promise<any | null> {
     if (!this.state.token) return null;
 
     try {
@@ -530,7 +511,7 @@ export class AuthService {
         console.error('Error fetching settings:', err);
         return null;
     }
-	}
+}
 
 
 	private async setAuthState_statistics(userId: string): Promise<UserStats | null> {
@@ -540,27 +521,42 @@ export class AuthService {
 	}
 
 
-	public clearAuthState(): void {
-		const userId = this.state.user?.id;
-		if (userId)
-			this.socketService?.disconnect(userId);
+public clearAuthState(): void {
+    const userId = this.state.user?.id;
+    if (userId) {
+        this.socketService?.disconnect(userId);
+    }
 
-		this.state = {
-			isAuthenticated: false,
-			isLoading: false,
-			token: null,
-			user: null,
-			statistics: null,
-			settings: null
-		};
-		this.clearStoredAuth();
-	}
+    this.state = {
+        isAuthenticated: false,
+        isLoading: false,
+        token: null,
+        user: null,
+        statistics: null,
+        settings: null
+    };
 
+    this.clearStoredAuth();
+
+    // Reset themes to default when unauthenticated
+    if (typeof window !== 'undefined') {
+        const simpleThemeManager = (window as any).simpleThemeManager;
+        const backgroundThemeManager = (window as any).backgroundThemeManager;
+
+        if (simpleThemeManager) {
+            simpleThemeManager.resetTheme();
+        }
+        if (backgroundThemeManager) {
+            backgroundThemeManager.resetTheme();
+        }
+    }
+}
 	private clearStoredAuth(): void {
 		localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
 		localStorage.removeItem(STORAGE_KEYS.USER_DATA);
 		localStorage.removeItem(STORAGE_KEYS.USER_STATISTICS);
 		localStorage.removeItem(STORAGE_KEYS.WEB_SETTINGS);
+		localStorage.removeItem(STORAGE_KEYS.GAME_SETTINGS);
 	}
 
 	private setLoading(loading: boolean): void {
@@ -1110,55 +1106,6 @@ export class AuthService {
 		}
 	}
 
-	// Add this method to fetch friend statistics
-async getFriendStatistics(friendId: string): Promise<UserStats | null> {
-    console.log('DEBUG: getFriendStatistics called with ID:', friendId); // DEBUG LINE
-
-    if (!this.state.token) {
-        console.error('No authentication token available');
-        return null;
-    }
-
-    try {
-        const url = `${API_BASE_URL}/statistics/${friendId}`;
-        console.log('DEBUG: Making request to:', url); // DEBUG LINE
-
-        const res = await fetch(url, {
-            method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${this.state.token}`,
-                'Content-Type': 'application/json',
-            },
-        });
-
-        console.log('DEBUG: Response status:', res.status); // DEBUG LINE
-
-        if (!res.ok) {
-            console.error('Failed to fetch friend statistics:', res.status);
-            const errorText = await res.text();
-            console.error('Error response:', errorText); // DEBUG LINE
-            return null;
-        }
-
-        const data = await res.json();
-        console.log('DEBUG: Received data:', data); // DEBUG LINE
-
-        const stats: UserStats = {
-            winCount: data.winCount ?? 0,
-            lossCount: data.lossCount ?? 0,
-            tournamentWinCount: data.tournamentWinCount ?? 0,
-            tournamentCount: data.tournamentCount ?? 0,
-            totalGames: data.totalGames ?? 0,
-        };
-
-        console.log('Friend statistics fetched successfully:', stats);
-        return stats;
-    } catch (err) {
-        console.error('Error fetching friend statistics:', err);
-        return null;
-    }
-}
-
 	private validateProfileUpdateData(data: UpdateProfileData): { isValid: boolean; message?: string } {
 		if (!data.firstName.trim()) {
 			return { isValid: false, message: 'First name is required' };
@@ -1691,33 +1638,6 @@ async getFriendStatistics(friendId: string): Promise<UserStats | null> {
 			window.close();
 		}
 	}
-
-	async getBlockedUsers(userId: string): Promise<AuthResponse> {
-    try {
-        const response = await fetch(`${API_BASE_URL}/relation/blocked/${userId}`, {
-            method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${this.state.token}`,
-                'Content-Type': 'application/json',
-            },
-        });
-
-        if (response.ok) {
-            const data = await response.json();
-            return { success: true, data };
-        } else {
-            const errorData = await response.json().catch(() => ({}));
-            return {
-                success: false,
-                message: errorData.message || 'Failed to load blocked users',
-                statusCode: response.status
-            };
-        }
-    } catch (error) {
-        console.error('Error loading blocked users:', error);
-        return { success: false, message: ERROR_MESSAGES.NETWORK_ERROR };
-    }
-}
 
 	public async routineStatistics(): Promise<UserStats | null> {
     if (!this.state.user) return null;
