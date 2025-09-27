@@ -1394,8 +1394,15 @@ async function start3DPongGame() {
 		const exitBtn = document.getElementById('exit-game');
 		if (exitBtn) {
 			exitBtn.addEventListener('click', async () => {
-				await cleanupGame();
-				addBasicJumbotron();
+				// Call the same exit functionality as ESC key
+				if (currentGameInstance && typeof currentGameInstance.exitGame === 'function') {
+					// Use the game's built-in exit method (same as ESC key)
+					await currentGameInstance.exitGame();
+				} else {
+					// Fallback to manual cleanup if exitGame method is not available
+					await cleanupGame();
+					addBasicJumbotron();
+				}
 			});
 		}
 

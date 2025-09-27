@@ -1920,7 +1920,7 @@ export class Pong3D {
     }
   }
 
-  private async exitGame() {
+  public async exitGame() {
     console.log("🚪 Exit game requested by player");
 
     // Show confirmation dialog for multiplayer games
