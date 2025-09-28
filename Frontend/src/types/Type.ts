@@ -11,8 +11,9 @@ export type Connection =
 
 export type PlayerCount = 2 | 4;
 
-export type ObstacleShape = "sphere" | "cylinder" | "cone" | "capsule" | "disc" | "box";
-// export type ObstacleShape = "box";
+// export type ObstacleShape = "sphere" | "cylinder" | "cone" | "capsule" | "disc" | "box";
+export type ObstacleShape = "box";
+
 
 export interface GameConfig {
   playerCount: PlayerCount;
@@ -53,6 +54,7 @@ export type RemoteMsgShort =
         color: [number, number, number];
         cap: [number, number, number];
         shape?: ObstacleShape;
+        textureIndex?: number; // Optional: for explicit texture synchronization
       }[];
     }
   | { t: "input"; idx: number; neg: boolean; pos: boolean; sid?: string }

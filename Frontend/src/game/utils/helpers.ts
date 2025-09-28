@@ -10,10 +10,9 @@ import {
   AbstractMesh,
 } from "@babylonjs/core";
 import type { RemoteMsgShort as RemoteMsg } from "../../types";
-let c: Color3; // ✅
-c = new Color3(1, 0, 0);
-
-let v: Vector3 = new Vector3(0, 1, 0);
+// Example Color3 and Vector3 for reference (used for type checking)
+// let c: Color3 = new Color3(1, 0, 0);
+// let v: Vector3 = new Vector3(0, 1, 0);
 
 // math
 export function clamp(v: number, a: number, b: number) {
@@ -139,7 +138,7 @@ function animateEaseOut<T extends Color3 | Vector3 | number>(
 /** Smooth flash across ALL faces, easing the emissive back down. */
 export function flashPaddle(
   p: AbstractMesh,
-  color = new Color3(1, 0.3, 0.3),
+  color = new Color3(0.53, 0.81, 0.92),
   ms = 120
 ) {
   const mat = p.material as StandardMaterial;
