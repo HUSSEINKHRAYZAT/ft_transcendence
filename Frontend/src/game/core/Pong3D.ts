@@ -400,8 +400,20 @@ export class Pong3D {
     dir.intensity = 0.9;
 
     // Field (picture floor)
+    const textures = [
+      "/textures/floor.png",
+      "/textures/floor1.jpg",
+      "/textures/floor2.jpg",
+      "/textures/floor3.jpg",
+      "/textures/floor4.jpg",
+      "/textures/floor5.jpg"
+    ];
+
+    // Pick random texture
+    const randomTex = textures[Math.floor(Math.random() * textures.length)];
+
     const fieldMat = new StandardMaterial("fieldMat", this.scene);
-    fieldMat.diffuseTexture = new Texture("/textures/floor2.jpg", this.scene);
+    fieldMat.diffuseTexture = new Texture(randomTex, this.scene);
     const texF = fieldMat.diffuseTexture as Texture;
     texF.wrapU = Texture.WRAP_ADDRESSMODE;
     texF.wrapV = Texture.WRAP_ADDRESSMODE;
@@ -459,8 +471,8 @@ const wallUrl = "/textures/44.jpg";
 const topMat = wallTextureMat(this.scene, wallUrl, 12, 1);   // repeat horizontally
 const bottomMat = wallTextureMat(this.scene, wallUrl, 12, 1);
 const wallUrl2 = "/textures/45.jpg";
-const leftMat = wallTextureMat(this.scene, wallUrl2, 1, 12);  // repeat vertically
-const rightMat = wallTextureMat(this.scene, wallUrl2, 1, 12);
+const leftMat = wallTextureMat(this.scene, wallUrl2, 1, 6);  // repeat vertically
+const rightMat = wallTextureMat(this.scene, wallUrl2, 1, 6);
 
 // No need for wAng rotation
 // (leftMat.diffuseTexture as Texture).wAng = Math.PI / 2;
@@ -553,15 +565,20 @@ this.rightWall = wall(
 
     // Ball
     const ballMat = new StandardMaterial("ballMat", this.scene);
-    ballMat.diffuseTexture = new Texture("/textures/ball.jpg", this.scene);
-    ballMat.emissiveColor = this.currentGameTheme.ball.scale(0.3); // Add glow with theme color
+    // ballMat.diffuseTexture = new Texture("/textures/ball.png", this.scene);
+
+    // Generate a random shining color
+    const randomColor = new Color3(Math.random(), Math.random(), Math.random());
+    ballMat.emissiveColor = randomColor.scale(0.6); // Scale to control brightness
+
     this.ball = MeshBuilder.CreateSphere(
-      "ball",
-      { diameter: this.ballRadius * 2, segments: 16 },
-      this.scene
+    "ball",
+    { diameter: this.ballRadius * 2, segments: 16 },
+    this.scene
     );
     this.ball.material = ballMat;
     this.ball.position = new Vector3(0, 0.3, 0);
+
 
     // Paddles (L,R,B,T indices)
     const dAxis = (this.config.playerCount === 4 ? height : width) / 2 - 0.3;
