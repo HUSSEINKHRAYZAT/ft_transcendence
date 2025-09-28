@@ -139,7 +139,7 @@ function animateEaseOut<T extends Color3 | Vector3 | number>(
 /** Smooth flash across ALL faces, easing the emissive back down. */
 export function flashPaddle(
   p: AbstractMesh,
-  color = new Color3(1, 0.3, 0.3),
+  color = new Color3(0.53, 0.81, 0.92),
   ms = 120
 ) {
   const mat = p.material as StandardMaterial;

@@ -56,7 +56,7 @@ export class Pong3D {
     radius: number;
     color: [number, number, number];
     cap: [number, number, number];
-    shape?: ObstacleShape; // NEW
+    shape?: ObstacleShape;
   }[] = [];
   private builtObstaclesFromNet = false;
   private corners: import("@babylonjs/core").Mesh[] = [];
@@ -454,32 +454,37 @@ export class Pong3D {
       return m;
     };
 
-    const wallUrl = "/textures/brick.jpeg";
-    const topMat = wallTextureMat(this.scene, wallUrl, 12, 1);
-    const bottomMat = wallTextureMat(this.scene, wallUrl, 12, 1);
-    const leftMat = wallTextureMat(this.scene, wallUrl, 1, 50);
-    const rightMat = wallTextureMat(this.scene, wallUrl, 1, 50);
-    (leftMat.diffuseTexture as Texture).wAng = Math.PI / 2;
-    (rightMat.diffuseTexture as Texture).wAng = Math.PI / 2;
+const wallUrl = "/textures/44.jpg";
+// const wallUrl = "/textures/brick.jpeg";
+const topMat = wallTextureMat(this.scene, wallUrl, 12, 1);   // repeat horizontally
+const bottomMat = wallTextureMat(this.scene, wallUrl, 12, 1);
+const wallUrl2 = "/textures/45.jpg";
+const leftMat = wallTextureMat(this.scene, wallUrl2, 1, 12);  // repeat vertically
+const rightMat = wallTextureMat(this.scene, wallUrl2, 1, 12);
 
-    wall(width + t, t, 0, height / 2 + t / 2, "wallTop", topMat);
-    wall(width + t, t, 0, -height / 2 - t / 2, "wallBottom", bottomMat);
-    this.leftWall = wall(
-      t,
-      height + t,
-      -width / 2 - t / 2,
-      0,
-      "wallLeft",
-      leftMat
-    );
-    this.rightWall = wall(
-      t,
-      height + t,
-      width / 2 + t / 2,
-      0,
-      "wallRight",
-      rightMat
-    );
+// No need for wAng rotation
+// (leftMat.diffuseTexture as Texture).wAng = Math.PI / 2;
+// (rightMat.diffuseTexture as Texture).wAng = Math.PI / 2;
+
+wall(width + t, t, 0, height / 2 + t / 2, "wallTop", topMat);
+wall(width + t, t, 0, -height / 2 - t / 2, "wallBottom", bottomMat);
+
+this.leftWall = wall(
+  t,
+  height + t,
+  -width / 2 - t / 2,
+  0,
+  "wallLeft",
+  leftMat
+);
+this.rightWall = wall(
+  t,
+  height + t,
+  width / 2 + t / 2,
+  0,
+  "wallRight",
+  rightMat
+);
 
     // Also create tiled walls for damage system
     this.createTiledWalls(width, height, t, leftMat, rightMat);
@@ -739,90 +744,140 @@ export class Pong3D {
   z: number,
   radius: number,
   bodyCol: Color3,
-  _capCol: Color3, // not used for spheres
-  shape?: ObstacleShape
+  _capCol: Color3, // not used anymore
+  _shape?: ObstacleShape // ignored, we always use "box"
 ) {
-  const sh = shape || this.fixedObstacleShape || "sphere";
+  // Always box
   let m: import("@babylonjs/core").Mesh;
   let hitRadius = radius;
 
-  if (sh === "sphere") {
-    m = MeshBuilder.CreateSphere(
-      `obs-${x.toFixed(3)}-${z.toFixed(3)}`,
-      { diameter: radius * 2, segments: 20 },
-      this.scene
-    );
-    m.position.set(x, radius, z);
-  } else if (sh === "cylinder") {
-    const height = Math.max(0.8, radius * 1.6);
-    m = MeshBuilder.CreateCylinder(
-      `obs-${x.toFixed(3)}-${z.toFixed(3)}`,
-      { diameter: radius * 2, height, tessellation: 24 },
-      this.scene
-    );
-    m.position.set(x, height / 2, z);
-    hitRadius = radius;
-  } else if (sh === "cone") {
-    const height = Math.max(1.0, radius * 2.2);
-    m = MeshBuilder.CreateCylinder(
-      `obs-${x.toFixed(3)}-${z.toFixed(3)}`,
-      { diameter: radius * 2, diameterTop: 0, height, tessellation: 24 },
-      this.scene
-    );
-    m.position.set(x, height / 2, z);
-    hitRadius = radius;
-  } else if (sh === "capsule") {
-    const height = Math.max(radius * 2.8, 1.2);
-    m = MeshBuilder.CreateCapsule(
-      `obs-${x.toFixed(3)}-${z.toFixed(3)}`,
-      { radius, height, tessellation: 12, capSubdivisions: 6 },
-      this.scene
-    );
-    m.position.set(x, height / 2, z);
-    hitRadius = radius;
-  } else if (sh === "disc") {
-    const height = Math.max(0.1, radius * 0.18);
-    m = MeshBuilder.CreateCylinder(
-      `obs-${x.toFixed(3)}-${z.toFixed(3)}`,
-      { diameter: radius * 2, height, tessellation: 36 },
-      this.scene
-    );
-    m.position.set(x, height / 2, z);
-    hitRadius = radius;
-  } else {
-    // BOX: apply image texture
-    const width = radius * 2.2;
-    const depth = radius * 2.2;
-    const height = Math.max(0.8, radius * 1.2);
-    m = MeshBuilder.CreateBox(
-      `obs-${x.toFixed(3)}-${z.toFixed(3)}`,
-      { width, depth, height },
-      this.scene
-    );
-    m.position.set(x, height / 2, z);
-    hitRadius = Math.hypot(width / 2, depth / 2);
+  const width = radius * 2.2;
+  const depth = radius * 2.2;
+  const height = Math.max(0.8, radius * 1.2);
 
-    // Create material with texture
-    const mat = new StandardMaterial(`mat-${x.toFixed(3)}-${z.toFixed(3)}`, this.scene);
-    mat.diffuseTexture = new Texture("/textures/42.png", this.scene);
-    mat.backFaceCulling = false;
-    mat.specularColor = new Color3(0.2, 0.2, 0.2); // slight shininess
-    m.material = mat;
-  }
+  m = MeshBuilder.CreateBox(
+    `obs-${x.toFixed(3)}-${z.toFixed(3)}`,
+    { width, depth, height },
+    this.scene
+  );
+  m.position.set(x, height / 2, z);
+  hitRadius = Math.hypot(width / 2, depth / 2);
 
-  // For non-box shapes, keep the old shinyMat
-  if (sh !== "box") {
-    m.material = shinyMat(this.scene, bodyCol, 0.7, true);
-  }
+  // Pick random texture from list
+  const textures = [
+    "/textures/42.png",
+    "/textures/40.jpg",
+    "/textures/41.jpg",
+  ];
+  const randomTexture = textures[Math.floor(Math.random() * textures.length)];
 
+  // Apply material with texture
+  const mat = new StandardMaterial(`mat-${x.toFixed(3)}-${z.toFixed(3)}`, this.scene);
+  mat.diffuseTexture = new Texture(randomTexture, this.scene);
+  mat.backFaceCulling = false;
+  mat.specularColor = new Color3(0.2, 0.2, 0.2); // slight shininess
+  m.material = mat;
+
+  // Optional metadata if you need it later
   (m as any).metadata = {
     radius: hitRadius,
     baseScale: m.scaling.clone(),
     pulseTimeout: 0 as any,
-    shape: sh,
+    shape: "box",
   };
+
   this.obstacles.push(m);
 }
+
+//   private buildObstacleMesh(
+//   x: number,
+//   z: number,
+//   radius: number,
+//   bodyCol: Color3,
+//   _capCol: Color3, // not used for spheres
+//   shape?: ObstacleShape
+// ) {
+//   const sh = shape || this.fixedObstacleShape || "sphere";
+//   let m: import("@babylonjs/core").Mesh;
+//   let hitRadius = radius;
+
+//   // if (sh === "sphere") {
+//   //   m = MeshBuilder.CreateSphere(
+//   //     `obs-${x.toFixed(3)}-${z.toFixed(3)}`,
+//   //     { diameter: radius * 2, segments: 20 },
+//   //     this.scene
+//   //   );
+//   //   m.position.set(x, radius, z);
+//   // } else if (sh === "cylinder") {
+//   //   const height = Math.max(0.8, radius * 1.6);
+//   //   m = MeshBuilder.CreateCylinder(
+//   //     `obs-${x.toFixed(3)}-${z.toFixed(3)}`,
+//   //     { diameter: radius * 2, height, tessellation: 24 },
+//   //     this.scene
+//   //   );
+//   //   m.position.set(x, height / 2, z);
+//   //   hitRadius = radius;
+//   // } else if (sh === "cone") {
+//   //   const height = Math.max(1.0, radius * 2.2);
+//   //   m = MeshBuilder.CreateCylinder(
+//   //     `obs-${x.toFixed(3)}-${z.toFixed(3)}`,
+//   //     { diameter: radius * 2, diameterTop: 0, height, tessellation: 24 },
+//   //     this.scene
+//   //   );
+//   //   m.position.set(x, height / 2, z);
+//   //   hitRadius = radius;
+//   // } else if (sh === "capsule") {
+//   //   const height = Math.max(radius * 2.8, 1.2);
+//   //   m = MeshBuilder.CreateCapsule(
+//   //     `obs-${x.toFixed(3)}-${z.toFixed(3)}`,
+//   //     { radius, height, tessellation: 12, capSubdivisions: 6 },
+//   //     this.scene
+//   //   );
+//   //   m.position.set(x, height / 2, z);
+//   //   hitRadius = radius;
+//   // } else if (sh === "disc") {
+//   //   const height = Math.max(0.1, radius * 0.18);
+//   //   m = MeshBuilder.CreateCylinder(
+//   //     `obs-${x.toFixed(3)}-${z.toFixed(3)}`,
+//   //     { diameter: radius * 2, height, tessellation: 36 },
+//   //     this.scene
+//   //   );
+//   //   m.position.set(x, height / 2, z);
+//   //   hitRadius = radius;
+//   // } else {
+//     // BOX: apply image texture
+//     const width = radius * 2.2;
+//     const depth = radius * 2.2;
+//     const height = Math.max(0.8, radius * 1.2);
+//     m = MeshBuilder.CreateBox(
+//       `obs-${x.toFixed(3)}-${z.toFixed(3)}`,
+//       { width, depth, height },
+//       this.scene
+//     );
+//     m.position.set(x, height / 2, z);
+//     hitRadius = Math.hypot(width / 2, depth / 2);
+
+//     // Create material with texture
+//     const mat = new StandardMaterial(`mat-${x.toFixed(3)}-${z.toFixed(3)}`, this.scene);
+//     mat.diffuseTexture = new Texture("/textures/42.png", this.scene);
+//     mat.backFaceCulling = false;
+//     mat.specularColor = new Color3(0.2, 0.2, 0.2); // slight shininess
+//     m.material = mat;
+//   }
+
+//   // For non-box shapes, keep the old shinyMat
+//   // if (sh !== "box") {
+//   //   m.material = shinyMat(this.scene, bodyCol, 0.7, true);
+//   // }
+
+//   // (m as any).metadata = {
+//   //   radius: hitRadius,
+//   //   baseScale: m.scaling.clone(),
+//   //   pulseTimeout: 0 as any,
+//   //   shape: sh,
+//   // };
+//   // this.obstacles.push(m);
+// // }
   //======================================================================================
   private resetBall(dirX = Math.random() < 0.5 ? 1 : -1) {
     this.ball.position.set(0, 0.3, 0);
