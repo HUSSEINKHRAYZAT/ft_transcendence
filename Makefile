@@ -1,6 +1,14 @@
 # FT Transcendence Project Makefile
 # This Makefile helps manage the Backend (Docker) and Frontend (npm) services
 
+# Detect docker-compose command (docker-compose or docker compose)
+DOCKER_COMPOSE := $(shell command -v docker-compose 2> /dev/null)
+ifndef DOCKER_COMPOSE
+	DOCKER_COMPOSE := docker compose
+else
+	DOCKER_COMPOSE := docker-compose
+endif
+
 .PHONY: all dev backend frontend backend-build backend-up backend-down backend-logs frontend-dev frontend-build frontend-preview clean help install
 
 # Default target
@@ -8,37 +16,31 @@ all: help
 
 # Development - Run both backend and frontend
 dev:
-	@echo "🚀 Starting Full Development Environment..."
 	@make backend-up-detached
-	@echo "⏳ Waiting for backend services to initialize..."
 	@sleep 10
-	@echo "📊 Backend service status:"
-	@cd Backend && docker-compose ps
-	@echo "⚡ Starting Frontend development server..."
+	@cd Backend && $(DOCKER_COMPOSE) ps > /dev/null
+	@cd ..
+	@cd Frontend && npm install
+	@sleep 2
 	@make frontend-dev
 
 # Backend targets
 backend: backend-up
 
 backend-build:
-	@echo "🔨 Building Backend services..."
-	@cd Backend && docker-compose build
+	@cd Backend && $(DOCKER_COMPOSE) build > /dev/null
 
 backend-up:
-	@echo "🐳 Starting Backend services..."
-	@cd Backend && docker-compose up --build
+	@cd Backend && $(DOCKER_COMPOSE) up --build
 
 backend-up-detached:
-	@echo "🐳 Starting Backend services in background..."
-	@cd Backend && docker-compose up --build -d
+	@cd Backend && $(DOCKER_COMPOSE) up --build -d > /dev/null
 
 backend-down:
-	@echo "🛑 Stopping Backend services..."
-	@cd Backend && docker-compose down
+	@cd Backend && $(DOCKER_COMPOSE) down > /dev/null
 
 backend-logs:
-	@echo "📋 Showing Backend logs..."
-	@cd Backend && docker-compose logs -f
+	@cd Backend && $(DOCKER_COMPOSE) logs -f
 
 backend-restart: backend-down backend-up
 
@@ -46,40 +48,34 @@ backend-restart: backend-down backend-up
 frontend: frontend-dev
 
 frontend-install:
-	@echo "📦 Installing Frontend dependencies..."
 	@cd Frontend && npm install
 
 frontend-dev:
-	@echo "⚡ Starting Frontend development server..."
 	@cd Frontend && npm run dev
 
 frontend-build:
-	@echo "🔨 Building Frontend for production..."
-	@cd Frontend && npm run build
+	@cd Frontend && npm run build > /dev/null
 
 frontend-preview:
-	@echo "👀 Starting Frontend preview server..."
 	@cd Frontend && npm run preview
 
 frontend-type-check:
-	@echo "🔍 Type checking Frontend..."
-	@cd Frontend && npm run type-check
+	@cd Frontend && npm run type-check > /dev/null
 
 # Installation targets
-install: backend-build frontend-install
-	@echo "✅ Installation complete!"
+install: frontend-install backend-build
 
 # Utility targets
 clean:
-	@echo "🧹 Cleaning up..."
-	@cd Backend && docker-compose down --volumes --remove-orphans
-	@cd Frontend && rm -rf node_modules dist
-	@docker system prune -f
+	@cd Backend && $(DOCKER_COMPOSE) down --volumes --remove-orphans > /dev/null
+	@cd Frontend && rm -rf node_modules dist 2>/dev/null || true
+	@docker system prune -f > /dev/null
 
 status:
 	@echo "📊 Service Status:"
+	@echo "Docker Compose Command: $(DOCKER_COMPOSE)"
 	@echo "Backend containers:"
-	@cd Backend && docker-compose ps
+	@cd Backend && $(DOCKER_COMPOSE) ps
 	@echo "\nFrontend process:"
 	@pgrep -f "vite.*dev" && echo "Frontend dev server is running" || echo "Frontend dev server is not running"
 

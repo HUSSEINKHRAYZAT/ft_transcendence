@@ -494,6 +494,25 @@
   "Resetting Password...": "جاري إعادة تعيين كلمة المرور...",
   "Password reset successful!": "تم إعادة تعيين كلمة المرور بنجاح!",
   "Password Reset Successful": "تمت إعادة تعيين كلمة المرور بنجاح",
-  "Your password has been updated successfully. You can now login": "تم تحديث كلمة المرور بنجاح. يمكنك الآن تسجيل الدخول"
+  "Your password has been updated successfully. You can now login": "تم تحديث كلمة المرور بنجاح. يمكنك الآن تسجيل الدخول",
+   "← Back to Frontend": "← العودة إلى الواجهة",
+  "3D Pong Game Setup": "إعداد لعبة البونج ثلاثية الأبعاد",
+  "🔒 Not signed in": "🔒 غير مسجل الدخول",
+  "2P Local Match": "مباراة محلية لشخصين",
+  "🤖 AI Difficulty": "🤖 صعوبة الذكاء الاصطناعي",
+  "VS AI": "ضد الذكاء الاصطناعي",
+  "3 AI (4P)": "3 ذكاء اصطناعي (4 لاعبين)",
+  "1 player vs 3 bots (uses difficulty above)": "لاعب واحد ضد 3 روبوتات (يستخدم مستوى الصعوبة أعلاه)",
+  "Host 2P": "استضافة 2 لاعب",
+  "Join 2P": "الانضمام إلى 2 لاعب",
+  "Host 4P": "استضافة 4 لاعبين",
+  "Join 4P": "الانضمام إلى 4 لاعبين",
+  "Real-time Web socket multiplayer": "متعدد اللاعبين عبر Web socket في الوقت الفعلي",
+  "Size:": "الحجم:",
+  "8 Players": "8 لاعبين",
+  "16 Players": "16 لاعبًا",
+  "Create Tournament": "إنشاء بطولة",
+  "Join Tournament": "الانضمام إلى بطولة",
+  "Results saved to database": "النتائج محفوظة في قاعدة البيانات"
 
 }

@@ -494,7 +494,26 @@
   "Resetting Password...": "Resetting Password...",
   "Password reset successful!": "Password reset successful!",
   "Password Reset Successful": "Password Reset Successful",
-  "Your password has been updated successfully. You can now login": "Your password has been updated successfully. You can now login"
+  "Your password has been updated successfully. You can now login": "Your password has been updated successfully. You can now login",
+  "← Back to Frontend": "← Back to Frontend",
+  "3D Pong Game Setup": "3D Pong Game Setup",
+  "🔒 Not signed in": "🔒 Not signed in",
+  "2P Local Match": "2P Local Match",
+  "🤖 AI Difficulty": "🤖 AI Difficulty",
+  "VS AI": "VS AI",
+  "3 AI (4P)": "3 AI (4P)",
+  "1 player vs 3 bots (uses difficulty above)": "1 player vs 3 bots (uses difficulty above)",
+  "Host 2P": "Host 2P",
+  "Join 2P": "Join 2P",
+  "Host 4P": "Host 4P",
+  "Join 4P": "Join 4P",
+  "Real-time Web socket multiplayer": "Real-time Web socket multiplayer",
+  "Size:": "Size:",
+  "8 Players": "8 Players",
+  "16 Players": "16 Players",
+  "Create Tournament": "Create Tournament",
+  "Join Tournament": "Join Tournament",
+  "Results saved to database": "Results saved to database"
 }
 
 
