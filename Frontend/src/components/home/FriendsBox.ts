@@ -28,12 +28,14 @@ export class FriendsBox {
     private chatMessages: Map<string, ChatMessage[]> = new Map();
     private processedMessageIds: Set<string> = new Set();
     private lastMessageContent: Map<string, string> = new Map();
+    private refreshTimeout: number | null = null;
 
     private boundHandleFriendStatusChange!: (event: Event) => void;
     private boundHandleDirectMessageReceived!: (event: Event) => void;
     private boundHandleDirectMessageSent!: (event: Event) => void;
     private boundHandleFriendsListChanged!: () => void;
     private boundHandleThemeChange!: (event: Event) => void;
+    private boundHandleSocketReconnected!: (event: Event) => void;
 
     constructor() {
         this.container = document.getElementById("friends-box");
@@ -47,6 +49,11 @@ export class FriendsBox {
         this.boundHandleDirectMessageReceived = this.handleDirectMessageReceived.bind(this);
         this.boundHandleDirectMessageSent = this.handleDirectMessageSent.bind(this);
         this.boundHandleFriendsListChanged = () => {
+            this.loadAndRenderFriends().catch(() => {});
+        };
+        this.boundHandleSocketReconnected = () => {
+            this.handleReconnection();
+            // Also refresh list on reconnection to reflect latest online/offline
             this.loadAndRenderFriends().catch(() => {});
         };
 
@@ -63,7 +70,7 @@ export class FriendsBox {
         window.addEventListener('friend-status-change', this.boundHandleFriendStatusChange);
         window.addEventListener('direct-message-received', this.boundHandleDirectMessageReceived);
         window.addEventListener('direct-message-sent', this.boundHandleDirectMessageSent);
-
+        window.addEventListener('socket-reconnected', this.boundHandleSocketReconnected);
         this.loadMessagesFromStorage();
     }
 
@@ -81,11 +88,16 @@ export class FriendsBox {
         this.updateFriendStatus(username, status);
 
         if (this.isRendered) {
-            setTimeout(() => {
+            // Refresh quickly without waiting 5 seconds
+            if (this.refreshTimeout) {
+                clearTimeout(this.refreshTimeout);
+            }
+            this.refreshTimeout = window.setTimeout(() => {
                 this.loadAndRenderFriends().catch(err => {
                     console.error("Error refreshing friends list after status change:", err);
                 });
-            }, 5000);
+                this.refreshTimeout = null;
+            }, 300);
         }
     }
 
@@ -105,6 +117,11 @@ export class FriendsBox {
         }
 
         this.processedMessageIds.add(msgId);
+        // prune processed ids to avoid unbounded growth
+        if (this.processedMessageIds.size > 500) {
+            const first = this.processedMessageIds.values().next().value;
+            this.processedMessageIds.delete(first);
+        }
         this.lastMessageContent.set(messageKey, text);
 
         const message: ChatMessage = {
@@ -137,50 +154,49 @@ export class FriendsBox {
     }
 
     private handleDirectMessageSent(event: Event): void {
-        const customEvent = event as CustomEvent;
-        const { to, text, messageId, timestamp } = customEvent.detail;
+            const customEvent = event as CustomEvent;
+            const { to, text, messageId, timestamp } = customEvent.detail;
 
-        console.log(`📤 Message sent to: ${to} - "${text}"`);
+            console.log(`📤 Message sent to: ${to} - "${text}"`);
 
-        // Enhanced duplicate detection for sent messages
-        const msgId = messageId || `sent_${Date.now()}`;
-        const messageKey = `${to}_sent`;
-        const lastMessage = this.lastMessageContent.get(messageKey);
+            const msgId = messageId || `sent_${Date.now()}`;
+            const messageKey = `${to}_sent`;
+            const lastMessage = this.lastMessageContent.get(messageKey);
 
-        // Check for duplicate sent messages
-        if (this.processedMessageIds.has(msgId) || lastMessage === text) {
-            console.log('📤 Duplicate sent message detected, ignoring');
-            return;
+            if (this.processedMessageIds.has(msgId) || lastMessage === text) {
+                console.log('📤 Duplicate sent message detected, ignoring');
+                return;
+            }
+
+            this.processedMessageIds.add(msgId);
+            // prune processed ids to avoid unbounded growth
+            if (this.processedMessageIds.size > 500) {
+                const first = this.processedMessageIds.values().next().value;
+                this.processedMessageIds.delete(first);
+            }
+            this.lastMessageContent.set(messageKey, text);
+
+            const message: ChatMessage = {
+                id: msgId,
+                from: 'me',
+                to: to,
+                text: text,
+                timestamp: timestamp ? new Date(timestamp) : new Date(),
+                isOwn: true
+            };
+
+            this.addMessageToChat(to, message);
+
+            if (this.activeChatUser === to) {
+                this.renderChatMessages();
+                setTimeout(() => {
+                    const chatMessages = document.getElementById('chat-messages');
+                    if (chatMessages) {
+                        chatMessages.scrollTop = chatMessages.scrollHeight;
+                    }
+                }, 100);
+            }
         }
-
-        this.processedMessageIds.add(msgId);
-        this.lastMessageContent.set(messageKey, text);
-
-        // Add sent message to chat history
-        const message: ChatMessage = {
-            id: msgId,
-            from: 'me',
-            to: to,
-            text: text,
-            timestamp: timestamp ? new Date(timestamp) : new Date(),
-            isOwn: true
-        };
-
-        this.addMessageToChat(to, message);
-
-        // If chat is active for this user, display the message immediately
-        if (this.activeChatUser === to) {
-            this.renderChatMessages();
-
-            // Scroll to bottom after a short delay to ensure DOM is updated
-            setTimeout(() => {
-                const chatMessages = document.getElementById('chat-messages');
-                if (chatMessages) {
-                    chatMessages.scrollTop = chatMessages.scrollHeight;
-                }
-            }, 100);
-        }
-    }
 
     private addMessageToChat(username: string, message: ChatMessage): void {
         if (!this.chatMessages.has(username)) {
@@ -1120,39 +1136,34 @@ export class FriendsBox {
         return div.innerHTML;
     }
 
-destroy(): void {
-    // Unsubscribe from language changes
-    if (this.unsubscribeLanguageChange) {
-        this.unsubscribeLanguageChange();
+ destroy(): void {
+        if (this.unsubscribeLanguageChange) {
+            this.unsubscribeLanguageChange();
+        }
+
+        window.removeEventListener('friend-status-change', this.boundHandleFriendStatusChange);
+        window.removeEventListener('direct-message-received', this.boundHandleDirectMessageReceived);
+        window.removeEventListener('direct-message-sent', this.boundHandleDirectMessageSent);
+        window.removeEventListener('friends-list-changed', this.boundHandleFriendsListChanged);
+        window.removeEventListener('theme-changed', this.boundHandleThemeChange);
+        window.removeEventListener('socket-reconnected', this.boundHandleSocketReconnected);
+
+        if (this.requestModal) {
+            this.requestModal.destroy();
+        }
+        if (this.blockedUsersModal) {
+            this.blockedUsersModal.destroy();
+        }
+
+        this.activeChatUser = null;
+        this.chatMessages.clear();
+        this.pendingMessages.clear();
+        this.processedMessageIds.clear();
+
+        if (this.container) {
+            this.container.innerHTML = "";
+        }
+        this.isRendered = false;
+        console.log("FriendsBox component destroyed");
     }
-
-    // Remove event listeners
-    window.removeEventListener('friend-status-change', this.boundHandleFriendStatusChange);
-    window.removeEventListener('direct-message-received', this.boundHandleDirectMessageReceived);
-    window.removeEventListener('direct-message-sent', this.boundHandleDirectMessageSent);
-    window.removeEventListener('friends-list-changed', this.boundHandleFriendsListChanged);
-    window.removeEventListener('theme-changed', this.boundHandleThemeChange);
-
-    // Cleanup request modal
-    if (this.requestModal) {
-        this.requestModal.destroy();
-    }
-
-    // Cleanup blocked users modal
-    if (this.blockedUsersModal) {
-        this.blockedUsersModal.destroy();
-    }
-
-    // Clear chat state
-    this.activeChatUser = null;
-    this.chatMessages.clear();
-    this.pendingMessages.clear();
-    this.processedMessageIds.clear();
-
-    if (this.container) {
-        this.container.innerHTML = "";
-    }
-    this.isRendered = false;
-    console.log("FriendsBox component destroyed");
-}
 }

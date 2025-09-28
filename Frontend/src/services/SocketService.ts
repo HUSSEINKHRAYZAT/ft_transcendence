@@ -1,5 +1,5 @@
 import { AuthService } from "./AuthService";
-import { WS_URL } from "../utils/Constants";
+import { WS_URL , API_BASE_URL} from "../utils/Constants";
 
 export interface SocketMessage {
     type: string;
@@ -195,13 +195,22 @@ export class SocketService {
     private handleBeforeUnload(): void {
         // Set status to offline when the user closes the browser
         if (this.userId) {
-            // Using fetch with keepalive to ensure the request completes
-            navigator.sendBeacon(
-                `/api/users/${this.userId}/status`,
-                JSON.stringify({ status: "offline" })
-            );
+            try {
+                // Use fetch with keepalive to ensure the PATCH is sent on unload
+                fetch(`${API_BASE_URL}/users/${this.userId}`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Authorization': `Bearer ${this.token}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ status: "offline" }),
+                    keepalive: true
+                }).catch(() => {});
+            } catch (error) {
+                console.error("[SocketService] Error sending offline status on unload:", error);
+            }
 
-            // Manually broadcast offline status
+            // Manually broadcast offline status to update UI immediately
             if (this.username) {
                 this.broadcastStatus(this.username, "offline");
             }
@@ -239,9 +248,9 @@ export class SocketService {
 
     private handleMessage(event: MessageEvent): void {
         try {
-        const rawMessage = JSON.parse(event.data);
-        const message: SocketMessage = this.normalizeMessage(rawMessage); // Add this line
-        this.logReceivedMessage(message);
+            const rawMessage = JSON.parse(event.data);
+            const message: SocketMessage = this.normalizeMessage(rawMessage);
+            this.logReceivedMessage(message);
 
             switch (message.type) {
                 case 'friend-online':
@@ -254,6 +263,21 @@ export class SocketService {
 
                 case 'direct-message':
                     this.handleDirectMessageReceived(message);
+                    break;
+
+                case 'friends-list-updated':
+                case 'friend-accepted':
+                case 'friend-removed':
+                    // Refresh friends list in UI without a page reload
+                    window.dispatchEvent(new Event('friends-list-changed'));
+                    if (message.type === 'friend-accepted') {
+                        const username = message.username || message.userName || '';
+                        this.showToast('success', 'Friend Added', username ? `${username} accepted your request` : 'Friend request accepted');
+                    }
+                    if (message.type === 'friend-removed') {
+                        const username = message.username || message.userName || '';
+                        this.showToast('info', 'Friend Removed', username ? `${username} removed from your friends` : 'Friend removed');
+                    }
                     break;
 
                 case 'error':

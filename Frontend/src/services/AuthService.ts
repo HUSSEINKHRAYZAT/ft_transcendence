@@ -520,37 +520,43 @@ private async settingsAPI(username: string): Promise<any | null> {
 		return raw ? JSON.parse(raw) as UserStats : await this.statisticsAPI(userId);
 	}
 
+	public async clearAuthState(): Promise<void> {
+		const userId = this.state.user?.id;
 
-public clearAuthState(): void {
-    const userId = this.state.user?.id;
-    if (userId) {
-        this.socketService?.disconnect(userId);
-    }
+		// Try to gracefully disconnect and set offline BEFORE clearing tokens
+		if (userId) {
+			try {
+				await this.socketService?.disconnect(userId);
+			} catch (err) {
+				console.error("Error disconnecting socket during clearAuthState:", err);
+			}
+		}
 
-    this.state = {
-        isAuthenticated: false,
-        isLoading: false,
-        token: null,
-        user: null,
-        statistics: null,
-        settings: null
-    };
+		this.state = {
+			isAuthenticated: false,
+			isLoading: false,
+			token: null,
+			user: null,
+			statistics: null,
+			settings: null
+		};
 
-    this.clearStoredAuth();
+		this.clearStoredAuth();
 
-    // Reset themes to default when unauthenticated
-    if (typeof window !== 'undefined') {
-        const simpleThemeManager = (window as any).simpleThemeManager;
-        const backgroundThemeManager = (window as any).backgroundThemeManager;
+		// Reset themes to default when unauthenticated
+		if (typeof window !== 'undefined') {
+			const simpleThemeManager = (window as any).simpleThemeManager;
+			const backgroundThemeManager = (window as any).backgroundThemeManager;
 
-        if (simpleThemeManager) {
-            simpleThemeManager.resetTheme();
-        }
-        if (backgroundThemeManager) {
-            backgroundThemeManager.resetTheme();
-        }
-    }
-}
+			if (simpleThemeManager) {
+				simpleThemeManager.resetTheme();
+			}
+			if (backgroundThemeManager) {
+				backgroundThemeManager.resetTheme();
+			}
+		}
+	}
+
 	private clearStoredAuth(): void {
 		localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
 		localStorage.removeItem(STORAGE_KEYS.USER_DATA);
@@ -811,21 +817,25 @@ public clearAuthState(): void {
 		}
 		}
 
-	public async setStatus(status: string, userId: string): Promise<boolean> {
+	public async setStatus(status: string, userId: string, opts?: { keepalive?: boolean }): Promise<boolean> {
 		const mode = status.toLowerCase();
 
 		try {
-			const token = localStorage.getItem("ft_pong_auth_token");
-			console.warn("the token here is", token);
+			// Use in-memory token to avoid race conditions with localStorage clearing
+			const token = this.state.token;
+			if (!token) {
+				console.warn("setStatus called without an auth token");
+				return false;
+			}
+
 			const response = await fetch(`${API_BASE_URL}/users/${userId}`, {
 				method: 'PATCH',
 				headers: {
 					'Authorization': `Bearer ${token}`,
 					'Content-Type': 'application/json',
 				},
-				body: JSON.stringify({
-					status: mode
-				}),
+				body: JSON.stringify({ status: mode }),
+				keepalive: opts?.keepalive === true, // allow keepalive when called on unload
 			});
 
 			if (!response.ok) {
@@ -834,10 +844,11 @@ public clearAuthState(): void {
 				return false;
 			}
 
-			const result = await response.json();
+			await response.json().catch(() => ({}));
 			return true;
 
 		} catch (error) {
+			console.error("setStatus error:", error);
 			return false;
 		}
 	}
