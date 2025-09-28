@@ -10,10 +10,9 @@ import {
   AbstractMesh,
 } from "@babylonjs/core";
 import type { RemoteMsgShort as RemoteMsg } from "../../types";
-let c: Color3; // ✅
-c = new Color3(1, 0, 0);
-
-let v: Vector3 = new Vector3(0, 1, 0);
+// Example Color3 and Vector3 for reference (used for type checking)
+// let c: Color3 = new Color3(1, 0, 0);
+// let v: Vector3 = new Vector3(0, 1, 0);
 
 // math
 export function clamp(v: number, a: number, b: number) {

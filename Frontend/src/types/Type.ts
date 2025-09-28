@@ -54,6 +54,7 @@ export type RemoteMsgShort =
         color: [number, number, number];
         cap: [number, number, number];
         shape?: ObstacleShape;
+        textureIndex?: number; // Optional: for explicit texture synchronization
       }[];
     }
   | { t: "input"; idx: number; neg: boolean; pos: boolean; sid?: string }

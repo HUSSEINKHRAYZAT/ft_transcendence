@@ -57,6 +57,7 @@ export class Pong3D {
     color: [number, number, number];
     cap: [number, number, number];
     shape?: ObstacleShape;
+    textureIndex?: number;
   }[] = [];
   private builtObstaclesFromNet = false;
   private corners: import("@babylonjs/core").Mesh[] = [];
@@ -81,6 +82,7 @@ export class Pong3D {
   // Theme system
   private currentGameTheme: GameThemeColors;
   private themeUnsubscribe?: () => void;
+  private floorTextureIndex?: number;
 
   // Chat system removed
 
@@ -240,6 +242,42 @@ export class Pong3D {
     this.initializeChat();
     this.init();
     if (this.isHost || this.isGuest) this.initRemote();
+  }
+
+  /* ---------------- Utility Methods ---------------- */
+  
+  private hashString(str: string): number {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32bit integer
+    }
+    return Math.abs(hash);
+  }
+
+  private hsvToRgb(h: number, s: number, v: number): Color3 {
+    const c = v * s;
+    const x = c * (1 - Math.abs(((h * 6) % 2) - 1));
+    const m = v - c;
+    
+    let r = 0, g = 0, b = 0;
+    
+    if (h >= 0 && h < 1/6) {
+      r = c; g = x; b = 0;
+    } else if (h >= 1/6 && h < 2/6) {
+      r = x; g = c; b = 0;
+    } else if (h >= 2/6 && h < 3/6) {
+      r = 0; g = c; b = x;
+    } else if (h >= 3/6 && h < 4/6) {
+      r = 0; g = x; b = c;
+    } else if (h >= 4/6 && h < 5/6) {
+      r = x; g = 0; b = c;
+    } else {
+      r = c; g = 0; b = x;
+    }
+    
+    return new Color3(r + m, g + m, b + m);
   }
 
   /* ---------------- UI ---------------- */
@@ -409,8 +447,10 @@ export class Pong3D {
       "/textures/floor5.jpg"
     ];
 
-    // Pick random texture
-    const randomTex = textures[Math.floor(Math.random() * textures.length)];
+    // Pick deterministic texture based on room/game config for consistency across remote players
+    const floorSeed = this.config.roomId ? this.hashString(this.config.roomId) : 0;
+    this.floorTextureIndex = floorSeed % textures.length;
+    const randomTex = textures[this.floorTextureIndex];
 
     const fieldMat = new StandardMaterial("fieldMat", this.scene);
     fieldMat.diffuseTexture = new Texture(randomTex, this.scene);
@@ -567,8 +607,13 @@ this.rightWall = wall(
     const ballMat = new StandardMaterial("ballMat", this.scene);
     // ballMat.diffuseTexture = new Texture("/textures/ball.png", this.scene);
 
-    // Generate a random shining color
-    const randomColor = new Color3(Math.random(), Math.random(), Math.random());
+    // Generate deterministic shining color based on room/game config
+    const ballSeed = this.config.roomId ? this.hashString(this.config.roomId + "ball") : 42;
+    const hue = (ballSeed % 360) / 360; // Convert to 0-1 range for hue
+    // Use HSV to RGB conversion for better color distribution
+    const saturation = 0.8;
+    const value = 1.0;
+    const randomColor = this.hsvToRgb(hue, saturation, value);
     ballMat.emissiveColor = randomColor.scale(0.6); // Scale to control brightness
 
     this.ball = MeshBuilder.CreateSphere(
@@ -743,6 +788,10 @@ this.rightWall = wall(
         ? this.fixedObstacleShape
         : pickWeighted(SHAPES, SHAPE_WEIGHTS);
 
+      // Calculate deterministic texture index for network synchronization
+      const textures = ["/textures/42.png", "/textures/40.jpg", "/textures/41.jpg"];
+      const textureIndex = this.hashString(`${x.toFixed(3)}-${z.toFixed(3)}`) % textures.length;
+
       this.obstacleInfo.push({
         x,
         z,
@@ -750,8 +799,9 @@ this.rightWall = wall(
         color: bodyArr,
         cap: capArr,
         shape,
+        textureIndex,
       });
-      this.buildObstacleMesh(x, z, radius, bodyCol, capCol, shape);
+      this.buildObstacleMesh(x, z, radius, bodyCol, capCol, shape, textureIndex);
     }
   }
 
@@ -760,9 +810,10 @@ this.rightWall = wall(
   x: number,
   z: number,
   radius: number,
-  bodyCol: Color3,
+  _bodyCol: Color3, // not used anymore since we use textures
   _capCol: Color3, // not used anymore
-  _shape?: ObstacleShape // ignored, we always use "box"
+  _shape?: ObstacleShape, // ignored, we always use "box"
+  textureIndex?: number // optional explicit texture index for network sync
 ) {
   // Always box
   let m: import("@babylonjs/core").Mesh;
@@ -780,13 +831,16 @@ this.rightWall = wall(
   m.position.set(x, height / 2, z);
   hitRadius = Math.hypot(width / 2, depth / 2);
 
-  // Pick random texture from list
+  // Pick deterministic texture based on explicit index or position for consistency across remote players
   const textures = [
     "/textures/42.png",
     "/textures/40.jpg",
     "/textures/41.jpg",
   ];
-  const randomTexture = textures[Math.floor(Math.random() * textures.length)];
+  const actualTextureIndex = textureIndex !== undefined 
+    ? textureIndex 
+    : this.hashString(`${x.toFixed(3)}-${z.toFixed(3)}`) % textures.length;
+  const randomTexture = textures[actualTextureIndex];
 
   // Apply material with texture
   const mat = new StandardMaterial(`mat-${x.toFixed(3)}-${z.toFixed(3)}`, this.scene);
@@ -1250,7 +1304,7 @@ this.rightWall = wall(
         const body = new Color3(o.color[0], o.color[1], o.color[2]);
         const cap = new Color3(o.cap[0], o.cap[1], o.cap[2]);
         this.obstacleInfo.push(o);
-        this.buildObstacleMesh(o.x, o.z, o.radius, body, cap, o.shape);
+        this.buildObstacleMesh(o.x, o.z, o.radius, body, cap, o.shape, o.textureIndex);
       }
       this.builtObstaclesFromNet = true;
     }
