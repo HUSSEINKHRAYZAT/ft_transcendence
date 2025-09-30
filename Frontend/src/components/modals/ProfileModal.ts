@@ -111,6 +111,7 @@ export class ProfileModal extends BaseModal {
 											value="${user.userName || ''}"
 											class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:border-lime-500 focus:ring-1 focus:ring-lime-500 transition-colors duration-300"
 											placeholder="${t('Enter username')}">
+									<p class="mt-1 text-xs text-gray-400">${t('Username must contain at least one digit (0-9)')}</p>
 							</div>
 
 							<div>
@@ -254,11 +255,19 @@ export class ProfileModal extends BaseModal {
 	errorDiv?.classList.add('hidden');
 	successDiv?.classList.add('hidden');
 
+	// Validate required fields
 	if (!updateData.firstName || !updateData.lastName || !updateData.userName || !updateData.email) {
 		this.showProfileError('Please fill in all required fields');
 		return;
 	}
 
+	// Validate username contains at least one digit
+	if (!this.hasDigit(updateData.userName)) {
+		this.showProfileError('Username must contain at least one digit (0-9)');
+		return;
+	}
+
+	// Validate email format
 	if (!this.isValidEmail(updateData.email)) {
 		this.showProfileError('Please enter a valid email address');
 		return;
@@ -359,6 +368,10 @@ export class ProfileModal extends BaseModal {
 	private isValidEmail(email: string): boolean {
 		const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 		return emailRegex.test(email);
+	}
+
+	private hasDigit(str: string): boolean {
+		return /\d/.test(str);
 	}
 
 	public static show(): void {

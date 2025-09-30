@@ -1,5 +1,3 @@
-export type Json = Record<string, any>;
-
 export interface Player {
   id: string;
   name: string;
@@ -7,20 +5,31 @@ export interface Player {
   connectedAt: number;
 }
 
+export interface PlayerInRoom {
+  id: string;
+  name: string;
+  isReady: boolean;
+  joinedAt: number;
+}
+
 export interface GameState {
   ball: { x: number; y: number; z: number; vx: number; vy: number; vz: number };
-  paddles: Array<{ x: number; y: number; z: number }>;
-  scores: [number, number];
-  playerAssignment?: Record<number, string>;
+  paddles: { x: number; y: number; z: number }[];
+  scores: number[];
   lastUpdate: number;
+  playerAssignment?: Record<number, string | undefined>;
 }
 
-export interface InboundMsg {
-  type: string;
-  [k: string]: any;
+export interface HealthResponse {
+  status: string;
+  message: string;
+  timestamp: string;
+  rooms: number;
+  connectedPlayers: number;
 }
 
-export interface OutboundMsg {
+/* Generic message coming over WebSocket */
+export interface Message {
   type: string;
-  [k: string]: any;
+  [key: string]: any;
 }

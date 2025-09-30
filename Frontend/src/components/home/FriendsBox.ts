@@ -1005,11 +1005,23 @@ export class FriendsBox {
                 }
             });
         });
+
+        // NEW: Setup block user listeners
+        const blockButtons = this.container?.querySelectorAll('.block-friend-btn') || [];
+        blockButtons.forEach((btn) => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                const username = btn.getAttribute('data-username');
+                if (username) {
+                    this.handleBlockFriend(username);
+                }
+            });
+        });
     }
 
     private renderFriendCard(friend: any): string {
         const username = (friend.username || "").toString();
-        const friendId = (friend.id || friend.userId || "").toString(); // Get friend ID
+        const friendId = (friend.id || friend.userId || "").toString();
         const firstName = (friend.firstName || "").toString();
         const lastName = (friend.lastName || "").toString();
         const profilePath = friend.profilePath;
@@ -1023,7 +1035,7 @@ export class FriendsBox {
 
         const color = this.colorFor(username);
 
-        // Create avatar display
+        // Create avatar display (keep existing avatar code)
         let avatarHtml = '';
         if (profilePath) {
             const fullAvatarPath = profilePath.startsWith('avatars/') ? profilePath : `avatars/${profilePath}`;
@@ -1080,6 +1092,17 @@ export class FriendsBox {
                     >
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                        </svg>
+                    </button>
+
+                    <!-- NEW BLOCK BUTTON -->
+                    <button
+                        class="block-friend-btn p-1 hover:opacity-70 transition-opacity duration-300 text-orange-400"
+                        data-username="${this.escape(username)}"
+                        title="${t('Block User')}"
+                    >
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path>
                         </svg>
                     </button>
 
@@ -1166,4 +1189,44 @@ export class FriendsBox {
         this.isRendered = false;
         console.log("FriendsBox component destroyed");
     }
+
+    private async handleBlockFriend(friendUsername: string): Promise<void> {
+    const me = this.getCurrentUser();
+    if (!me?.userName) {
+        alert(t('Please sign in first.'));
+        return;
+    }
+
+    if (!confirm(t('Are you sure you want to block') + ` ${friendUsername}? ${t('This will remove them from your friends list and prevent them from contacting you.')}`)) {
+        return;
+    }
+
+    try {
+        const response = await authService.blockUserFromRequest(me.userName, friendUsername);
+
+        if (response.success) {
+            this.showNotification(t('User blocked successfully'), 'success');
+
+            // Close chat if blocking the active chat user
+            if (this.activeChatUser === friendUsername) {
+                this.closeChatInterface();
+            }
+
+            // Refresh friends list
+            await this.loadAndRenderFriends();
+
+            // Dispatch event to notify other components
+            window.dispatchEvent(new CustomEvent('friends-list-changed'));
+        } else {
+            if (response.message?.includes('404')) {
+                this.showNotification(t('User not found'), 'error');
+            } else {
+                this.showNotification(t('Failed to block user:') + ' ' + response.message, 'error');
+            }
+        }
+    } catch (err: any) {
+        console.error('Error blocking user:', err);
+        this.showNotification(t('Failed to block user:') + ' ' + err.message, 'error');
+    }
+}
 }

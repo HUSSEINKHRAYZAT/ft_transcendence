@@ -9,6 +9,7 @@ import {
 import './styles/main.css';
 import { handleOAuthCallback } from './auth/callback';
 import { API_BASE_URL } from './';
+import { sessionBootstrap } from './utils/SessionBootstrap';
 
 document.addEventListener("DOMContentLoaded", () => {
     if (window.location.hash.includes('token')) {
@@ -26,7 +27,39 @@ let componentInstances: Component[] = [];
 let isComponentsLoaded = false;
 
 
-initializeApplication();
+
+bootstrapAndInitialize();
+
+async function bootstrapAndInitialize(): Promise<void> {
+  console.log('🔐 Starting session bootstrap...');
+
+  try {
+    // Set up listener BEFORE calling sessionBootstrap
+    const sessionReadyPromise = new Promise<{ isAuthenticated: boolean; user: any }>((resolve) => {
+      window.addEventListener('session-ready', ((e: CustomEvent) => {
+        console.log('✅ Session ready:', e.detail);
+        resolve(e.detail);
+      }) as EventListener, { once: true });
+    });
+
+    // Now call sessionBootstrap (which will dispatch the event)
+    await sessionBootstrap();
+
+    // Wait for the event
+    const sessionData = await sessionReadyPromise;
+    console.log('📊 Session data:', sessionData);
+
+    // Now initialize the application
+    await initializeApplication();
+
+  } catch (error) {
+    console.error('❌ Bootstrap failed:', error);
+    // Still try to initialize the app
+    await initializeApplication();
+  }
+}
+// initializeApplication();
+
 
 async function initializeApplication(): Promise<void> {
   console.log('🚀 Starting FT_PONG application initialization...');
@@ -532,19 +565,19 @@ function showBasicProfileModal(): void
 			<div class="space-y-3 mb-6">
 				<div class="bg-gray-700 p-3 rounded">
 					<span class="text-gray-400">Username:</span>
-					<span class="text-white ml-2">${user.userName || 'Not set'}</span>
+					<span class="text-white ml-2">'Not set'</span>
 				</div>
 				<div class="bg-gray-700 p-3 rounded">
 					<span class="text-gray-400">Games Played:</span>
-					<span class="text-white ml-2">${safeStats.totalGames}</span>
+					<span class="text-white ml-2"></span>
 				</div>
 				<div class="bg-gray-700 p-3 rounded">
 					<span class="text-gray-400">Wins:</span>
-					<span class="text-lime-500 ml-2 font-bold">${safeStats.winCount }</span>
+					<span class="text-lime-500 ml-2 font-bold"></span>
 				</div>
 				<div class="bg-gray-700 p-3 rounded">
 					<span class="text-gray-400">Losses:</span>
-					<span class="text-red-400 ml-2 font-bold">${safeStats.lossCount }</span>
+					<span class="text-red-400 ml-2 font-bold"></span>
 				</div>
 			</div>
 
@@ -871,7 +904,9 @@ function setupProfileDropdown(): void {
 	console.log('🔑 Login clicked...');
 	if ((window as any).modalService) {
 		(window as any).modalService.showLoginModal();
-	} else {
+	}
+	else
+	{
 		showBasicAuthModal('login');
 	}
 };
@@ -920,35 +955,36 @@ function setupProfileDropdown(): void {
 (window as any).handleLogout = async function() {
     console.log('Logout clicked...');
 
-    const confirmed = confirm('Are you sure you want to logout?');
-    if (confirmed) {
-        try {
-            await authService.logout();
+    try {
+        await authService.logout();
 
-            // Reset settings will be handled by the auth-state-changed event
-            // But we can also do it directly here for immediate feedback
-            resetSettingsToDefaults();
+        // Reset settings will be handled by the auth-state-changed event
+        resetSettingsToDefaults();
 
-            if (typeof (window as any).addBasicNavbar === 'function') {
-                (window as any).addBasicNavbar();
-            }
-            if (typeof (window as any).updateJumbotronButton === 'function') {
-                (window as any).updateJumbotronButton();
-            }
+        // Dispatch auth state changed event
+        window.dispatchEvent(new CustomEvent('auth-state-changed', {
+            detail: { isAuthenticated: false, user: null }
+        }));
 
-            window.dispatchEvent(new CustomEvent('auth-state-changed', {
-                detail: { isAuthenticated: false, user: null }
-            }));
-
-            if (typeof (window as any).showBasicToast === 'function') {
-                (window as any).showBasicToast('success', 'You have been logged out successfully!');
-            }
-        } catch (error) {
-            console.error('Logout error:', error);
-            if (typeof (window as any).showBasicToast === 'function') {
-                (window as any).showBasicToast('error', 'Logout failed');
-            }
+        if (typeof (window as any).showBasicToast === 'function') {
+            (window as any).showBasicToast('success', 'You have been logged out successfully!');
         }
+
+        // Reload the page after a brief delay to show the toast
+        setTimeout(() => {
+            window.location.reload();
+        }, 500);
+
+    } catch (error) {
+        console.error('Logout error:', error);
+        if (typeof (window as any).showBasicToast === 'function') {
+            (window as any).showBasicToast('error', 'Logout failed');
+        }
+
+        // Still reload even if there's an error
+        setTimeout(() => {
+            window.location.reload();
+        }, 500);
     }
 };
 
@@ -1031,7 +1067,7 @@ function updateJumbotronButton(): void {
 		🎮 ${t('Play Game')}
 		</button>
 		<p class="text-gray-300">
-		${t('Welcome back !')},
+		${t('Welcome')},
 		<span class="text-lime-500 font-bold">${user.firstName || user.userName || 'Player'}</span> !
 		</p>
 	</div>

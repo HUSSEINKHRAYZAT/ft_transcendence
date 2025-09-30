@@ -1,32 +1,22 @@
-export interface PlayerInRoom {
-  id: string;
-  name: string;
-  isReady: boolean;
-  joinedAt: number;
-}
-
-export interface GameState {
-  ball: { x: number; y: number; z: number; vx: number; vy: number; vz: number };
-  paddles: { x: number; y: number; z: number }[];
-  scores: number[];
-  lastUpdate: number;
-}
+import type { GameState } from './types.js';
 
 export class GameRoom {
   id: string;
   hostId: string;
-  gameMode: "2p" | "4p";
+  gameMode: '2p' | '4p';
   maxPlayers: number;
-  players: Map<string, PlayerInRoom>;
+  players: Map<string, { id: string; name: string; isReady: boolean; joinedAt: number }>;
   isGameStarted: boolean;
   gameState: GameState | null;
   createdAt: number;
+  isPaused?: boolean;
+  pausedBy?: string;
 
-  constructor(id: string, hostId: string, hostName: string, gameMode: "2p" | "4p" = "2p") {
+  constructor(id: string, hostId: string, hostName: string, gameMode: '2p' | '4p' = '2p') {
     this.id = id;
     this.hostId = hostId;
     this.gameMode = gameMode;
-    this.maxPlayers = gameMode === "4p" ? 4 : 2;
+    this.maxPlayers = gameMode === '4p' ? 4 : 2;
     this.players = new Map();
     this.isGameStarted = false;
     this.gameState = null;
@@ -34,19 +24,20 @@ export class GameRoom {
     this.addPlayer(hostId, hostName);
   }
 
-  addPlayer(playerId: string, playerName: string): boolean {
+  addPlayer(playerId: string, playerName: string) {
     if (this.players.size >= this.maxPlayers) return false;
     this.players.set(playerId, {
       id: playerId,
       name: playerName,
       isReady: false,
-      joinedAt: Date.now(),
+      joinedAt: Date.now()
     });
     return true;
   }
 
-  removePlayer(playerId: string): boolean {
+  removePlayer(playerId: string) {
     const removed = this.players.delete(playerId);
+
     if (playerId === this.hostId && this.players.size > 0) {
       // reassign host safely
       const newHost = Array.from(this.players.keys())[0];
@@ -54,28 +45,29 @@ export class GameRoom {
         this.hostId = newHost;
       }
     }
+
     return removed;
   }
 
-  getPlayerCount(): number {
+  getPlayerCount() {
     return this.players.size;
   }
 
-  canStartGame(): boolean {
+  canStartGame() {
     return this.players.size >= 2 && !this.isGameStarted;
   }
 
-  startGame(): boolean {
+  startGame() {
     if (!this.canStartGame()) return false;
     this.isGameStarted = true;
     this.gameState = {
       ball: { x: 0, y: 1, z: 0, vx: 0, vy: 0, vz: 0 },
       paddles: [
         { x: -15, y: 0, z: 0 }, // host
-        { x: 15, y: 0, z: 0 }, // joiner
+        { x:  15, y: 0, z: 0 }  // joiner
       ],
       scores: [0, 0],
-      lastUpdate: Date.now(),
+      lastUpdate: Date.now()
     };
     return true;
   }
@@ -88,7 +80,7 @@ export class GameRoom {
       isGameStarted: this.isGameStarted,
       playerCount: this.players.size,
       maxPlayers: this.maxPlayers,
-      players: Array.from(this.players.values()),
+      players: Array.from(this.players.values())
     };
   }
 }

@@ -1665,6 +1665,71 @@ private async settingsAPI(username: string): Promise<any | null> {
     const cached = localStorage.getItem("ft_pong_statistics");
     return cached ? JSON.parse(cached) as UserStats : stats;
 }
+
+async getBlockedUsers(userId: string): Promise<AuthResponse> {
+    try {
+        const response = await fetch(`${API_BASE_URL}/relation/blocked/${userId}`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${this.state.token}`,
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            return { success: true, data };
+        } else {
+            const errorData = await response.json().catch(() => ({}));
+            return {
+                success: false,
+                message: errorData.message || 'Failed to load blocked users',
+                statusCode: response.status
+            };
+        }
+    } catch (error) {
+        console.error('Error loading blocked users:', error);
+        return { success: false, message: ERROR_MESSAGES.NETWORK_ERROR };
+    }
+}
+
+async getFriendStatistics(friendId: string): Promise<UserStats | null> {
+    if (!this.state.token) {
+        console.error('No auth token available');
+        return null;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/statistics/${friendId}`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${this.state.token}`,
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (!response.ok) {
+            console.error('Failed to fetch friend statistics:', response.status);
+            return null;
+        }
+
+        const data = await response.json();
+
+        const stats: UserStats = {
+            winCount: data.winCount ?? 0,
+            lossCount: data.lossCount ?? 0,
+            tournamentWinCount: data.tournamentWinCount ?? 0,
+            tournamentCount: data.tournamentCount ?? 0,
+            totalGames: data.totalGames ?? 0,
+        };
+
+        console.log('Friend statistics loaded:', stats);
+        return stats;
+    } catch (error) {
+        console.error('Error fetching friend statistics:', error);
+        return null;
+    }
+}
 }
 
 export const authService = new AuthService();
