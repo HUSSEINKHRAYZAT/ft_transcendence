@@ -2,6 +2,8 @@ export interface TournamentPlayer {
   id: string;
   name: string;
   isOnline: boolean;
+  isAI?: boolean;
+  avatar?: string;
 }
 
 export interface TournamentMatch {
@@ -14,17 +16,27 @@ export interface TournamentMatch {
   score1?: number;
   score2?: number;
   isComplete: boolean;
+  isActive: boolean;
   nextMatchId?: string;
+  scheduledTime?: Date;
+  startedAt?: Date;
+  completedAt?: Date;
 }
 
 export interface TournamentBracketData {
   tournamentId: string;
-  size: 8 | 16;
+  name: string;
+  size: 4 | 8 | 16;
   players: TournamentPlayer[];
   matches: TournamentMatch[];
   currentRound: number;
   isComplete: boolean;
   winner?: TournamentPlayer;
+  createdAt: Date;
+  status: 'waiting' | 'active' | 'completed';
+  createdBy: string;
+  isPublic: boolean;
+  allowSpectators: boolean;
 }
 
 export class TournamentBracket {
@@ -255,13 +267,46 @@ export class TournamentBracket {
           border-radius: 50%;
           transform: translate(50%, -50%);
         }
+        .connection-lines::after {
+          content: '';
+          position: absolute;
+          right: 0;
+          top: 50%;
+          width: 8px;
+          height: 8px;
+          background: rgba(255,255,255,0.3);
+          border-radius: 50%;
+          transform: translate(50%, -50%);
+        }
+        
+        .match-actions {
+          margin-top: 12px;
+          text-align: center;
+        }
+        
+        .btn-start-match {
+          background: linear-gradient(135deg, #84cc16, #65a30d);
+          color: white;
+          border: none;
+          padding: 8px 16px;
+          border-radius: 6px;
+          font-weight: 600;
+          font-size: 12px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+        
+        .btn-start-match:hover {
+          background: linear-gradient(135deg, #65a30d, #4d7c0f);
+          transform: translateY(-1px);
+        }
       </style>
     `;
   }
 
   private getRounds(): TournamentMatch[][] {
     const rounds: TournamentMatch[][] = [];
-    const maxRound = this.data.size === 16 ? 4 : 3; // 16 players = 4 rounds, 8 players = 3 rounds
+    const maxRound = this.data.size === 16 ? 4 : this.data.size === 8 ? 3 : 2; // 16 players = 4 rounds, 8 players = 3 rounds, 4 players = 2 rounds
     
     for (let round = 1; round <= maxRound; round++) {
       const roundMatches = this.data.matches.filter(match => match.round === round);
@@ -274,7 +319,9 @@ export class TournamentBracket {
   private generateRoundHTML(matches: TournamentMatch[], roundIndex: number): string {
     const roundNames = this.data.size === 16 
       ? ['Round of 16', 'Quarterfinals', 'Semifinals', 'Final']
-      : ['Quarterfinals', 'Semifinals', 'Final'];
+      : this.data.size === 8
+      ? ['Quarterfinals', 'Semifinals', 'Final']
+      : ['Semifinals', 'Final']; // For 4 players
     
     const roundName = roundNames[roundIndex] || `Round ${roundIndex + 1}`;
     
@@ -289,7 +336,7 @@ export class TournamentBracket {
   }
 
   private generateMatchHTML(match: TournamentMatch): string {
-    const isActive = match.round === this.data.currentRound && !match.isComplete;
+    const isActive = match.isActive && !match.isComplete;
     const cardClass = match.isComplete ? 'completed' : (isActive ? 'active' : '');
     
     return `
@@ -300,6 +347,7 @@ export class TournamentBracket {
           <div class="match-vs">VS</div>
           ${this.generatePlayerHTML(match.player2, match.score2, match.winner)}
         </div>
+        ${isActive ? '<div class="match-actions"><button class="btn-start-match">Start Match</button></div>' : ''}
         ${!match.isComplete && match.round < this.getRounds().length ? '<div class="connection-lines"></div>' : ''}
       </div>
     `;
@@ -318,12 +366,13 @@ export class TournamentBracket {
     const isWinner = winner && winner.id === player.id;
     const isLoser = winner && winner.id !== player.id;
     const playerClass = isWinner ? 'winner' : (isLoser ? 'loser' : '');
+    const aiIcon = player.isAI ? '🤖 ' : '';
+    const offlineText = !player.isOnline && !player.isAI ? ' (offline)' : '';
     
     return `
       <div class="player ${playerClass}">
         <span class="player-name">
-          ${player.name}
-          ${!player.isOnline ? ' (offline)' : ''}
+          ${aiIcon}${player.name}${offlineText}
         </span>
         <span class="player-score">${score !== undefined ? score : '-'}</span>
       </div>
@@ -348,12 +397,46 @@ export class TournamentBracket {
     const match = this.data.matches.find(m => m.id === matchId);
     if (match) {
       console.log('Match clicked:', match);
-      // Could emit an event or call a callback here
+      
+      // If match is ready to start, emit event
+      if (!match.isComplete && match.player1 && match.player2 && !match.isActive) {
+        this.emitMatchStartRequest(match);
+      } else if (match.isActive) {
+        this.emitMatchViewRequest(match);
+      }
     }
   }
 
+  private emitMatchStartRequest(match: TournamentMatch) {
+    const event = new CustomEvent('tournamentMatchStartRequest', {
+      detail: { 
+        tournamentId: this.data.tournamentId,
+        match: match 
+      }
+    });
+    window.dispatchEvent(event);
+  }
+
+  private emitMatchViewRequest(match: TournamentMatch) {
+    const event = new CustomEvent('tournamentMatchViewRequest', {
+      detail: { 
+        tournamentId: this.data.tournamentId,
+        match: match 
+      }
+    });
+    window.dispatchEvent(event);
+  }
+
   // Method to generate initial bracket from player list
-  public static generateInitialBracket(tournamentId: string, size: 8 | 16, players: TournamentPlayer[]): TournamentBracketData {
+  public static generateInitialBracket(
+    tournamentId: string, 
+    size: 4 | 8 | 16, 
+    players: TournamentPlayer[], 
+    createdBy: string,
+    name: string = 'Tournament',
+    isPublic: boolean = true,
+    allowSpectators: boolean = true
+  ): TournamentBracketData {
     const matches: TournamentMatch[] = [];
     const shuffledPlayers = [...players].sort(() => Math.random() - 0.5); // Shuffle for random bracket
     
@@ -369,12 +452,13 @@ export class TournamentBracket {
         matchIndex: i,
         player1,
         player2,
-        isComplete: false
+        isComplete: false,
+        isActive: i === 0, // First match is active initially
       });
     }
     
     // Generate subsequent rounds (empty for now)
-    const totalRounds = size === 16 ? 4 : 3;
+    const totalRounds = size === 16 ? 4 : size === 8 ? 3 : 2;
     for (let round = 2; round <= totalRounds; round++) {
       const matchesInRound = Math.pow(2, totalRounds - round);
       for (let i = 0; i < matchesInRound; i++) {
@@ -382,18 +466,25 @@ export class TournamentBracket {
           id: `round${round}-match${i}`,
           round,
           matchIndex: i,
-          isComplete: false
+          isComplete: false,
+          isActive: false,
         });
       }
     }
     
     return {
       tournamentId,
+      name,
       size,
       players: shuffledPlayers,
       matches,
       currentRound: 1,
-      isComplete: false
+      isComplete: false,
+      createdAt: new Date(),
+      status: 'waiting',
+      createdBy,
+      isPublic,
+      allowSpectators,
     };
   }
 }

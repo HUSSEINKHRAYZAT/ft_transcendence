@@ -80,6 +80,7 @@ export function createMenuRoot(ctx: MenuRenderContext) {
           <div class="flex gap-3 items-center mb-3">
             <label class="text-sm font-medium" style="color: #9333ea;">👥 ${t('Size:')}</label>
             <select id="tSize" class="px-3 py-2 text-white font-medium text-sm flex-1 rounded-lg border" style="background: rgba(0, 0, 0, 0.3); border-color: rgba(147, 51, 234, 0.3);">
+              <option value="4">${t('4 Players')}</option>
               <option value="8" selected>${t('8 Players')}</option>
               <option value="16">${t('16 Players')}</option>
             </select>

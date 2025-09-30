@@ -455,13 +455,8 @@ export async function joinTournament(onResolveDone?: ()=>void) {
         <div class="muted">Checking tournament code: ${code}</div>
       </div>`;
 
-      // Use the tournament service for reliable tournament joining
-      const { tournamentService } = await import('../tournament/TournamentService');
-      const tournamentInfo = await tournamentService.joinTournament({
-        tournamentId: code,
-        playerId: String(user?.id || 'default-user'),
-        playerName: user?.name || 'Player'
-      });
+      // Call API to join tournament
+      const tournamentInfo = await ApiClient.joinTournament({ code });
       
       ov.innerHTML = `<div class="card">
         <div style="font-weight:700; margin-bottom:16px; color:#10b981; font-size:18px;">✅ Tournament Joined Successfully!</div>
@@ -469,7 +464,7 @@ export async function joinTournament(onResolveDone?: ()=>void) {
         <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 8px; padding: 16px; margin-bottom: 20px;">
           <div style="font-weight: 600; margin-bottom: 8px;">Tournament Details:</div>
           <div style="color: #d1d5db; margin-bottom: 4px;">📋 Tournament: ${tournamentInfo.name || code}</div>
-          <div style="color: #d1d5db; margin-bottom: 4px;">👥 Players: ${tournamentInfo.players.length}/${tournamentInfo.size}</div>
+          <div style="color: #d1d5db; margin-bottom: 4px;">👥 Players: ${tournamentInfo.currentPlayers}/${tournamentInfo.maxPlayers}</div>
           <div style="color: #d1d5db;">⏱️ Status: ${tournamentInfo.status || 'Waiting for players'}</div>
         </div>
 
@@ -584,19 +579,12 @@ export async function createTournament(onResolveDone?: ()=>void) {
     </div>`);
 
     try {
-      // Use the tournament service for reliable tournament creation
-      const { tournamentService } = await import('../tournament/TournamentService');
-      
-      const tournament = await tournamentService.createTournament({
+      // Create tournament with just the organizer initially
+      const { code, tournamentId } = await ApiClient.createTournament({ 
+        size, 
         name: tournamentName,
-        size: size,
-        isPublic: true,
-        allowSpectators: true
+        participants: [user.id] // Only include the organizer initially
       });
-      
-      // Extract code and tournamentId for compatibility
-      const code = tournament.tournamentId;
-      const tournamentId = tournament.tournamentId;
       
       ov.innerHTML = `<div class="card" style="max-width: 900px; width: 90vw;">
         <div style="font-weight:700; margin-bottom:16px; color:#84cc16; font-size:24px; text-align:center;">🏆 Tournament Created Successfully!</div>

@@ -455,13 +455,8 @@ export async function joinTournament(onResolveDone?: ()=>void) {
         <div class="muted">Checking tournament code: ${code}</div>
       </div>`;
 
-      // Use the tournament service for reliable tournament joining
-      const { tournamentService } = await import('../tournament/TournamentService');
-      const tournamentInfo = await tournamentService.joinTournament({
-        tournamentId: code,
-        playerId: String(user?.id || 'default-user'),
-        playerName: user?.name || 'Player'
-      });
+      // Call API to join tournament
+      const tournamentInfo = await ApiClient.joinTournament({ code });
       
       ov.innerHTML = `<div class="card">
         <div style="font-weight:700; margin-bottom:16px; color:#10b981; font-size:18px;">✅ Tournament Joined Successfully!</div>
@@ -469,7 +464,7 @@ export async function joinTournament(onResolveDone?: ()=>void) {
         <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 8px; padding: 16px; margin-bottom: 20px;">
           <div style="font-weight: 600; margin-bottom: 8px;">Tournament Details:</div>
           <div style="color: #d1d5db; margin-bottom: 4px;">📋 Tournament: ${tournamentInfo.name || code}</div>
-          <div style="color: #d1d5db; margin-bottom: 4px;">👥 Players: ${tournamentInfo.players.length}/${tournamentInfo.size}</div>
+          <div style="color: #d1d5db; margin-bottom: 4px;">👥 Players: ${tournamentInfo.currentPlayers}/${tournamentInfo.maxPlayers}</div>
           <div style="color: #d1d5db;">⏱️ Status: ${tournamentInfo.status || 'Waiting for players'}</div>
         </div>
 
@@ -527,77 +522,51 @@ export async function createTournament(onResolveDone?: ()=>void) {
   }
 
   const sizeSel = document.querySelector<HTMLSelectElement>("#tSize");
-  const size = parseInt(sizeSel?.value ?? "8", 10) as 4 | 8 | 16;
+  const size = parseInt(sizeSel?.value ?? "8", 10) as 8 | 16;
 
-  // Tournament creation wizard similar to host2p
-  const nameOv = overlay(`
-    <div class="card" style="max-width: 420px; margin: auto; padding: 24px; border-radius: 16px; background: rgba(17, 24, 39, 0.95); box-shadow: 0 8px 20px rgba(0,0,0,0.4);">
-      
-      <h2 style="font-weight:700; margin-bottom:20px; color:#7c3aed; font-size:20px; text-align:center;">
-        🏆 Create <span style="color:#facc15;">${size}-Player</span> Tournament
-      </h2>
-      
-      <label for="tournamentName" 
-      style="display:block; margin-bottom:8px; color:#e5e7eb; font-size:18px; font-weight:700;">
-      🎯 Tournament name:
-      </label>
-      
-      <input 
-        id="tournamentName"
-        type="text"
-        value="${user?.name || 'Player'}'s Tournament"
-        maxlength="30"
-        style="width:100%; padding:12px; background:rgba(31,41,55,0.8); border:2px solid #4b5563; border-radius:10px; text-align:center; font-size:16px; color:#e5e7eb;"
-      />
-      
-      <div style="margin: 16px 0; padding: 12px; background: rgba(124, 58, 237, 0.1); border: 1px solid rgba(124, 58, 237, 0.3); border-radius: 8px;">
-        <div style="font-size: 14px; color: #a855f7;">
-          <strong>📋 Tournament Settings:</strong><br>
-          • ${size} players maximum<br>
-          • Single elimination bracket<br>
-          • AI bots fill empty slots<br>
-          • Get a code to share with players
-        </div>
-      </div>
-      
-      <div style="display:flex; gap:12px; margin-top:28px;">
-        <button class="btn btn-outline" data-close style="flex:1; padding:12px; border-radius:10px; font-size:15px;">
-          Cancel
-        </button>
-        <button class="btn btn-primary" id="createTournamentBtn" style="flex:1; padding:12px; border-radius:10px; font-size:15px;">
-          Create Tournament
-        </button>
-      </div>
+  const ov = overlay(`<div class="card">
+    <div style="font-weight:700; margin-bottom:8px;">Create Tournament (${size})</div>
+    <div class="muted">Fetching online players…</div>
+  </div>`);
+
+  const players = await ApiClient.listOnlinePlayers();
+  if (!players.length) {
+    ov.innerHTML = `<div class="card">
+      <div style="font-weight:700; margin-bottom:8px;">No online players</div>
+      <div class="muted">Ask players to sign in and come online.</div>
+      <div style="margin-top:10px; text-align:right;"><button class="btn" data-close>Close</button></div>
+    </div>`;
+    return;
+  }
+
+  ov.innerHTML = `<div class="card">
+    <div style="font-weight:700; margin-bottom:8px;">Select ${size} players</div>
+    <div style="max-height:280px; overflow:auto; margin:8px 0;">
+      ${players.map((p: any) => `
+        <label style="display:flex; align-items:center; gap:8px; margin:6px 0;">
+          <input type="checkbox" value="${p.id}"> ${p.name}
+        </label>`).join("")}
     </div>
-  `);
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <div class="muted">You’re included automatically if selected.</div>
+      <button class="btn" id="go">Create</button>
+    </div>
+  </div>`;
 
-  const createBtn = nameOv.querySelector("#createTournamentBtn") as HTMLButtonElement;
-  const nameInput = nameOv.querySelector("#tournamentName") as HTMLInputElement;
-
-  createBtn.onclick = async () => {
-    const tournamentName = (nameInput.value.trim() || `${user?.name || 'Player'}'s Tournament`).slice(0, 30);
-    nameOv.remove();
-
-    const ov = overlay(`<div class="card">
-      <div style="font-weight:700; margin-bottom:8px;">🏆 Creating tournament...</div>
-      <div class="muted">Setting up ${size}-player tournament bracket...</div>
-    </div>`);
-
+  (ov.querySelector("#go") as HTMLButtonElement).onclick = async () => {
+    const ids = Array.from(ov.querySelectorAll<HTMLInputElement>('input[type="checkbox"]:checked')).map((i) => i.value);
+    if (ids.length !== size) { alert(`Please select exactly ${size} players.`); return; }
     try {
-      // Use the tournament service for reliable tournament creation
-      const { tournamentService } = await import('../tournament/TournamentService');
+      const { code, tournamentId } = await ApiClient.createTournament({ size, participants: ids });
       
-      const tournament = await tournamentService.createTournament({
-        name: tournamentName,
-        size: size,
-        isPublic: true,
-        allowSpectators: true
-      });
+      // Create tournament bracket data
+      const selectedPlayers = players.filter(p => ids.includes(p.id)).map(p => ({
+        id: p.id,
+        name: p.userName || `${p.firstName} ${p.lastName}`.trim() || 'Unknown Player',
+        isOnline: true
+      }));
       
-      // Extract code and tournamentId for compatibility
-      const code = tournament.tournamentId;
-      const tournamentId = tournament.tournamentId;
-      
+      // Show tournament bracket
       ov.innerHTML = `<div class="card" style="max-width: 900px; width: 90vw;">
         <div style="font-weight:700; margin-bottom:16px; color:#84cc16; font-size:24px; text-align:center;">🏆 Tournament Created Successfully!</div>
         
@@ -607,161 +576,47 @@ export async function createTournament(onResolveDone?: ()=>void) {
           <div style="color: #9ca3af; margin-top: 8px; font-size: 14px;">Share this code with all participants</div>
         </div>
 
-        <div style="background: rgba(124, 58, 237, 0.1); border: 1px solid rgba(124, 58, 237, 0.3); border-radius: 8px; padding: 16px; margin-bottom: 20px;">
-          <div style="font-weight: 600; margin-bottom: 8px; color: #a855f7;">Tournament: ${tournamentName}</div>
-          <div id="tournament-status" style="color: #d1d5db; margin-bottom: 4px;">👥 Players: 1/${size} (You joined automatically)</div>
-          <div style="color: #d1d5db;">⏱️ Status: Waiting for players to join</div>
-        </div>
+        <div id="tournament-bracket-container" style="margin: 20px 0;"></div>
 
         <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 8px; padding: 12px; margin-bottom: 16px;">
           <div style="font-size: 14px; color: #3b82f6;">
-            <strong>📋 How it works:</strong><br>
-            • Share the code above with ${size-1} other players<br>
-            • Players use "Join Tournament" to enter with the code<br>
-            • AI bots will fill any remaining empty slots<br>
-            • Start the tournament when you're ready!<br>
+            <strong>📋 Tournament Rules:</strong><br>
+            • ${size} players, single elimination<br>
+            • ${size === 16 ? 'Round of 16 → ' : ''}Quarterfinals → Semifinals → Final<br>
+            • Winners advance automatically<br>
+            • Match results are saved to database<br>
           </div>
         </div>
 
         <div style="display:flex; gap:12px; margin-top:20px;">
           <button class="btn btn-outline" data-close style="flex:1;">Close</button>
-          <button class="btn btn-secondary" id="invite-players-btn" style="flex:1;">🎯 Invite Players</button>
-          <button class="btn btn-primary" id="start-tournament" style="flex:1; opacity:0.6;" disabled>Start Tournament</button>
+          <button class="btn btn-primary" id="start-tournament" style="flex:1;">Start First Round</button>
         </div>
       </div>`;
 
-      // Handle invite players button
-      const inviteBtn = ov.querySelector("#invite-players-btn") as HTMLButtonElement;
-      const startBtn = ov.querySelector("#start-tournament") as HTMLButtonElement;
+      // Import and create the tournament bracket
+      const { TournamentBracket } = await import('../tournament/TournamentBracket');
+      const bracketContainer = ov.querySelector('#tournament-bracket-container') as HTMLElement;
       
-      let currentPlayers = 1; // Start with organizer
-      
-      const updateStatus = () => {
-        const statusDiv = ov.querySelector("#tournament-status");
-        if (statusDiv) {
-          statusDiv.textContent = `👥 Players: ${currentPlayers}/${size} ${currentPlayers === 1 ? '(You joined automatically)' : ''}`;
-        }
-        
-        // Enable start button when we have at least 4 players or allow starting with fewer
-        if (currentPlayers >= Math.min(4, size)) {
-          startBtn.disabled = false;
-          startBtn.style.opacity = '1';
-        }
-      };
-
-      inviteBtn.onclick = async () => {
-        try {
-          inviteBtn.disabled = true;
-          inviteBtn.textContent = "Loading friends...";
-
-          // Get current user's friends list
-          const friendsResponse = await (user?.id ?
-            (window as any).authService?.getFriendsList(user.id) : null);
-
-          if (!friendsResponse?.success || !friendsResponse.data?.length) {
-            alert("You don't have any friends to invite yet! Share the tournament code manually or add some friends first.");
-            return;
-          }
-
-          const friends = friendsResponse.data.filter((friend: any) => friend.status === 'online');
-
-          if (!friends.length) {
-            alert("No friends are currently online to invite. Share the tournament code manually!");
-            return;
-          }
-
-          // Create invite modal
-          const inviteModal = overlay(`<div class="card">
-            <div style="font-weight:700; margin-bottom:16px; color:#7c3aed; font-size:18px;">🎯 Invite Friends to Tournament</div>
-            <div style="margin-bottom:12px; color:#d1d5db;">Tournament Code: <span style="color:#84cc16; font-weight:600;">${code}</span></div>
-            <div style="margin-bottom:12px; color:#d1d5db;">Select friends to invite:</div>
-            <div style="max-height:200px; overflow-y:auto; margin:16px 0; border:1px solid #374151; border-radius:8px; padding:8px;">
-              ${friends.map((friend: any) => `
-                <label style="display:flex; align-items:center; gap:8px; margin:6px 0; cursor:pointer;">
-                  <input type="checkbox" value="${friend.username}" data-friend-id="${friend.id}">
-                  <div style="color:#84cc16;">●</div>
-                  <span>${friend.username}</span>
-                </label>
-              `).join('')}
-            </div>
-            <div style="display:flex; gap:12px; margin-top:20px;">
-              <button class="btn btn-outline" id="cancel-invite" style="flex:1;">Cancel</button>
-              <button class="btn btn-primary" id="send-invites" style="flex:1;">Send Invites</button>
-            </div>
-          </div>`);
-
-          const cancelBtn = inviteModal.querySelector("#cancel-invite") as HTMLButtonElement;
-          const sendBtn = inviteModal.querySelector("#send-invites") as HTMLButtonElement;
-
-          cancelBtn.onclick = () => inviteModal.remove();
-
-          sendBtn.onclick = () => {
-            const checkboxes = inviteModal.querySelectorAll<HTMLInputElement>('input[type="checkbox"]:checked');
-            const selectedFriends = Array.from(checkboxes).map(cb => ({
-              username: cb.value,
-              id: cb.getAttribute('data-friend-id')
-            }));
-
-            if (selectedFriends.length === 0) {
-              alert("Please select at least one friend to invite!");
-              return;
-            }
-
-            // Send tournament invites
-            selectedFriends.forEach(friend => {
-              if ((window as any).notifyBox) {
-                (window as any).notifyBox.showTournamentNotification('invite', {
-                  organizerName: user?.name || 'A player',
-                  tournamentName,
-                  tournamentCode: code,
-                  maxPlayers: size,
-                  invitedBy: user?.id
-                });
-              }
-            });
-
-            alert(`Tournament invitations sent to ${selectedFriends.length} friend(s)!`);
-            inviteModal.remove();
-          };
-
-        } catch (error) {
-          console.error('Error inviting friends:', error);
-          alert('Failed to load friends list. Please share the tournament code manually.');
-        } finally {
-          inviteBtn.disabled = false;
-          inviteBtn.textContent = "🎯 Invite Players";
-        }
-      };
+      if (bracketContainer) {
+        const bracketData = TournamentBracket.generateInitialBracket(tournamentId || 'temp', size, selectedPlayers);
+        new TournamentBracket(bracketContainer, bracketData);
+      }
 
       // Handle start tournament button
-      startBtn.onclick = async () => {
-        try {
-          startBtn.disabled = true;
-          startBtn.textContent = "Starting...";
-          
-          // Start the tournament (this will fill empty slots with AI)
-          await ApiClient.startTournament(tournamentId);
-          
+      const startBtn = ov.querySelector('#start-tournament') as HTMLButtonElement;
+      if (startBtn) {
+        startBtn.onclick = () => {
           ov.remove();
-          alert(`Tournament "${tournamentName}" has been started! AI bots have filled any empty slots. Players will be notified when matches begin.`);
-          
-          // Optionally open tournament hub to manage the tournament
-          openTournamentHub();
-          
-        } catch (error: any) {
-          alert(`Failed to start tournament: ${error?.message || 'Unknown error'}`);
-          startBtn.disabled = false;
-          startBtn.textContent = "Start Tournament";
-        }
-      };
-
-      // Initial status update
-      updateStatus();
+          // Could implement tournament match queue here
+          alert(`Tournament "${code}" is ready! Players can now join matches using the tournament system.`);
+        };
+      }
 
       onResolveDone?.();
     } catch (e: any) {
       ov.innerHTML = `<div class="card">
-        <div style="font-weight:700; margin-bottom:8px;">❌ Couldn't create tournament</div>
+        <div style="font-weight:700; margin-bottom:8px;">Couldn’t create tournament</div>
         <div class="muted">${e?.message || "Please try again."}</div>
         <div style="margin-top:10px; text-align:right;"><button class="btn" data-close>Close</button></div>
       </div>`;

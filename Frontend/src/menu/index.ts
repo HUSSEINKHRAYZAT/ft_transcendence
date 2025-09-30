@@ -11,5 +11,6 @@ export {
   startVsAI,
   startVs3AI,
   createTournament,
-  joinTournament
+  joinTournament,
+  openTournamentHub
 } from './MenuActions';

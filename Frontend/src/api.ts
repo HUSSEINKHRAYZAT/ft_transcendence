@@ -57,29 +57,86 @@ export class ApiClient {
     return r.json();
   }
 
-  static async createTournament(params: { size: 8 | 16; participants: string[]; }): Promise<{
+  static async createTournament(params: { 
+    name: string;
+    size: 4 | 8 | 16; 
+    isPublic: boolean;
+    allowSpectators: boolean;
+    createdBy: string;
+  }): Promise<{
     tournamentId: string; code: string;
   }> {
-    const r = await fetch("/api/pong/tournaments", {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(params),
-    });
-    if (!r.ok) throw new Error("Failed to create tournament");
-    return r.json();
+    try {
+      // Try the new tournament API first
+      const r = await fetch("/tournaments", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(params),
+      });
+      
+      if (r.ok) {
+        return r.json();
+      }
+      
+      // If new API fails, try legacy API
+      const legacyR = await fetch("/tournaments", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nbOfPlayers: params.size }),
+      });
+      
+      if (legacyR.ok) {
+        const result = await legacyR.json();
+        // Convert legacy response to new format
+        return {
+          tournamentId: result.id?.toString() || Math.random().toString(36).substring(2, 8).toUpperCase(),
+          code: result.id?.toString() || Math.random().toString(36).substring(2, 8).toUpperCase(),
+        };
+      }
+      
+      throw new Error("Both new and legacy tournament APIs failed");
+    } catch (error) {
+      // Always throw to trigger client-side fallback
+      throw new Error(`Failed to create tournament: ${error.message}`);
+    }
   }
 
   static async joinTournament(params: { code: string }): Promise<{
     name?: string; currentPlayers: number; maxPlayers: number; status?: string;
   }> {
-    const r = await fetch("/api/pong/tournaments/join", {
+    // Get current user info for joining
+    const authState = (window as any).authService?.getState();
+    const user = authState?.user;
+    
+    if (!user) {
+      throw new Error("User not authenticated");
+    }
+    
+    const r = await fetch("/tournaments/join", {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(params),
+      body: JSON.stringify({
+        code: params.code,
+        playerId: user.id,
+        playerName: user.firstName || user.userName || user.email || 'Player'
+      }),
     });
     if (!r.ok) throw new Error("Failed to join tournament");
+    return r.json();
+  }
+
+  static async startTournament(tournamentId: string): Promise<{
+    success: boolean; message?: string;
+  }> {
+    const r = await fetch(`/tournaments/${tournamentId}/start`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+    });
+    if (!r.ok) throw new Error("Failed to start tournament");
     return r.json();
   }
 

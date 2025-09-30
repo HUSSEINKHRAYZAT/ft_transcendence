@@ -530,6 +530,97 @@ function handleMessage(playerId: string, ws: WSClient, msg: WSMessage): void {
   }
 }
 
+// Tournament room management
+interface TournamentRoom {
+  id: string;
+  tournamentId: string;
+  spectators: Set<string>;
+  participants: Set<string>;
+  createdAt: number;
+}
+
+class TournamentManager {
+  private tournamentRooms = new Map<string, TournamentRoom>();
+  private clientTournaments = new Map<string, string>(); // clientId -> tournamentId
+
+  createTournamentRoom(tournamentId: string): TournamentRoom {
+    const room: TournamentRoom = {
+      id: `tournament-${tournamentId}`,
+      tournamentId,
+      spectators: new Set(),
+      participants: new Set(),
+      createdAt: Date.now(),
+    };
+    
+    this.tournamentRooms.set(tournamentId, room);
+    return room;
+  }
+
+  joinTournamentAsSpectator(clientId: string, tournamentId: string): boolean {
+    let room = this.tournamentRooms.get(tournamentId);
+    if (!room) {
+      room = this.createTournamentRoom(tournamentId);
+    }
+    
+    room.spectators.add(clientId);
+    this.clientTournaments.set(clientId, tournamentId);
+    return true;
+  }
+
+  joinTournamentAsParticipant(clientId: string, tournamentId: string): boolean {
+    let room = this.tournamentRooms.get(tournamentId);
+    if (!room) {
+      room = this.createTournamentRoom(tournamentId);
+    }
+    
+    room.participants.add(clientId);
+    this.clientTournaments.set(clientId, tournamentId);
+    return true;
+  }
+
+  leaveTournament(clientId: string): void {
+    const tournamentId = this.clientTournaments.get(clientId);
+    if (!tournamentId) return;
+
+    const room = this.tournamentRooms.get(tournamentId);
+    if (room) {
+      room.spectators.delete(clientId);
+      room.participants.delete(clientId);
+      
+      // Clean up empty rooms
+      if (room.spectators.size === 0 && room.participants.size === 0) {
+        this.tournamentRooms.delete(tournamentId);
+      }
+    }
+    
+    this.clientTournaments.delete(clientId);
+  }
+
+  broadcastToTournament(tournamentId: string, message: any, excludeClientId?: string): void {
+    const room = this.tournamentRooms.get(tournamentId);
+    if (!room) return;
+
+    const allClients = new Set([...room.spectators, ...room.participants]);
+    
+    allClients.forEach(clientId => {
+      if (clientId === excludeClientId) return;
+      
+      const client = clientMap.get(clientId);
+      if (client && client.readyState === WebSocket.OPEN) {
+        client.send(JSON.stringify(message));
+      }
+    });
+  }
+
+  getTournamentRoom(tournamentId: string): TournamentRoom | undefined {
+    return this.tournamentRooms.get(tournamentId);
+  }
+
+  getAllTournamentRooms(): TournamentRoom[] {
+    return Array.from(this.tournamentRooms.values());
+  }
+}
+
 // Main server function
 async function start(): Promise<void> {
   // Initialize Fastify
