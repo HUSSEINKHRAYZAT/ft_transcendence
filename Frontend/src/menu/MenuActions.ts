@@ -110,10 +110,10 @@ export async function createSocketIORoom(gameMode: '2p' | '4p', currentUser: any
       await socketManager.connect(finalPlayerName);
       ov.innerHTML = `<div class="card"><div style="font-weight:700; margin-bottom:8px;">🏠 Creating ${gameMode.toUpperCase()} room…</div><div class="muted">Setting up multiplayer session…</div></div>`;
       const roomId = await socketManager.createRoom(gameMode);
-      if (!roomId) 
+      if (!roomId)
         throw new Error('Failed to create room');
-      
-     
+
+
       ov.innerHTML = `<div class="card">
         <div style="font-weight:700; margin-bottom:16px; color:#84cc16; font-size:18px;">✅ Room Created Successfully!</div>
         <div style="margin-bottom:12px; color:#d1d5db;">Share this room ID with other players:</div>
@@ -129,7 +129,7 @@ export async function createSocketIORoom(gameMode: '2p' | '4p', currentUser: any
 
       const startBtn = ov.querySelector("#start-game-btn") as HTMLButtonElement;
       const inviteBtn = ov.querySelector("#invite-friends-btn") as HTMLButtonElement;
-      
+
       // Track player count to enable/disable start button
       let connectedPlayers = 1; // Host is already connected
       const updateStartButton = () => {
@@ -401,10 +401,10 @@ export async function joinTournament(onResolveDone?: ()=>void) {
 
       // Call API to join tournament
       const tournamentInfo = await ApiClient.joinTournament({ code });
-      
+
       ov.innerHTML = `<div class="card">
         <div style="font-weight:700; margin-bottom:16px; color:#10b981; font-size:18px;">✅ Tournament Joined Successfully!</div>
-        
+
         <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 8px; padding: 16px; margin-bottom: 20px;">
           <div style="font-weight: 600; margin-bottom: 8px;">Tournament Details:</div>
           <div style="color: #d1d5db; margin-bottom: 4px;">📋 Tournament: ${tournamentInfo.name || code}</div>
@@ -502,18 +502,18 @@ export async function createTournament(onResolveDone?: ()=>void) {
     if (ids.length !== size) { alert(`Please select exactly ${size} players.`); return; }
     try {
       const { code, tournamentId } = await ApiClient.createTournament({ size, participants: ids });
-      
+
       // Create tournament bracket data
       const selectedPlayers = players.filter(p => ids.includes(p.id)).map(p => ({
         id: p.id,
         name: p.userName || `${p.firstName} ${p.lastName}`.trim() || 'Unknown Player',
         isOnline: true
       }));
-      
+
       // Show tournament bracket
       ov.innerHTML = `<div class="card" style="max-width: 900px; width: 90vw;">
         <div style="font-weight:700; margin-bottom:16px; color:#84cc16; font-size:24px; text-align:center;">🏆 Tournament Created Successfully!</div>
-        
+
         <div style="background: rgba(132, 204, 22, 0.1); border: 1px solid rgba(132, 204, 22, 0.3); border-radius: 8px; padding: 16px; margin-bottom: 20px; text-align: center;">
           <div style="font-weight: 600; margin-bottom: 8px;">Tournament Code:</div>
           <div style="font-size: 28px; font-weight: 800; color: #84cc16; font-family: monospace; letter-spacing: 2px;">${code}</div>
@@ -541,7 +541,7 @@ export async function createTournament(onResolveDone?: ()=>void) {
       // Import and create the tournament bracket
       const { TournamentBracket } = await import('../tournament/TournamentBracket');
       const bracketContainer = ov.querySelector('#tournament-bracket-container') as HTMLElement;
-      
+
       if (bracketContainer) {
         const bracketData = TournamentBracket.generateInitialBracket(tournamentId || 'temp', size, selectedPlayers);
         new TournamentBracket(bracketContainer, bracketData);

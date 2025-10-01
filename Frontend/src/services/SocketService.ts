@@ -340,6 +340,13 @@ export class SocketService {
             }
         }));
 
+        // Check if there's an active chat with this user and close it
+        window.dispatchEvent(new CustomEvent('close-chat-if-active', {
+            detail: {
+                username: username
+            }
+        }));
+
         // Show toast notification
         this.showToast('info', 'Friend Offline', `${username} is now offline`);
     }
