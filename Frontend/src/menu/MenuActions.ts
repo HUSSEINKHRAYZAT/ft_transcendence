@@ -182,6 +182,8 @@ export async function createSocketIORoom(gameMode: '2p' | '4p', currentUser: any
 
           if (!friendsResponse?.success || !friendsResponse.data?.length) {
             alert("You don't have any friends to invite yet! Add some friends first.");
+            inviteBtn.disabled = false;
+            inviteBtn.textContent = "🎯 Invite Friends";
             return;
           }
 
@@ -189,22 +191,39 @@ export async function createSocketIORoom(gameMode: '2p' | '4p', currentUser: any
 
           if (!friends.length) {
             alert("No friends are currently online to invite.");
+            inviteBtn.disabled = false;
+            inviteBtn.textContent = "🎯 Invite Friends";
             return;
           }
+
+          // Track last refresh time for cooldown
+          let lastRefreshTime = Date.now();
+          const REFRESH_COOLDOWN = 5000; // 5 seconds
+
+          // Function to render the friends list
+          const renderFriendsList = (friendsList: any[]) => {
+            return friendsList.map((friend: any) => `
+              <label style="display:flex; align-items:center; gap:8px; margin:6px 0; cursor:pointer;">
+                <input type="checkbox" value="${friend.username}" data-friend-id="${friend.id}">
+                <div style="color:#84cc16;">●</div>
+                <span>${friend.username}</span>
+              </label>
+            `).join('');
+          };
 
           // Create invite modal
           const inviteModal = overlay(`<div class="card">
             <div style="font-weight:700; margin-bottom:16px; color:#3b82f6; font-size:18px;">🎯 Invite Friends to Game</div>
             <div style="margin-bottom:12px; color:#d1d5db;">Room Code: <span style="color:#84cc16; font-weight:600;">${roomId}</span></div>
-            <div style="margin-bottom:12px; color:#d1d5db;">Select friends to invite:</div>
-            <div style="max-height:200px; overflow-y:auto; margin:16px 0; border:1px solid #374151; border-radius:8px; padding:8px;">
-              ${friends.map((friend: any) => `
-                <label style="display:flex; align-items:center; gap:8px; margin:6px 0; cursor:pointer;">
-                  <input type="checkbox" value="${friend.username}" data-friend-id="${friend.id}">
-                  <div style="color:#84cc16;">●</div>
-                  <span>${friend.username}</span>
-                </label>
-              `).join('')}
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+              <div style="color:#d1d5db;">Select friends to invite:</div>
+              <button class="btn btn-secondary" id="refresh-friends" style="padding:6px 12px; font-size:14px;">🔄 Refresh</button>
+            </div>
+            <div id="friends-list-container" style="max-height:200px; overflow-y:auto; margin:16px 0; border:1px solid #374151; border-radius:8px; padding:8px;">
+              ${renderFriendsList(friends)}
+            </div>
+            <div id="refresh-cooldown-msg" style="display:none; color:#f59e0b; font-size:12px; margin-bottom:8px; text-align:center;">
+              ⏳ Please wait <span id="cooldown-timer">5</span> seconds before refreshing again
             </div>
             <div style="display:flex; gap:12px; margin-top:20px;">
               <button class="btn btn-outline" id="cancel-invite" style="flex:1;">Cancel</button>
@@ -214,6 +233,68 @@ export async function createSocketIORoom(gameMode: '2p' | '4p', currentUser: any
 
           const cancelBtn = inviteModal.querySelector("#cancel-invite") as HTMLButtonElement;
           const sendBtn = inviteModal.querySelector("#send-invites") as HTMLButtonElement;
+          const refreshBtn = inviteModal.querySelector("#refresh-friends") as HTMLButtonElement;
+          const friendsListContainer = inviteModal.querySelector("#friends-list-container") as HTMLElement;
+          const cooldownMsg = inviteModal.querySelector("#refresh-cooldown-msg") as HTMLElement;
+          const cooldownTimer = inviteModal.querySelector("#cooldown-timer") as HTMLElement;
+
+          // Refresh friends list handler
+          refreshBtn.onclick = async () => {
+            const now = Date.now();
+            const timeSinceLastRefresh = now - lastRefreshTime;
+            
+            if (timeSinceLastRefresh < REFRESH_COOLDOWN) {
+              // Show cooldown message
+              const remainingSeconds = Math.ceil((REFRESH_COOLDOWN - timeSinceLastRefresh) / 1000);
+              cooldownTimer.textContent = remainingSeconds.toString();
+              cooldownMsg.style.display = 'block';
+              
+              // Hide message after remaining time
+              setTimeout(() => {
+                cooldownMsg.style.display = 'none';
+              }, remainingSeconds * 1000);
+              return;
+            }
+
+            try {
+              refreshBtn.disabled = true;
+              refreshBtn.textContent = "⏳ Refreshing...";
+              cooldownMsg.style.display = 'none';
+
+              // Fetch updated friends list
+              const updatedResponse = await (currentUser?.id ?
+                (window as any).authService.getFriendsList(currentUser.id) : null);
+
+              if (updatedResponse?.success && updatedResponse.data) {
+                const onlineFriends = updatedResponse.data.filter((friend: any) => friend.status === 'online');
+                
+                if (onlineFriends.length > 0) {
+                  friendsListContainer.innerHTML = renderFriendsList(onlineFriends);
+                  refreshBtn.textContent = "✅ Refreshed";
+                } else {
+                  friendsListContainer.innerHTML = '<div style="color:#9ca3af; text-align:center; padding:20px;">No friends are currently online</div>';
+                  refreshBtn.textContent = "✅ Refreshed";
+                }
+                
+                lastRefreshTime = Date.now();
+                
+                // Reset button text after 1.5 seconds
+                setTimeout(() => {
+                  refreshBtn.textContent = "🔄 Refresh";
+                }, 1500);
+              } else {
+                throw new Error('Failed to fetch friends');
+              }
+            } catch (error) {
+              console.error('Error refreshing friends list:', error);
+              refreshBtn.textContent = "❌ Error";
+              setTimeout(() => {
+                refreshBtn.textContent = "🔄 Refresh";
+              }, 1500);
+            } finally {
+              refreshBtn.disabled = false;
+            }
+          };
 
           cancelBtn.onclick = () => inviteModal.remove();
 
