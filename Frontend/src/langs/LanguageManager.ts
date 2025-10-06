@@ -159,7 +159,7 @@ export class LanguageManager {
       const fallback = this.translations.en[key];
       if (fallback === undefined) {
         console.warn(`Translation not found for key: ${key}`);
-        return key; // Return the key itself as last resort
+        return key;
       }
       return this.replaceVariables(fallback, replacements);
     }

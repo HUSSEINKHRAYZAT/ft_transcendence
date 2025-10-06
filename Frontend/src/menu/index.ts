@@ -9,8 +9,5 @@ export {
   joinSocketIORoom,
   startLocal2P,
   startVsAI,
-  startVs3AI,
-  createTournament,
-  joinTournament,
-  openTournamentHub
+  startVs3AI
 } from './MenuActions';

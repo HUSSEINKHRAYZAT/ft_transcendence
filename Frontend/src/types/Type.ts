@@ -23,17 +23,23 @@ export interface GameConfig {
   roomId?: string;
   winScore?: number;
   matchId?: string;
-  tournament?: {
-    tournamentId: string;
-    round: number;
-    matchIndex: number;
-    leftUserId: string;
-    rightUserId: string;
-  };
   currentUser?: User | null;
   sessionId?: string | null;
   displayNames?: string[];
   obstacleShape?: ObstacleShape;
+  skipCountdown?: boolean;
+  tournament?: {
+    id: string;
+    matchId: string;
+    round: number;
+    matchIndex: number;
+    players?: Array<{
+      id: string;
+      name: string;
+      isAI?: boolean;
+      side?: 'left' | 'right';
+    }>;
+  };
 }
 
 export type Session = { user: User; sessionId: string };

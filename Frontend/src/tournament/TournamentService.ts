@@ -1,3 +1,10 @@
+import { authService } from '../services/AuthService';
+import {
+  socketManager,
+  ServerTournamentState,
+  ServerTournamentMatch,
+  ServerTournamentPlayer
+} from '../services/SocketManager';
 import { TournamentBracketData, TournamentPlayer, TournamentMatch } from './TournamentBracket';
 
 export interface CreateTournamentRequest {
@@ -9,8 +16,8 @@ export interface CreateTournamentRequest {
 
 export interface JoinTournamentRequest {
   tournamentId: string;
-  playerId: string;
-  playerName: string;
+  playerId?: string;
+  playerName?: string;
 }
 
 export interface TournamentListItem {
@@ -25,577 +32,614 @@ export interface TournamentListItem {
   allowSpectators: boolean;
 }
 
+type TournamentEventName =
+  | 'tournamentCreated'
+  | 'tournamentUpdated'
+  | 'playerJoined'
+  | 'tournamentStarted'
+  | 'matchStarted'
+  | 'matchCompleted'
+  | 'tournamentCompleted'
+  | 'matchReady'
+  | 'tournamentGameStart'
+  | 'tournamentsCleared'
+  | 'bothPlayersReady';
+
+type TournamentEventCallback = (payload: any) => void;
+
+interface PendingAck {
+  resolve: (value?: any) => void;
+  reject: (reason?: any) => void;
+  timeout: number;
+}
+
+function toTournamentPlayer(player: ServerTournamentPlayer | undefined): TournamentPlayer | undefined {
+  if (!player) return undefined;
+  return {
+    id: player.id,
+    name: player.name,
+    isOnline: true,
+    isAI: Boolean(player.isAI),
+    aiLevel: player.aiLevel
+  };
+}
+
 export class TournamentService {
-  private baseUrl: string;
-  private socket: WebSocket | null = null;
-  private eventCallbacks: Map<string, Function[]> = new Map();
-  
-  // Client-side tournament storage for when backend is unavailable
-  private clientTournaments: Map<string, TournamentBracketData> = new Map();
-  private useClientSide: boolean = false;
+  private tournaments: Map<string, ServerTournamentState> = new Map();
+  private eventCallbacks: Map<TournamentEventName, TournamentEventCallback[]> = new Map();
+  private initPromise: Promise<void> | null = null;
+  private handlersRegistered = false;
+  private currentUser: { id: string; name: string } | null = null;
+  private pendingAcks: Map<string, PendingAck> = new Map();
 
-  constructor(baseUrl: string = '') {
-    this.baseUrl = baseUrl || 'ws://localhost:3001';
-    
-    // Check if we should use client-side mode
-    this.detectBackendAvailability();
+  constructor() {
+    void this.ensureInitialized();
   }
 
-  private async detectBackendAvailability() {
-    // For now, always use client-side mode since Docker containers use legacy schema
-    this.useClientSide = true;
-    console.log('🏆 Using client-side tournament system (backend containers use legacy schema)');
-  }
-
-  private generateTournamentId(): string {
-    return Math.random().toString(36).substring(2, 8).toUpperCase();
-  }
-
-  private getCurrentUser() {
-    // Try to get user from auth system
-    const authState = (window as any).authService?.getState();
-    if (authState?.user) {
-      return {
-        id: authState.user.id || 'user-' + Math.random().toString(36).substring(2, 8),
-        name: authState.user.firstName || authState.user.userName || authState.user.email || 'Player'
-      };
+  private async ensureInitialized(): Promise<void> {
+    if (this.initPromise) {
+      return this.initPromise;
     }
-    
-    // Fallback to mock user
+    this.initPromise = this.initialize();
+    return this.initPromise;
+  }
+
+  private async initialize(): Promise<void> {
+    this.registerSocketHandlers();
+
+    const user = this.getCurrentUser();
+    try {
+      if (user) {
+        await socketManager.connect(user.name, user.id);
+      } else {
+        await socketManager.connect();
+      }
+    } catch (error) {
+      console.error('Failed to connect to realtime service:', error);
+      throw error;
+    }
+
+    socketManager.sendCommand('request_tournaments');
+  }
+
+  private registerSocketHandlers(): void {
+    if (this.handlersRegistered) {
+      return;
+    }
+    this.handlersRegistered = true;
+
+    socketManager.on('connected', () => {
+      this.currentUser = this.resolveCurrentUser();
+      socketManager.sendCommand('request_tournaments');
+    });
+
+    socketManager.on('tournament_snapshot', ({ tournaments }) => {
+      this.ingestSnapshot(tournaments || []);
+    });
+
+    socketManager.on('tournament_update', ({ tournament }) => {
+      if (tournament) {
+        this.storeTournament(tournament, 'update');
+      }
+    });
+
+    socketManager.on('tournament_created', ({ tournament }) => {
+      if (tournament) {
+        this.storeTournament(tournament, 'created');
+      }
+    });
+
+    socketManager.on('tournament_joined', ({ tournament }) => {
+      if (tournament) {
+        this.storeTournament(tournament, 'joined');
+      }
+    });
+
+    socketManager.on('tournament_started', ({ tournament }) => {
+      if (tournament) {
+        this.storeTournament(tournament, 'started');
+      }
+    });
+
+    socketManager.on('tournament_match_ready', (payload) => {
+      if (!payload) return;
+      const { tournamentId, matchId, role, match } = payload;
+      const state = this.tournaments.get(tournamentId);
+      const bracket = state ? this.toBracket(state) : null;
+      const bracketMatch = this.toMatch(match);
+
+      if (bracket) {
+        this.emit('matchReady', {
+          tournament: bracket,
+          match: bracketMatch,
+          role
+        });
+
+        this.emit('matchStarted', {
+          tournament: bracket,
+          match: bracketMatch,
+          role
+        });
+      }
+    });
+
+    socketManager.on('both_players_ready', (payload) => {
+      if (!payload) return;
+      const { tournamentId, matchId, players } = payload;
+      console.log('🎮 Both players ready event received:', { tournamentId, matchId, players });
+      
+      this.emit('bothPlayersReady', {
+        tournamentId,
+        matchId,
+        players
+      });
+    });
+
+    socketManager.on('tournament_ack', (ack) => {
+      if (!ack || typeof ack !== 'object') return;
+      const key = this.resolveAckKey(ack);
+      if (!key) {
+        return;
+      }
+      const pending = this.pendingAcks.get(key);
+      if (!pending) {
+        return;
+      }
+      clearTimeout(pending.timeout);
+      this.pendingAcks.delete(key);
+      pending.resolve(ack);
+    });
+
+    socketManager.on('tournament_error', (error) => {
+      if (!error) return;
+      const pendingKeys = Array.from(this.pendingAcks.keys());
+      pendingKeys.forEach((key) => {
+        const pending = this.pendingAcks.get(key);
+        if (pending) {
+          clearTimeout(pending.timeout);
+          pending.reject(new Error(error.reason || 'tournament_error'));
+          this.pendingAcks.delete(key);
+        }
+      });
+    });
+  }
+
+  private ingestSnapshot(tournaments: ServerTournamentState[]): void {
+    const seen = new Set<string>();
+    tournaments.forEach((state) => {
+      seen.add(state.id);
+      this.storeTournament(state, 'snapshot');
+    });
+
+    for (const existingId of Array.from(this.tournaments.keys())) {
+      if (!seen.has(existingId)) {
+        this.tournaments.delete(existingId);
+      }
+    }
+
+    this.emit('tournamentsCleared', { count: this.tournaments.size });
+  }
+
+  private storeTournament(state: ServerTournamentState, origin: 'snapshot' | 'created' | 'joined' | 'started' | 'update'): void {
+    const previous = this.tournaments.get(state.id);
+    this.tournaments.set(state.id, state);
+    const bracket = this.toBracket(state);
+
+    if (!previous && origin !== 'snapshot') {
+      this.emit('tournamentCreated', bracket);
+    }
+
+    if (origin === 'joined') {
+      this.emit('playerJoined', bracket);
+    }
+
+    if (origin === 'started') {
+      this.emit('tournamentStarted', bracket);
+    }
+
+    this.emit('tournamentUpdated', bracket);
+    this.detectMatchTransitions(previous, state, bracket);
+  }
+
+  private detectMatchTransitions(previous: ServerTournamentState | undefined, next: ServerTournamentState, bracket: TournamentBracketData): void {
+    if (!previous) {
+      return;
+    }
+
+    const prevMatches = new Map(previous.matches.map((match) => [match.id, match]));
+    const nextMatches = new Map(next.matches.map((match) => [match.id, match]));
+
+    nextMatches.forEach((match, matchId) => {
+      const before = prevMatches.get(matchId);
+      if (!before || before.status === match.status) {
+        return;
+      }
+
+      const bracketMatch = bracket.matches.find((m) => m.id === matchId);
+      if (!bracketMatch) {
+        return;
+      }
+
+      if (match.status === 'active') {
+        this.emit('matchStarted', { tournament: bracket, match: bracketMatch });
+      }
+
+      if (match.status === 'completed') {
+        this.emit('matchCompleted', { tournament: bracket, match: bracketMatch });
+      }
+    });
+
+    if (previous.status !== next.status && next.status === 'completed') {
+      this.emit('tournamentCompleted', { tournament: bracket, winner: bracket.winner });
+    }
+  }
+
+  private toBracket(state: ServerTournamentState): TournamentBracketData {
+    const matches: TournamentMatch[] = state.matches.map((match) => this.toMatch(match, state));
+
     return {
-      id: 'user-' + Math.random().toString(36).substring(2, 8),
-      name: 'Player'
+      tournamentId: state.id,
+      name: state.name,
+      size: state.size,
+      players: state.players.map((player) => ({
+        id: player.id,
+        name: player.name,
+        isOnline: true,
+        isAI: Boolean(player.isAI),
+        aiLevel: player.aiLevel,
+        avatar: player.isAI ? '🤖' : undefined
+      })),
+      matches,
+      currentRound: state.currentRound,
+      isComplete: state.status === 'completed',
+      winner: state.winner ? toTournamentPlayer(state.winner) : undefined,
+      createdAt: new Date(state.createdAt),
+      status: state.status,
+      createdBy: state.createdBy?.name || 'Unknown',
+      isPublic: state.isPublic,
+      allowSpectators: state.allowSpectators
     };
   }
 
-  // Event system for real-time updates
-  public on(event: string, callback: Function) {
+  private toMatch(match: ServerTournamentMatch, state?: ServerTournamentState): TournamentMatch {
+    const player1 = toTournamentPlayer(match.player1);
+    const player2 = toTournamentPlayer(match.player2);
+    let winner: TournamentPlayer | undefined;
+
+    if (match.winnerId) {
+      if (player1 && player1.id === match.winnerId) {
+        winner = player1;
+      } else if (player2 && player2.id === match.winnerId) {
+        winner = player2;
+      } else if (state) {
+        const fallback = state.players.find((p) => p.id === match.winnerId);
+        if (fallback) {
+          winner = toTournamentPlayer(fallback);
+        }
+      }
+    }
+
+    return {
+      id: match.id,
+      round: match.round,
+      matchIndex: match.matchIndex,
+      player1,
+      player2,
+      winner,
+      score1: match.score1,
+      score2: match.score2,
+      isComplete: match.status === 'completed',
+      isActive: match.status === 'active',
+      startedAt: match.startedAt ? new Date(match.startedAt) : undefined,
+      completedAt: match.completedAt ? new Date(match.completedAt) : undefined
+    };
+  }
+
+  private resolveAckKey(ack: any): string | null {
+    if (!ack || typeof ack !== 'object') {
+      return null;
+    }
+
+    if (ack.message === 'match_completed' && ack.tournamentId && ack.matchId) {
+      return `match:${ack.tournamentId}:${ack.matchId}`;
+    }
+
+    return null;
+  }
+
+  private waitForTournamentEvent(
+    eventName: 'tournament_created' | 'tournament_joined' | 'tournament_started' | 'tournament_update',
+    predicate: (tournament: ServerTournamentState) => boolean,
+    timeoutMs: number = 8000
+  ): Promise<TournamentBracketData> {
+    return new Promise((resolve, reject) => {
+      const handler = ({ tournament }: { tournament: ServerTournamentState }) => {
+        if (!tournament) return;
+        if (predicate(tournament)) {
+          cleanup();
+          resolve(this.toBracket(tournament));
+        }
+      };
+
+      const cleanup = () => {
+        socketManager.off(eventName, handler as any);
+        clearTimeout(timerId);
+      };
+
+      const timerId = window.setTimeout(() => {
+        cleanup();
+        reject(new Error(`Timed out waiting for ${eventName}`));
+      }, timeoutMs);
+
+      socketManager.on(eventName, handler as any);
+    });
+  }
+
+  private waitForAck(key: string, timeoutMs: number = 8000): Promise<any> {
+    return new Promise((resolve, reject) => {
+      const timeout = window.setTimeout(() => {
+        if (this.pendingAcks.has(key)) {
+          this.pendingAcks.delete(key);
+        }
+        reject(new Error('Timed out waiting for acknowledgement'));
+      }, timeoutMs);
+
+      this.pendingAcks.set(key, {
+        resolve,
+        reject,
+        timeout
+      });
+    });
+  }
+
+  public on(event: TournamentEventName, callback: TournamentEventCallback): void {
     if (!this.eventCallbacks.has(event)) {
       this.eventCallbacks.set(event, []);
     }
     this.eventCallbacks.get(event)!.push(callback);
   }
 
-  public off(event: string, callback: Function) {
+  public off(event: TournamentEventName, callback: TournamentEventCallback): void {
     const callbacks = this.eventCallbacks.get(event);
-    if (callbacks) {
-      const index = callbacks.indexOf(callback);
-      if (index > -1) {
-        callbacks.splice(index, 1);
-      }
+    if (!callbacks) return;
+    const index = callbacks.indexOf(callback);
+    if (index >= 0) {
+      callbacks.splice(index, 1);
     }
   }
 
-  private emit(event: string, data: any) {
+  private emit(event: TournamentEventName, payload: any): void {
     const callbacks = this.eventCallbacks.get(event);
-    if (callbacks) {
-      callbacks.forEach(callback => callback(data));
-    }
-  }
-
-  // WebSocket connection for real-time updates
-  public connect(): Promise<void> {
-    return new Promise((resolve, reject) => {
+    if (!callbacks) return;
+    callbacks.forEach((cb) => {
       try {
-        this.socket = new WebSocket(this.baseUrl);
-        
-        this.socket.onopen = () => {
-          console.log('Tournament service connected');
-          resolve();
-        };
-
-        this.socket.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data);
-            this.handleMessage(data);
-          } catch (error) {
-            console.error('Error parsing tournament message:', error);
-          }
-        };
-
-        this.socket.onclose = () => {
-          console.log('Tournament service disconnected');
-          this.emit('disconnected', {});
-        };
-
-        this.socket.onerror = (error) => {
-          console.error('Tournament service error:', error);
-          reject(error);
-        };
+        cb(payload);
       } catch (error) {
-        reject(error);
+        console.error(`Error in tournament event handler for ${event}:`, error);
       }
     });
-  }
-
-  private handleMessage(data: any) {
-    switch (data.type) {
-      case 'tournament_updated':
-        this.emit('tournamentUpdated', data.tournament);
-        break;
-      case 'match_started':
-        this.emit('matchStarted', data.match);
-        break;
-      case 'match_completed':
-        this.emit('matchCompleted', data.match);
-        break;
-      case 'player_joined':
-        this.emit('playerJoined', data.player);
-        break;
-      case 'tournament_started':
-        this.emit('tournamentStarted', data.tournament);
-        break;
-      default:
-        console.log('Unknown tournament message type:', data.type);
-    }
-  }
-
-  // Tournament CRUD operations
-  public async createTournament(request: CreateTournamentRequest): Promise<TournamentBracketData> {
-    if (this.useClientSide) {
-      return this.createTournamentClientSide(request);
-    }
-    
-    try {
-      const response = await fetch('/api/tournaments', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(request),
-      });
-
-      if (!response.ok) {
-        console.warn('Backend tournament creation failed, falling back to client-side');
-        return this.createTournamentClientSide(request);
-      }
-
-      const tournament = await response.json();
-      return tournament;
-    } catch (error) {
-      console.error('Error creating tournament via backend, using client-side:', error);
-      return this.createTournamentClientSide(request);
-    }
-  }
-
-  private createTournamentClientSide(request: CreateTournamentRequest): TournamentBracketData {
-    const tournamentId = this.generateTournamentId();
-    const currentUser = this.getCurrentUser();
-    
-    const tournament: TournamentBracketData = {
-      tournamentId,
-      name: request.name,
-      size: request.size,
-      players: [{
-        id: currentUser.id,
-        name: currentUser.name,
-        isOnline: true,
-        isAI: false
-      }],
-      matches: [],
-      currentRound: 1,
-      isComplete: false,
-      createdAt: new Date(),
-      status: 'waiting',
-      createdBy: currentUser.id,
-      isPublic: request.isPublic,
-      allowSpectators: request.allowSpectators,
-    };
-    
-    this.clientTournaments.set(tournamentId, tournament);
-    this.emit('tournamentCreated', tournament);
-    
-    return tournament;
-  }
-
-  public async joinTournament(request: JoinTournamentRequest): Promise<TournamentBracketData> {
-    if (this.useClientSide) {
-      return this.joinTournamentClientSide(request);
-    }
-    
-    try {
-      const response = await fetch(`/api/tournaments/${request.tournamentId}/join`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          playerId: request.playerId,
-          playerName: request.playerName,
-        }),
-      });
-
-      if (!response.ok) {
-        console.warn('Backend join failed, trying client-side');
-        return this.joinTournamentClientSide(request);
-      }
-
-      const tournament = await response.json();
-      return tournament;
-    } catch (error) {
-      console.error('Error joining tournament via backend, using client-side:', error);
-      return this.joinTournamentClientSide(request);
-    }
-  }
-
-  private joinTournamentClientSide(request: JoinTournamentRequest): TournamentBracketData {
-    const tournament = this.clientTournaments.get(request.tournamentId);
-    if (!tournament) {
-      throw new Error('Tournament not found');
-    }
-
-    if (tournament.status !== 'waiting') {
-      throw new Error('Tournament has already started or completed');
-    }
-
-    if (tournament.players.length >= tournament.size) {
-      throw new Error('Tournament is full');
-    }
-
-    // Check if player is already in tournament
-    if (tournament.players.find(p => p.id === request.playerId)) {
-      throw new Error('Player is already in this tournament');
-    }
-
-    tournament.players.push({
-      id: request.playerId,
-      name: request.playerName,
-      isOnline: true,
-      isAI: false
-    });
-
-    this.clientTournaments.set(request.tournamentId, tournament);
-    this.emit('playerJoined', { tournament, playerId: request.playerId });
-    
-    return tournament;
-  }
-
-  public async getTournament(tournamentId: string): Promise<TournamentBracketData> {
-    if (this.useClientSide) {
-      const tournament = this.clientTournaments.get(tournamentId);
-      if (!tournament) {
-        throw new Error('Tournament not found');
-      }
-      return tournament;
-    }
-    
-    try {
-      const response = await fetch(`/api/tournaments/${tournamentId}`);
-      
-      if (!response.ok) {
-        // Fallback to client-side
-        const tournament = this.clientTournaments.get(tournamentId);
-        if (tournament) {
-          return tournament;
-        }
-        throw new Error(`Failed to get tournament: ${response.statusText}`);
-      }
-
-      return await response.json();
-    } catch (error) {
-      // Try client-side fallback
-      const tournament = this.clientTournaments.get(tournamentId);
-      if (tournament) {
-        return tournament;
-      }
-      console.error('Error getting tournament:', error);
-      throw error;
-    }
   }
 
   public async getTournaments(): Promise<TournamentListItem[]> {
-    if (this.useClientSide) {
-      return Array.from(this.clientTournaments.values()).map(t => ({
-        id: t.tournamentId,
-        name: t.name,
-        size: t.size,
-        currentPlayers: t.players.length,
-        status: t.status,
-        createdBy: t.createdBy,
-        createdAt: t.createdAt,
-        isPublic: t.isPublic,
-        allowSpectators: t.allowSpectators,
-      }));
-    }
-    
-    try {
-      const response = await fetch('/api/tournaments');
-      
-      if (!response.ok) {
-        // Fallback to client-side tournaments
-        return Array.from(this.clientTournaments.values()).map(t => ({
-          id: t.tournamentId,
-          name: t.name,
-          size: t.size,
-          currentPlayers: t.players.length,
-          status: t.status,
-          createdBy: t.createdBy,
-          createdAt: t.createdAt,
-          isPublic: t.isPublic,
-          allowSpectators: t.allowSpectators,
-        }));
-      }
+    await this.ensureInitialized();
 
-      return await response.json();
-    } catch (error) {
-      console.error('Error getting tournaments, using client-side:', error);
-      return Array.from(this.clientTournaments.values()).map(t => ({
-        id: t.tournamentId,
-        name: t.name,
-        size: t.size,
-        currentPlayers: t.players.length,
-        status: t.status,
-        createdBy: t.createdBy,
-        createdAt: t.createdAt,
-        isPublic: t.isPublic,
-        allowSpectators: t.allowSpectators,
-      }));
-    }
-  }
-
-  public async startTournament(tournamentId: string): Promise<TournamentBracketData> {
-    if (this.useClientSide) {
-      return this.startTournamentClientSide(tournamentId);
-    }
-    
-    try {
-      const response = await fetch(`/api/tournaments/${tournamentId}/start`, {
-        method: 'POST',
-      });
-
-      if (!response.ok) {
-        console.warn('Backend start failed, trying client-side');
-        return this.startTournamentClientSide(tournamentId);
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error('Error starting tournament via backend, using client-side:', error);
-      return this.startTournamentClientSide(tournamentId);
-    }
-  }
-
-  private startTournamentClientSide(tournamentId: string): TournamentBracketData {
-    const tournament = this.clientTournaments.get(tournamentId);
-    if (!tournament) {
-      throw new Error('Tournament not found');
-    }
-
-    if (tournament.status !== 'waiting') {
-      throw new Error('Tournament has already started or completed');
-    }
-
-    if (tournament.players.length < 2) {
-      throw new Error('Need at least 2 players to start tournament');
-    }
-
-    // Fill remaining slots with AI if needed
-    if (tournament.players.length < tournament.size) {
-      const slotsNeeded = tournament.size - tournament.players.length;
-      const aiPlayers = this.generateAIPlayers(slotsNeeded);
-      tournament.players.push(...aiPlayers);
-    }
-
-    // Generate bracket matches
-    tournament.matches = this.generateMatches(tournament.tournamentId, tournament.size, tournament.players);
-    tournament.status = 'active';
-    
-    this.clientTournaments.set(tournamentId, tournament);
-    this.emit('tournamentStarted', tournament);
-    
-    return tournament;
-  }
-
-  private generateAIPlayers(count: number): TournamentPlayer[] {
-    const aiNames = [
-      'AlphaBot', 'BetaBot', 'GammaBot', 'DeltaBot',
-      'EpsilonBot', 'ZetaBot', 'EtaBot', 'ThetaBot',
-      'IotaBot', 'KappaBot', 'LambdaBot', 'MuBot',
-      'NuBot', 'XiBot', 'OmicronBot', 'PiBot'
-    ];
-
-    return Array.from({ length: count }, (_, index) => ({
-      id: `ai-bot-${index + 1}`,
-      name: aiNames[index] || `Bot${index + 1}`,
-      isOnline: true,
-      isAI: true,
-      avatar: '🤖',
+    return Array.from(this.tournaments.values()).map((state) => ({
+      id: state.id,
+      name: state.name,
+      size: state.size,
+      currentPlayers: state.players.length,
+      status: state.status,
+      createdBy: state.createdBy?.name || 'Unknown',
+      createdAt: new Date(state.createdAt),
+      isPublic: state.isPublic,
+      allowSpectators: state.allowSpectators
     }));
   }
 
-  private generateMatches(tournamentId: string, size: 4 | 8 | 16, players: TournamentPlayer[]): TournamentMatch[] {
-    const matches: TournamentMatch[] = [];
-    const shuffledPlayers = [...players].sort(() => Math.random() - 0.5);
-    
-    // Generate first round matches
-    const firstRoundMatches = size / 2;
-    for (let i = 0; i < firstRoundMatches; i++) {
-      const player1 = shuffledPlayers[i * 2];
-      const player2 = shuffledPlayers[i * 2 + 1];
-      
-      matches.push({
-        id: `${tournamentId}-round1-match${i}`,
-        round: 1,
-        matchIndex: i,
-        player1,
-        player2,
-        isComplete: false,
-        isActive: i === 0, // First match is active initially
-      });
-    }
-    
-    // Generate subsequent rounds (empty for now)
-    const totalRounds = size === 16 ? 4 : size === 8 ? 3 : 2;
-    for (let round = 2; round <= totalRounds; round++) {
-      const matchesInRound = Math.pow(2, totalRounds - round);
-      for (let i = 0; i < matchesInRound; i++) {
-        matches.push({
-          id: `${tournamentId}-round${round}-match${i}`,
-          round,
-          matchIndex: i,
-          isComplete: false,
-          isActive: false,
-        });
-      }
-    }
-    
-    return matches;
-  }
-
-  public async startMatch(tournamentId: string, matchId: string): Promise<any> {
-    try {
-      const response = await fetch(`/api/tournaments/${tournamentId}/matches/${matchId}/start`, {
-        method: 'POST',
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to start match: ${response.statusText}`);
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error('Error starting match:', error);
-      throw error;
-    }
-  }
-
-  public async completeMatch(tournamentId: string, matchId: string, winnerId: string, score1: number, score2: number): Promise<TournamentBracketData> {
-    try {
-      const response = await fetch(`/api/tournaments/${tournamentId}/matches/${matchId}/complete`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          winnerId,
-          score1,
-          score2,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to complete match: ${response.statusText}`);
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error('Error completing match:', error);
-      throw error;
-    }
-  }
-
-  public async fillWithAI(tournamentId: string): Promise<TournamentBracketData> {
-    if (this.useClientSide) {
-      return this.fillWithAIClientSide(tournamentId);
-    }
-    
-    try {
-      const response = await fetch(`/api/tournaments/${tournamentId}/fill-ai`, {
-        method: 'POST',
-      });
-
-      if (!response.ok) {
-        console.warn('Backend fill-AI failed, trying client-side');
-        return this.fillWithAIClientSide(tournamentId);
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error('Error filling with AI via backend, using client-side:', error);
-      return this.fillWithAIClientSide(tournamentId);
-    }
-  }
-
-  private fillWithAIClientSide(tournamentId: string): TournamentBracketData {
-    const tournament = this.clientTournaments.get(tournamentId);
-    if (!tournament) {
-      throw new Error('Tournament not found');
+  public async getTournament(tournamentId: string): Promise<TournamentBracketData> {
+    await this.ensureInitialized();
+    const existing = this.tournaments.get(tournamentId);
+    if (existing) {
+      return this.toBracket(existing);
     }
 
-    if (tournament.status !== 'waiting') {
-      throw new Error('Tournament has already started or completed');
-    }
+    const tournament = await this.waitForTournamentEvent(
+      'tournament_update',
+      (state) => state.id === tournamentId,
+      8000
+    );
 
-    const slotsNeeded = tournament.size - tournament.players.length;
-    if (slotsNeeded <= 0) {
-      throw new Error('Tournament is already full');
-    }
-
-    const aiPlayers = this.generateAIPlayers(slotsNeeded);
-    tournament.players.push(...aiPlayers);
-    
-    this.clientTournaments.set(tournamentId, tournament);
-    this.emit('playersAdded', { tournament, players: aiPlayers });
-    
     return tournament;
   }
 
-  // Spectator functionality
+  public async createTournament(request: CreateTournamentRequest): Promise<TournamentBracketData> {
+    await this.ensureInitialized();
+    const user = this.getCurrentUser();
+
+    const waitForCreated = this.waitForTournamentEvent(
+      'tournament_created',
+      (state) =>
+        state.name === request.name &&
+        state.size === request.size &&
+        (!user || state.createdBy?.id === user.id),
+      10000
+    );
+
+    socketManager.sendCommand('create_tournament', {
+      name: request.name,
+      size: request.size,
+      isPublic: request.isPublic,
+      allowSpectators: request.allowSpectators
+    });
+
+    return waitForCreated;
+  }
+
+  public async joinTournament(request: JoinTournamentRequest): Promise<TournamentBracketData> {
+    await this.ensureInitialized();
+
+    const waitForJoined = this.waitForTournamentEvent(
+      'tournament_joined',
+      (state) => state.id === request.tournamentId,
+      8000
+    );
+
+    socketManager.sendCommand('join_tournament', {
+      tournamentId: request.tournamentId
+    });
+
+    return waitForJoined;
+  }
+
+  public async startTournament(tournamentId: string): Promise<TournamentBracketData> {
+    await this.ensureInitialized();
+
+    const waitForStarted = this.waitForTournamentEvent(
+      'tournament_started',
+      (state) => state.id === tournamentId,
+      10000
+    );
+
+    socketManager.sendCommand('start_tournament', {
+      tournamentId
+    });
+
+    return waitForStarted;
+  }
+
+  public async completeMatch(
+    tournamentId: string,
+    matchId: string,
+    winnerId: string,
+    score1: number,
+    score2: number
+  ): Promise<void> {
+    await this.ensureInitialized();
+    
+    const ackKey = `match:${tournamentId}:${matchId}`;
+    const ackPromise = this.waitForAck(ackKey);
+
+    socketManager.sendCommand('complete_tournament_match', {
+      tournamentId,
+      matchId,
+      winnerId,
+      score1,
+      score2
+    });
+
+    await ackPromise;
+  }
+
+  public async markPlayerReady(tournamentId: string, matchId: string): Promise<void> {
+    await this.ensureInitialized();
+    
+    socketManager.sendCommand('mark_player_ready', {
+      tournamentId,
+      matchId
+    });
+    
+    console.log('🏆 Marked player as ready for match:', matchId);
+  }
+
+  public async requestTournaments(): Promise<void> {
+    await this.ensureInitialized();
+    socketManager.sendCommand('request_tournaments');
+  }
+
+  public async clearInactiveTournaments(): Promise<void> {
+    await this.ensureInitialized();
+    socketManager.sendCommand('clear_inactive_tournaments');
+  }
+
   public async joinAsSpectator(tournamentId: string): Promise<void> {
-    if (this.socket) {
-      this.socket.send(JSON.stringify({
-        type: 'spectate_tournament',
-        tournamentId: tournamentId,
-      }));
-    }
+    await this.ensureInitialized();
+    socketManager.sendCommand('join_tournament_spectator', { tournamentId });
   }
 
   public async leaveSpectator(tournamentId: string): Promise<void> {
-    if (this.socket) {
-      this.socket.send(JSON.stringify({
-        type: 'leave_spectator',
-        tournamentId: tournamentId,
-      }));
-    }
+    await this.ensureInitialized();
+    socketManager.sendCommand('leave_tournament_spectator', { tournamentId });
   }
 
-  public disconnect() {
-    if (this.socket) {
-      this.socket.close();
-      this.socket = null;
+  public getCurrentUser() {
+    if (!this.currentUser) {
+      this.currentUser = this.resolveCurrentUser();
     }
+    return this.currentUser;
   }
 
-  // Helper methods for tournament logic
+  private resolveCurrentUser(): { id: string; name: string } | null {
+    try {
+      const user = authService.getUser();
+      if (user) {
+        const userId = user.id || user.userName || user.email;
+        const name =
+          [user.firstName, user.lastName].filter(Boolean).join(' ').trim() ||
+          user.userName ||
+          user.email?.split('@')[0] ||
+          'Player';
+
+        if (userId) {
+          const currentUser = { id: String(userId), name };
+          sessionStorage.setItem('ft_pong_current_user', JSON.stringify(currentUser));
+          sessionStorage.setItem('ft_pong_session_user_id', currentUser.id);
+          return currentUser;
+        }
+      }
+    } catch (error) {
+      console.warn('TournamentService: failed to resolve user from authService:', error);
+    }
+
+    const cachedUser = sessionStorage.getItem('ft_pong_current_user');
+    if (cachedUser) {
+      try {
+        const parsed = JSON.parse(cachedUser);
+        if (parsed?.id && parsed?.name) {
+          return parsed;
+        }
+      } catch (error) {
+        console.warn('TournamentService: failed to parse cached user:', error);
+      }
+    }
+
+    let sessionUserId = sessionStorage.getItem('ft_pong_session_user_id');
+    if (!sessionUserId) {
+      sessionUserId = 'guest-' + Math.random().toString(36).substring(2, 11);
+      sessionStorage.setItem('ft_pong_session_user_id', sessionUserId);
+    }
+
+    const fallbackUser = {
+      id: sessionUserId,
+      name: 'Guest ' + sessionUserId.slice(-4).toUpperCase()
+    };
+
+    sessionStorage.setItem('ft_pong_current_user', JSON.stringify(fallbackUser));
+    return fallbackUser;
+  }
+
   public static canStartTournament(tournament: TournamentBracketData): boolean {
-    return tournament.players.length >= 2 && tournament.status === 'waiting';
+    // Only allow starting with real users (no AI)
+    const realPlayers = tournament.players.filter(p => !p.isAI);
+    return realPlayers.length >= 2 && tournament.status === 'waiting';
   }
 
   public static getNextMatch(tournament: TournamentBracketData): TournamentMatch | null {
-    return tournament.matches.find(match => 
-      !match.isComplete && 
-      match.player1 && 
-      match.player2 && 
-      !match.isActive
-    ) || null;
+    return (
+      tournament.matches.find(
+        (match) =>
+          !match.isComplete &&
+          match.player1 &&
+          match.player2 &&
+          !match.isActive
+      ) || null
+    );
   }
 
   public static getTournamentProgress(tournament: TournamentBracketData): number {
     const totalMatches = tournament.matches.length;
-    const completedMatches = tournament.matches.filter(m => m.isComplete).length;
+    const completedMatches = tournament.matches.filter((match) => match.isComplete).length;
     return totalMatches > 0 ? (completedMatches / totalMatches) * 100 : 0;
   }
 }
 
-// Singleton instance
 export const tournamentService = new TournamentService();

@@ -1,5 +1,5 @@
 import { AuthService } from "./AuthService";
-import { WS_URL } from "../utils/Constants";
+import { WS_URL , API_BASE_URL} from "../utils/Constants";
 
 export interface SocketMessage {
     type: string;
@@ -14,6 +14,11 @@ export interface DirectMessageData {
 
 export interface FriendStatusData {
     username: string;
+}
+
+export interface AvatarChangedData {
+    username: string;
+    avatar: string;
 }
 
 export class SocketService {
@@ -40,7 +45,6 @@ export class SocketService {
         this.handleSendMessageRequest = this.handleSendMessageRequest.bind(this);
 
         window.addEventListener('send-message-request', this.handleSendMessageRequest as EventListener);
-        console.log("SocketService: send-message-request listener added");
 
         window.addEventListener('beforeunload', this.handleBeforeUnload.bind(this));
 
@@ -55,7 +59,6 @@ export class SocketService {
             if (userData) {
                 const user = JSON.parse(userData);
                 if (user?.id && user?.userName) {
-                    console.log("[SocketService] Restoring connection for stored user session");
                     this.userId = user.id;
                     this.username = user.userName;
                     this.connect(user.id, user.userName);
@@ -68,12 +71,10 @@ export class SocketService {
 
     public connect(userId: string, username: string): void {
         if (this.socket && this.socket.readyState === WebSocket.OPEN) {
-            console.warn("[SocketService] Socket already connected.");
             return;
         }
 
         if (this.isConnecting) {
-            console.warn("[SocketService] Socket connection already in progress.");
             return;
         }
 
@@ -82,13 +83,11 @@ export class SocketService {
         this.username = username;
 
         const url = `${WS_URL}?token=${this.token}`;
-        console.log("[SocketService] Connecting to WebSocket:", url);
 
         try {
             this.socket = new WebSocket(url);
 
             this.socket.onopen = () => {
-                console.log("[SocketService] Connected to WebSocket.");
                 this.reconnectAttempts = 0;
                 this.isConnecting = false;
                 this.authService.setStatus("online", userId);
@@ -140,12 +139,10 @@ export class SocketService {
     }
 
     private startHeartbeat(): void {
-        this.stopHeartbeat(); // Clear any existing interval
+        this.stopHeartbeat();
 
-        // Send a ping every 30 seconds to keep the connection alive
         this.heartbeatInterval = window.setInterval(() => {
             if (this.socket && this.socket.readyState === WebSocket.OPEN) {
-                console.log("[SocketService] Sending heartbeat ping");
                 try {
                     this.socket.send(JSON.stringify({ type: 'ping' }));
                 } catch (error) {
@@ -195,13 +192,22 @@ export class SocketService {
     private handleBeforeUnload(): void {
         // Set status to offline when the user closes the browser
         if (this.userId) {
-            // Using fetch with keepalive to ensure the request completes
-            navigator.sendBeacon(
-                `/api/users/${this.userId}/status`,
-                JSON.stringify({ status: "offline" })
-            );
+            try {
+                // Use fetch with keepalive to ensure the PATCH is sent on unload
+                fetch(`${API_BASE_URL}/users/${this.userId}`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Authorization': `Bearer ${this.token}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ status: "offline" }),
+                    keepalive: true
+                }).catch(() => {});
+            } catch (error) {
+                console.error("[SocketService] Error sending offline status on unload:", error);
+            }
 
-            // Manually broadcast offline status
+            // Manually broadcast offline status to update UI immediately
             if (this.username) {
                 this.broadcastStatus(this.username, "offline");
             }
@@ -224,7 +230,6 @@ export class SocketService {
     }
 
     private logReceivedMessage(message: any): void {
-        console.log('[SocketService] Raw message received:', JSON.stringify(message, null, 2));
     }
 
     private normalizeMessage(rawMessage: any): SocketMessage {
@@ -239,9 +244,9 @@ export class SocketService {
 
     private handleMessage(event: MessageEvent): void {
         try {
-        const rawMessage = JSON.parse(event.data);
-        const message: SocketMessage = this.normalizeMessage(rawMessage); // Add this line
-        this.logReceivedMessage(message);
+            const rawMessage = JSON.parse(event.data);
+            const message: SocketMessage = this.normalizeMessage(rawMessage);
+            this.logReceivedMessage(message);
 
             switch (message.type) {
                 case 'friend-online':
@@ -256,20 +261,43 @@ export class SocketService {
                     this.handleDirectMessageReceived(message);
                     break;
 
+                case 'friends-list-updated':
+                case 'friend-accepted':
+                case 'friend-removed':
+                    // Refresh friends list in UI without a page reload
+                    window.dispatchEvent(new Event('friends-list-changed'));
+                    if (message.type === 'friend-accepted') {
+                        const username = message.username || message.userName || '';
+                        this.showToast('success', 'Friend Added', username ? `${username} accepted your request` : 'Friend request accepted');
+                    }
+                    if (message.type === 'friend-removed') {
+                        const username = message.username || message.userName || '';
+                        this.showToast('info', 'Friend Removed', username ? `${username} removed from your friends` : 'Friend removed');
+                    }
+                    break;
+
+                case 'user-blocked':
+                    this.handleUserBlocked(message);
+                    break;
+
+                case 'avatar-changed':
+                    this.handleAvatarChanged(message);
+                    break;
+
                 case 'error':
                     this.handleError(message);
                     break;
 
                 case 'welcome':
-                    console.log('[SocketService] Welcome message:', message);
+                    // console.log('[SocketService] Welcome message:', message);
                     break;
 
                 case 'pong':
-                    console.log('[SocketService] Received heartbeat pong');
+                    // console.log('[SocketService] Received heartbeat pong');
                     break;
 
                 default:
-                    console.warn("[SocketService] Unknown message type:", message.type);
+                    // console.warn("[SocketService] Unknown message type:", message.type);
             }
         } catch (error) {
             console.error("[SocketService] Error parsing message:", error, event.data);
@@ -277,16 +305,13 @@ export class SocketService {
     }
 
     private handleFriendOnline(data: any): void {
-        // Backend sends: { "type": "friend-online", "username": "afayad123" }
         const username = data.username;
-        console.log(`[SocketService] Friend ${username} is now online`);
 
         if (!username) {
             console.error('[SocketService] No username in friend-online message:', data);
             return;
         }
 
-        // Emit custom event for FriendsBox to update status
         window.dispatchEvent(new CustomEvent('friend-status-change', {
             detail: {
                 username: username,
@@ -294,14 +319,10 @@ export class SocketService {
             }
         }));
 
-        // Show toast notification
-        this.showToast('info', 'Friend Online', `${username} is now online`);
     }
 
     private handleFriendOffline(data: any): void {
-        // Backend sends: { "type": "friend-offline", "username": "afayad123" }
         const username = data.username;
-        console.log(`[SocketService] Friend ${username} is now offline`);
 
         if (!username) {
             console.error('[SocketService] No username in friend-offline message:', data);
@@ -316,21 +337,68 @@ export class SocketService {
             }
         }));
 
+        // Check if there's an active chat with this user and close it
+        window.dispatchEvent(new CustomEvent('close-chat-if-active', {
+            detail: {
+                username: username
+            }
+        }));
+
         // Show toast notification
         this.showToast('info', 'Friend Offline', `${username} is now offline`);
     }
 
+    private handleUserBlocked(data: any): void {
+        const username = data.username;
+
+        if (!username) {
+            console.error('[SocketService] No username in user-blocked message:', data);
+            return;
+        }
+
+        // Refresh friends list to reflect the block
+        window.dispatchEvent(new Event('friends-list-changed'));
+
+        // Close any active chat with this user
+        window.dispatchEvent(new CustomEvent('close-chat-if-active', {
+            detail: {
+                username: username
+            }
+        }));
+
+        // Show toast notification
+        this.showToast('warning', 'User Blocked', `${username} has blocked you`);
+    }
+
+    private handleAvatarChanged(data: any): void {
+        const username = data.username;
+        const avatar = data.avatar;
+
+        if (!username) {
+            console.error('[SocketService] No username in avatar-changed message:', data);
+            return;
+        }
+
+        // Dispatch event to update friend's avatar in UI
+        window.dispatchEvent(new CustomEvent('friend-avatar-changed', {
+            detail: {
+                username: username,
+                avatar: avatar
+            }
+        }));
+
+        // Show toast notification
+        this.showToast('info', 'Avatar Updated', `${username} changed their avatar`);
+    }
+
     private handleDirectMessageReceived(data: any): void {
-            console.log("🔵 [SocketService] handleDirectMessageReceived called with:", data);
 
             const from = data.from;
             const text = data.text;
             const messageId = data.id || `received_${from}_${Date.now()}_${Math.random()}`;
 
-            console.log(`🔵 [SocketService] Processing message - from: "${from}", text: "${text}"`);
 
             if (!from || !text) {
-                console.error('🔵 [SocketService] Invalid message data received:', data);
                 return;
             }
 
@@ -340,7 +408,6 @@ export class SocketService {
 
             // Check for duplicate messages by content and sender
             if (this.processedMessages.has(messageId) || lastMessage === text) {
-                console.log('🔵 [SocketService] Duplicate message detected, ignoring:', { messageId, from, text });
                 return;
             }
 
@@ -355,8 +422,6 @@ export class SocketService {
                 }
             }
 
-            console.log('🔵 [SocketService] Dispatching direct-message-received event');
-
             // Dispatch received event
             const receivedEvent = new CustomEvent('direct-message-received', {
                 detail: {
@@ -368,10 +433,6 @@ export class SocketService {
             });
 
             window.dispatchEvent(receivedEvent);
-            console.log('🔵 [SocketService] direct-message-received event dispatched successfully');
-
-            // Show toast notification
-            this.showToast('info', 'New Message', `${from}: ${text.substring(0, 50)}${text.length > 50 ? '...' : ''}`);
     }
 
 
@@ -383,19 +444,15 @@ export class SocketService {
     private handleSendMessageRequest(event: CustomEvent): void {
         const { recipient, message, sender } = event.detail;
 
-        // Include sender information if available
         if (sender) {
-            console.log(`[SocketService] Sending message from ${sender} to ${recipient}`);
         }
 
         this.sendDirectMessage(recipient, message);
     }
 
     public sendDirectMessage(to: string, text: string): void {
-        console.log(`🔴 [SocketService] sendDirectMessage called: to="${to}", text="${text}"`);
 
         if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
-            console.warn("🔴 [SocketService] Socket not connected, queueing message");
             this.messageQueue.push({ to, text });
 
             if (!this.isConnecting && this.userId && this.username) {
@@ -418,7 +475,6 @@ export class SocketService {
         const lastSentMessage = this.lastProcessedMessage.get(lastSentKey);
 
         if (lastSentMessage === messageText) {
-            console.log("🔴 [SocketService] Duplicate send attempt detected, ignoring");
             return;
         }
 
@@ -430,18 +486,14 @@ export class SocketService {
             text: messageText
         };
 
-        console.log("🔴 [SocketService] Sending to WebSocket:", JSON.stringify(messageData));
 
         try {
             // Send via WebSocket
             this.socket.send(JSON.stringify(messageData));
-            console.log("🔴 [SocketService] WebSocket send successful");
 
             // Create unique message ID
             const messageId = `sent_${this.username}_${targetUsername}_${Date.now()}_${Math.random()}`;
 
-            // Dispatch sent event IMMEDIATELY
-            console.log("🔴 [SocketService] Dispatching direct-message-sent event");
             const sentEvent = new CustomEvent('direct-message-sent', {
                 detail: {
                     to: targetUsername,
@@ -452,7 +504,6 @@ export class SocketService {
             });
 
             window.dispatchEvent(sentEvent);
-            console.log("🔴 [SocketService] direct-message-sent event dispatched successfully");
 
         } catch (error) {
             console.error("🔴 [SocketService] Error sending message:", error);
@@ -460,10 +511,28 @@ export class SocketService {
         }
     }
 
+    public sendAvatarChanged(avatar: string): void {
+        if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+            console.warn("[SocketService] Cannot send avatar-changed: Socket not connected");
+            return;
+        }
+
+        const messageData = {
+            type: 'avatar-changed',
+            avatar: avatar
+        };
+
+        try {
+            this.socket.send(JSON.stringify(messageData));
+            console.log("[SocketService] Avatar changed message sent:", messageData);
+        } catch (error) {
+            console.error("[SocketService] Error sending avatar-changed message:", error);
+        }
+    }
+
     private processMessageQueue(): void {
         if (this.messageQueue.length === 0) return;
 
-        console.log(`[SocketService] Processing ${this.messageQueue.length} queued messages`);
 
         // Process all queued messages
         while (this.messageQueue.length > 0) {
@@ -481,8 +550,6 @@ export class SocketService {
 
         this.reconnectAttempts++;
         const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1); // Exponential backoff
-
-        console.log(`[SocketService] Attempting to reconnect in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
 
         setTimeout(() => {
             if (this.userId && this.username) {
@@ -502,7 +569,6 @@ export class SocketService {
     }
 
     public async disconnect(userId: string): Promise<void> {
-        console.log(`[SocketService] Disconnecting user ${userId}...`);
 
         try {
             // Stop intervals
@@ -511,13 +577,10 @@ export class SocketService {
 
             // Set status to offline before disconnecting
             await this.authService.setStatus("offline", userId);
-            console.log(`[SocketService] User status set to offline`);
-
             if (this.socket) {
                 // Close socket with normal closure code
                 this.socket.close(1000, "User logout");
                 this.socket = null;
-                console.log(`[SocketService] WebSocket connection closed`);
             }
         } catch (error) {
             console.error("[SocketService] Error during disconnect:", error);
@@ -540,4 +603,43 @@ export class SocketService {
             default: return 'unknown';
         }
     }
+
+    public sendFriendAccepted(targetUsername: string): void {
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+        console.warn("[SocketService] Cannot send friend-accepted: Socket not connected");
+        return;
+    }
+
+    const messageData = {
+        type: 'friend-accepted',
+        targetUsername: targetUsername
+    };
+
+    try {
+        this.socket.send(JSON.stringify(messageData));
+        console.log("[SocketService] Friend accepted message sent:", messageData);
+    } catch (error) {
+        console.error("[SocketService] Error sending friend-accepted message:", error);
+    }
+}
+
+// Send user blocked notification
+public sendUserBlocked(targetUsername: string): void {
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+        console.warn("[SocketService] Cannot send user-blocked: Socket not connected");
+        return;
+    }
+
+    const messageData = {
+        type: 'user-blocked',
+        targetUsername: targetUsername
+    };
+
+    try {
+        this.socket.send(JSON.stringify(messageData));
+        console.log("[SocketService] User blocked message sent:", messageData);
+    } catch (error) {
+        console.error("[SocketService] Error sending user-blocked message:", error);
+    }
+}
 }

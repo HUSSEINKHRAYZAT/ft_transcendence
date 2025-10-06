@@ -12,6 +12,47 @@ export interface RoomInfo {
   isGameStarted: boolean;
 }
 
+export interface ServerTournamentPlayer {
+  id: string;
+  name: string;
+  externalId?: string;
+  isAI?: boolean;
+  aiLevel?: 'easy' | 'medium' | 'hard';
+}
+
+export interface ServerTournamentMatch {
+  id: string;
+  round: number;
+  matchIndex: number;
+  player1?: ServerTournamentPlayer;
+  player2?: ServerTournamentPlayer;
+  status: 'pending' | 'active' | 'completed';
+  winnerId?: string;
+  score1?: number;
+  score2?: number;
+  startedAt?: number;
+  completedAt?: number;
+}
+
+export interface ServerTournamentState {
+  id: string;
+  name: string;
+  size: 4 | 8 | 16;
+  status: 'waiting' | 'active' | 'completed';
+  players: ServerTournamentPlayer[];
+  matches: ServerTournamentMatch[];
+  currentRound: number;
+  createdAt: number;
+  updatedAt: number;
+  createdBy: {
+    id: string;
+    name: string;
+  };
+  isPublic: boolean;
+  allowSpectators: boolean;
+  winner?: ServerTournamentPlayer;
+}
+
 export interface SocketEvents {
   'connected': (data: { playerId: string; playerName: string }) => void;
   'disconnected': () => void;
@@ -36,6 +77,48 @@ export interface SocketEvents {
   // Chat events
   'chat_message': (message: any) => void;
   'system_message': (message: string) => void;
+
+  // Tournament-specific events (old system)
+  'tournament_match_room': (data: {
+    roomId: string;
+    tournamentId: string;
+    matchId: string;
+    match?: any;
+    hostPlayer: { id: string; name: string };
+  }) => void;
+  'tournament_match_room_ack': (data: {
+    status: 'sent' | 'error';
+    opponentExternalId?: string;
+    deliveredTo?: string;
+    reason?: string;
+  }) => void;
+  'tournament_snapshot': (data: { tournaments: ServerTournamentState[] }) => void;
+  'tournament_update': (data: { tournament: ServerTournamentState }) => void;
+  'tournament_created': (data: { tournament: ServerTournamentState }) => void;
+  'tournament_joined': (data: { tournament: ServerTournamentState }) => void;
+  'tournament_started': (data: { tournament: ServerTournamentState }) => void;
+  'tournament_ack': (data: any) => void;
+  'tournament_error': (data: { reason: string }) => void;
+
+  // New tournament system events
+  'tournament_updated': (data: any) => void;
+  'round_started': (data: any) => void;
+  'match_ready': (data: any) => void;
+  'match_completed': (data: any) => void;
+  'round_completed': (data: any) => void;
+  'tournament_completed': (data: any) => void;
+  'player_eliminated': (data: any) => void;
+  'tournament_match_ready': (data: {
+    tournamentId: string;
+    matchId: string;
+    role: 'host' | 'guest';
+    match: ServerTournamentMatch;
+  }) => void;
+  'both_players_ready': (data: {
+    tournamentId: string;
+    matchId: string;
+    players: string[];
+  }) => void;
 }
 
 export class SocketManager {
@@ -44,10 +127,11 @@ export class SocketManager {
   private currentRoom: string | null = null;
   private playerId: string = '';
   private playerName: string = 'Player';
+  private externalId: string | null = null;
   private eventHandlers: Map<keyof SocketEvents, Function[]> = new Map();
   private reconnectAttempts: number = 0;
   private maxReconnectAttempts: number = 3;
-  private reconnectTimer: NodeJS.Timeout | null = null;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
   // WebSocket server URL - dynamically detect protocol and avoid fixed IPs
   private getServerURL(): string {
@@ -68,15 +152,53 @@ export class SocketManager {
   }
 
   private setupEventHandlers(): void {
-    // Initialize event handler storage
-    Object.keys({} as SocketEvents).forEach(event => {
-      this.eventHandlers.set(event as keyof SocketEvents, []);
+    const events: Array<keyof SocketEvents> = [
+      'connected',
+      'disconnected',
+      'error',
+      'room_created',
+      'room_joined',
+      'room_left',
+      'room_updated',
+      'room_state',
+      'player_joined',
+      'player_left',
+      'game_started',
+      'game_ready',
+      'game_state',
+      'game_exit',
+      'player_input',
+      'chat_message',
+      'system_message',
+      'tournament_match_room',
+      'tournament_match_room_ack',
+      'tournament_snapshot',
+      'tournament_update',
+      'tournament_created',
+      'tournament_joined',
+      'tournament_started',
+      'tournament_ack',
+      'tournament_error',
+      'tournament_match_ready'
+    ];
+
+    events.forEach(event => {
+      if (!this.eventHandlers.has(event)) {
+        this.eventHandlers.set(event, []);
+      }
     });
   }
 
-  public async connect(playerName: string = 'Player'): Promise<boolean> {
+  public async connect(playerName: string = 'Player', externalId?: string): Promise<boolean> {
+    if (externalId) {
+      this.externalId = String(externalId);
+    }
+
     if (this.isConnected) {
       console.log('Already connected to WebSocket server');
+      if (playerName && playerName !== this.playerName) {
+        this.playerName = playerName;
+      }
       return true;
     }
 
@@ -102,7 +224,8 @@ export class SocketManager {
 
           // Register player with server
           this.send('register_player', {
-            name: this.playerName
+            name: this.playerName,
+            externalId: this.externalId ?? undefined
           });
 
           this.setupSocketEventListeners();
@@ -225,6 +348,98 @@ export class SocketManager {
         this.emit('system_message', message.message);
         break;
 
+      case 'tournament_match_room':
+        this.emit('tournament_match_room', {
+          roomId: message.roomId,
+          tournamentId: message.tournamentId,
+          matchId: message.matchId,
+          match: message.match,
+          hostPlayer: message.hostPlayer
+        });
+        break;
+
+      case 'tournament_match_room_ack':
+        this.emit('tournament_match_room_ack', message);
+        break;
+
+      case 'tournament_snapshot':
+        this.emit('tournament_snapshot', {
+          tournaments: Array.isArray(message.tournaments) ? message.tournaments : []
+        });
+        break;
+
+      case 'tournament_update':
+        if (message.tournament) {
+          this.emit('tournament_update', { tournament: message.tournament });
+        }
+        break;
+
+      case 'tournament_created':
+        if (message.tournament) {
+          this.emit('tournament_created', { tournament: message.tournament });
+        }
+        break;
+
+      case 'tournament_joined':
+        if (message.tournament) {
+          this.emit('tournament_joined', { tournament: message.tournament });
+        }
+        break;
+
+      case 'tournament_started':
+        if (message.tournament) {
+          this.emit('tournament_started', { tournament: message.tournament });
+        }
+        break;
+
+      case 'tournament_ack':
+        this.emit('tournament_ack', message);
+        break;
+
+      case 'tournament_error':
+        this.emit('tournament_error', { reason: message.reason || 'unknown_error' });
+        break;
+
+      case 'tournament_match_ready':
+        if (message.match && message.tournamentId && message.matchId) {
+          this.emit('tournament_match_ready', {
+            tournamentId: message.tournamentId,
+            matchId: message.matchId,
+            role: message.role === 'host' ? 'host' : 'guest',
+            match: message.match
+          });
+        }
+        break;
+
+      // New tournament system events
+      case 'tournament_updated':
+        this.emit('tournament_updated', message);
+        break;
+
+      case 'round_started':
+        this.emit('round_started', message);
+        break;
+
+      case 'match_ready':
+        this.emit('match_ready', message);
+        break;
+
+      case 'match_completed':
+        this.emit('match_completed', message);
+        break;
+
+      case 'round_completed':
+        this.emit('round_completed', message);
+        break;
+
+      case 'tournament_completed':
+        this.emit('tournament_completed', message);
+        break;
+
+      case 'player_eliminated':
+        this.emit('player_eliminated', message);
+        break;
+
       case 'error':
         console.error('❌ WebSocket error:', message.error);
         this.emit('error', message.error);
@@ -236,7 +451,7 @@ export class SocketManager {
         break;
 
       default:
-        console.warn('Unknown message type:', type, message);
+        console.warn('❌ WebSocket error: Unknown message type:', type);
     }
   }
 
@@ -245,6 +460,10 @@ export class SocketManager {
       const message = { type, ...data };
       this.socket.send(JSON.stringify(message));
     }
+  }
+
+  public sendCommand(type: string, data: Record<string, any> = {}): void {
+    this.send(type, data);
   }
 
   /**
@@ -282,6 +501,31 @@ export class SocketManager {
       this.on('room_created', onRoomCreated);
       this.on('error', onError);
     });
+  }
+
+  public announceTournamentMatchRoom(params: {
+    roomId: string;
+    tournamentId: string;
+    matchId: string;
+    opponentExternalId: string;
+    match?: any;
+    hostName?: string;
+  }): void {
+    if (!this.isConnected || !this.socket) {
+      console.warn('Cannot announce tournament match room without an active connection');
+      return;
+    }
+
+    const payload = {
+      roomId: params.roomId,
+      tournamentId: params.tournamentId,
+      matchId: params.matchId,
+      opponentExternalId: params.opponentExternalId,
+      match: params.match,
+      hostName: params.hostName || this.playerName
+    };
+
+    this.send('tournament_match_room', payload);
   }
 
   /**
@@ -447,6 +691,10 @@ export class SocketManager {
 
   public get name(): string {
     return this.playerName;
+  }
+
+  public get externalPlayerId(): string | null {
+    return this.externalId;
   }
 
   /**

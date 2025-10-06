@@ -3,8 +3,7 @@ import { CameraConfig } from "../game/config/camconfig";
 import { socketManager } from "../services/SocketManager";
 import { ApiClient } from "../api";
 import { overlay } from "../game/ui/overlay";
-import { requireLogin } from "../auth/session";
-import { NotificationBox } from "../components/home/NotificationBox";
+import { FriendInviteModal } from "../components/modals/FriendInviteModal";
 
 export function startLocal2P(currentUser: any, onResolve: (cfg: GameConfig)=>void) {
   const cfg: GameConfig = {
@@ -71,18 +70,18 @@ export async function createSocketIORoom(gameMode: '2p' | '4p', currentUser: any
 
 const nameOv = overlay(`
   <div class="card" style="max-width: 420px; margin: auto; padding: 24px; border-radius: 16px; background: rgba(17, 24, 39, 0.95); box-shadow: 0 8px 20px rgba(0,0,0,0.4);">
-    
+
     <h2 style="font-weight:700; margin-bottom:20px; color:#a3e635; font-size:20px; text-align:center;">
       🎯 Host <span style="color:#facc15;">${gameMode.toUpperCase()}</span> Game
     </h2>
-    
-        <label for="hostPlayerName" 
+
+        <label for="hostPlayerName"
         style="display:block; margin-bottom:8px; color:#e5e7eb; font-size:18px; font-weight:700;">
         🎮 Your player name:
         </label>
 
-    
-    <input 
+
+    <input
       id="hostPlayerName"
       type="text"
       value="${currentUser?.name || ''}"
@@ -90,7 +89,7 @@ const nameOv = overlay(`
       disabled
       style="width:100%; padding:12px; background:rgba(31,41,55,0.6); border:2px solid #374151; border-radius:10px; text-align:center; font-size:16px; color:#9ca3af; cursor:not-allowed;"
     />
-    
+
     <div style="display:flex; gap:12px; margin-top:28px;">
       <button class="btn btn-outline" data-close style="flex:1; padding:12px; border-radius:10px; font-size:15px;">
         Cancel
@@ -133,10 +132,10 @@ const nameOv = overlay(`
       await socketManager.connect(finalPlayerName);
       ov.innerHTML = `<div class="card"><div style="font-weight:700; margin-bottom:8px;">🏠 Creating ${gameMode.toUpperCase()} room…</div><div class="muted">Setting up multiplayer session…</div></div>`;
       const roomId = await socketManager.createRoom(gameMode);
-      if (!roomId) 
+      if (!roomId)
         throw new Error('Failed to create room');
-      
-     
+
+
       ov.innerHTML = `<div class="card">
         <div style="font-weight:700; margin-bottom:16px; color:#84cc16; font-size:18px;">✅ Room Created Successfully!</div>
         <div style="margin-bottom:12px; color:#d1d5db;">Share this room ID with other players:</div>
@@ -152,7 +151,7 @@ const nameOv = overlay(`
 
       const startBtn = ov.querySelector("#start-game-btn") as HTMLButtonElement;
       const inviteBtn = ov.querySelector("#invite-friends-btn") as HTMLButtonElement;
-      
+
       // Track player count to enable/disable start button
       let connectedPlayers = 1; // Host is already connected
       const updateStartButton = () => {
@@ -194,89 +193,30 @@ const nameOv = overlay(`
       };
 
       // Invite friends button handler
-      inviteBtn.onclick = async () => {
-        try {
-          inviteBtn.disabled = true;
-          inviteBtn.textContent = "Loading friends...";
+inviteBtn.onclick = async () => {
+  try {
+    // Disable button while loading
+    inviteBtn.disabled = true;
+    inviteBtn.textContent = "Loading friends...";
 
-          // Get current user's friends list
-          const friendsResponse = await (currentUser?.id ?
-            (window as any).authService.getFriendsList(currentUser.id) : null);
+    const token = localStorage.getItem('ft_pong_token') || '';
+    // Create and show the friend invite modal
+    const friendInviteModal = new FriendInviteModal(token);
+    await friendInviteModal.show(roomId, gameMode, currentUser?.name || finalPlayerName);
 
-          if (!friendsResponse?.success || !friendsResponse.data?.length) {
-            alert("You don't have any friends to invite yet! Add some friends first.");
-            return;
-          }
-
-          const friends = friendsResponse.data.filter((friend: any) => friend.status === 'online');
-
-          if (!friends.length) {
-            alert("No friends are currently online to invite.");
-            return;
-          }
-
-          // Create invite modal
-          const inviteModal = overlay(`<div class="card">
-            <div style="font-weight:700; margin-bottom:16px; color:#3b82f6; font-size:18px;">🎯 Invite Friends to Game</div>
-            <div style="margin-bottom:12px; color:#d1d5db;">Room Code: <span style="color:#84cc16; font-weight:600;">${roomId}</span></div>
-            <div style="margin-bottom:12px; color:#d1d5db;">Select friends to invite:</div>
-            <div style="max-height:200px; overflow-y:auto; margin:16px 0; border:1px solid #374151; border-radius:8px; padding:8px;">
-              ${friends.map((friend: any) => `
-                <label style="display:flex; align-items:center; gap:8px; margin:6px 0; cursor:pointer;">
-                  <input type="checkbox" value="${friend.username}" data-friend-id="${friend.id}">
-                  <div style="color:#84cc16;">●</div>
-                  <span>${friend.username}</span>
-                </label>
-              `).join('')}
-            </div>
-            <div style="display:flex; gap:12px; margin-top:20px;">
-              <button class="btn btn-outline" id="cancel-invite" style="flex:1;">Cancel</button>
-              <button class="btn btn-primary" id="send-invites" style="flex:1;">Send Invites</button>
-            </div>
-          </div>`);
-
-          const cancelBtn = inviteModal.querySelector("#cancel-invite") as HTMLButtonElement;
-          const sendBtn = inviteModal.querySelector("#send-invites") as HTMLButtonElement;
-
-          cancelBtn.onclick = () => inviteModal.remove();
-
-          sendBtn.onclick = () => {
-            const checkboxes = inviteModal.querySelectorAll<HTMLInputElement>('input[type="checkbox"]:checked');
-            const selectedFriends = Array.from(checkboxes).map(cb => ({
-              username: cb.value,
-              id: cb.getAttribute('data-friend-id')
-            }));
-
-            if (selectedFriends.length === 0) {
-              alert("Please select at least one friend to invite!");
-              return;
-            }
-
-            // Send notifications to selected friends
-            selectedFriends.forEach(friend => {
-              // Use the notification system to send game invites
-              if ((window as any).notifyBox) {
-                (window as any).notifyBox.showGameNotification('invite', {
-                  playerName: currentUser?.name || finalPlayerName,
-                  roomCode: roomId,
-                  gameMode,
-                  invitedBy: currentUser?.id
-                });
-              }
-            });
-
-            alert(`Invitations sent to ${selectedFriends.length} friend(s)!`);
-            inviteModal.remove();
-          };
-
-        } catch (error) {
-          console.error('Error inviting friends:', error);
-          alert('Failed to load friends list. Please try again.');
-        } finally {
-          inviteBtn.disabled = false;
-          inviteBtn.textContent = "🎯 Invite Friends";
-        }
-      };
+  } catch (error) {
+    console.error('Error inviting friends:', error);
+    if ((window as any).notifyBox) {
+      (window as any).notifyBox.addNotification('Failed to load friends list. Please try again.', 'error');
+    } else {
+      alert('Failed to load friends list. Please try again.');
+    }
+  } finally {
+    // Re-enable button
+    inviteBtn.disabled = false;
+    inviteBtn.textContent = "🎯 Invite Friends";
+  }
+};
 
       // Initial button state check
       updateStartButton();
@@ -310,19 +250,19 @@ export async function joinSocketIORoom(gameMode: '2p' | '4p', currentUser: any, 
 
 const ov = overlay(`
   <div class="card" style="max-width: 420px; margin: auto; padding: 24px; border-radius: 16px; background: rgba(17, 24, 39, 0.95); box-shadow: 0 8px 20px rgba(0,0,0,0.4);">
-    
+
     <h2 style="font-weight:700; margin-bottom:20px; color:#3b82f6; font-size:20px; text-align:center;">
       🔗 Join <span style="color:#facc15;">${gameMode.toUpperCase()}</span> Room
     </h2>
-    
+
     <p style="margin-bottom:16px; color:#d1d5db; text-align:center; font-size:14px;">
       Enter your room ID below:
     </p>
-    
+
     <label for="guestPlayerName" style="display:block; margin-bottom:6px; color:#e5e7eb; font-size:14px; font-weight:500;">
       Your name
     </label>
-    <input 
+    <input
       id="guestPlayerName"
       type="text"
       value="${currentUser?.name || ''}"
@@ -334,12 +274,12 @@ const ov = overlay(`
     <label for="roomId" style="display:block; margin-bottom:6px; color:#e5e7eb; font-size:14px; font-weight:500;">
       Room ID
     </label>
-    <input 
+    <input
       id="roomId"
       type="text"
       placeholder="ABC123"
       maxlength="6"
-      style="width:100%; padding:12px; background:rgba(31,41,55,0.8); border:2px solid #4b5563; border-radius:10px; text-align:center; font-size:20px; font-weight:600; text-transform:uppercase; letter-spacing:2px; color:#a3e635; font-family:monospace; transition:border-color 0.2s;"
+      style="width:100%; padding:12px; background:rgba(31,41,55,0.8); border:2px solid #4b5563; border-radius:10px; text-align:center; font-size:20px; font-weight:600; text-transform:uppercase; letter-spacing:2px; color:#a3e635; font-family:monospace;"
     />
 
     <div style="display:flex; gap:12px; margin-top:28px;">
@@ -405,407 +345,4 @@ const ov = overlay(`
       </div>`;
     }
   };
-}
-
-export async function joinTournament(onResolveDone?: ()=>void) {
-  // throws if not signed in
-  const { user } = requireLogin(overlay);
-
-  // Check if user can join a tournament
-  const sessionCheck = await ApiClient.checkUserCanJoin('tournament');
-  if (!sessionCheck.canJoin) {
-    overlay(`<div class="card">
-      <div style="font-weight:700; margin-bottom:16px; color:#ef4444; font-size:18px;">⚠️ Cannot Join Tournament</div>
-      <div style="margin-bottom:16px; color:#d1d5db;">${sessionCheck.reason}</div>
-      <div style="margin-top:20px; text-align:right;">
-        <button class="btn btn-primary" data-close>Got it!</button>
-      </div>
-    </div>`);
-    return;
-  }
-
-  const ov = overlay(`<div class="card">
-    <div style="font-weight:700; margin-bottom:16px; color:#7c3aed; font-size:18px;">🎯 Join Tournament</div>
-    <div style="margin-bottom:12px; color:#d1d5db;">Enter the tournament code to join:</div>
-    <div style="margin:16px 0;">
-      <input id="tournamentCode" placeholder="ABC123" style="width:100%; padding:12px; background:rgba(0,0,0,0.4); border:2px solid #374151; border-radius:8px; text-align:center; font-size:20px; font-weight:600; text-transform:uppercase; letter-spacing:2px; color:#84cc16; font-family:monospace;" maxlength="10">
-    </div>
-    <div style="display:flex; gap:12px; margin-top:20px;">
-      <button class="btn btn-outline" data-close style="flex:1;">Cancel</button>
-      <button class="btn btn-primary" id="joinTournBtn" style="flex:1;">Join Tournament</button>
-    </div>
-  </div>`);
-
-  const btn = ov.querySelector("#joinTournBtn") as HTMLButtonElement;
-  const inp = ov.querySelector("#tournamentCode") as HTMLInputElement;
-
-  btn.onclick = async () => {
-    btn.disabled = true;
-    const code = inp.value.trim().toUpperCase();
-
-    if (!code) {
-      alert("Please enter a tournament code.");
-      btn.disabled = false;
-      return;
-    }
-
-    try {
-      ov.innerHTML = `<div class="card">
-        <div style="font-weight:700; margin-bottom:8px;">🔍 Looking for tournament...</div>
-        <div class="muted">Checking tournament code: ${code}</div>
-      </div>`;
-
-      // Use the tournament service for reliable tournament joining
-      const { tournamentService } = await import('../tournament/TournamentService');
-      const tournamentInfo = await tournamentService.joinTournament({
-        tournamentId: code,
-        playerId: String(user?.id || 'default-user'),
-        playerName: user?.name || 'Player'
-      });
-      
-      ov.innerHTML = `<div class="card">
-        <div style="font-weight:700; margin-bottom:16px; color:#10b981; font-size:18px;">✅ Tournament Joined Successfully!</div>
-        
-        <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 8px; padding: 16px; margin-bottom: 20px;">
-          <div style="font-weight: 600; margin-bottom: 8px;">Tournament Details:</div>
-          <div style="color: #d1d5db; margin-bottom: 4px;">📋 Tournament: ${tournamentInfo.name || code}</div>
-          <div style="color: #d1d5db; margin-bottom: 4px;">👥 Players: ${tournamentInfo.players.length}/${tournamentInfo.size}</div>
-          <div style="color: #d1d5db;">⏱️ Status: ${tournamentInfo.status || 'Waiting for players'}</div>
-        </div>
-
-        <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 8px; padding: 12px; margin-bottom: 16px;">
-          <div style="font-size: 14px; color: #3b82f6;">
-            <strong>📋 What's Next:</strong><br>
-            • Wait for all players to join<br>
-            • Tournament organizer will start matches<br>
-            • You'll be notified when your match begins<br>
-            • Good luck! 🍀
-          </div>
-        </div>
-
-        <div style="display:flex; gap:12px; margin-top:20px;">
-          <button class="btn btn-primary" data-close style="flex:1;">Got it!</button>
-        </div>
-      </div>`;
-
-      onResolveDone?.();
-    } catch (e: any) {
-      ov.innerHTML = `<div class="card">
-        <div style="font-weight:700; margin-bottom:8px;">❌ Join Failed</div>
-        <div class="muted">${e?.message || "Could not join tournament. Please check the code and try again."}</div>
-        <div style="margin-top:10px; text-align:right;">
-          <button class="btn btn-outline" onclick="location.reload()">Try Again</button>
-          <button class="btn" data-close style="margin-left: 8px;">Close</button>
-        </div>
-      </div>`;
-    }
-  };
-
-  // Allow Enter key to join
-  inp.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-      btn.click();
-    }
-  });
-}
-
-export async function createTournament(onResolveDone?: ()=>void) {
-  // throws if not signed in
-  const { user } = requireLogin(overlay);
-
-  // Check if user can create a tournament
-  const sessionCheck = await ApiClient.checkUserCanJoin('tournament');
-  if (!sessionCheck.canJoin) {
-    overlay(`<div class="card">
-      <div style="font-weight:700; margin-bottom:16px; color:#ef4444; font-size:18px;">⚠️ Cannot Create Tournament</div>
-      <div style="margin-bottom:16px; color:#d1d5db;">${sessionCheck.reason}</div>
-      <div style="margin-top:20px; text-align:right;">
-        <button class="btn btn-primary" data-close>Got it!</button>
-      </div>
-    </div>`);
-    return;
-  }
-
-  const sizeSel = document.querySelector<HTMLSelectElement>("#tSize");
-  const size = parseInt(sizeSel?.value ?? "8", 10) as 4 | 8 | 16;
-
-  // Tournament creation wizard similar to host2p
-  const nameOv = overlay(`
-    <div class="card" style="max-width: 420px; margin: auto; padding: 24px; border-radius: 16px; background: rgba(17, 24, 39, 0.95); box-shadow: 0 8px 20px rgba(0,0,0,0.4);">
-      
-      <h2 style="font-weight:700; margin-bottom:20px; color:#7c3aed; font-size:20px; text-align:center;">
-        🏆 Create <span style="color:#facc15;">${size}-Player</span> Tournament
-      </h2>
-      
-      <label for="tournamentName" 
-      style="display:block; margin-bottom:8px; color:#e5e7eb; font-size:18px; font-weight:700;">
-      🎯 Tournament name:
-      </label>
-      
-      <input 
-        id="tournamentName"
-        type="text"
-        value="${user?.name || 'Player'}'s Tournament"
-        maxlength="30"
-        style="width:100%; padding:12px; background:rgba(31,41,55,0.8); border:2px solid #4b5563; border-radius:10px; text-align:center; font-size:16px; color:#e5e7eb;"
-      />
-      
-      <div style="margin: 16px 0; padding: 12px; background: rgba(124, 58, 237, 0.1); border: 1px solid rgba(124, 58, 237, 0.3); border-radius: 8px;">
-        <div style="font-size: 14px; color: #a855f7;">
-          <strong>📋 Tournament Settings:</strong><br>
-          • ${size} players maximum<br>
-          • Single elimination bracket<br>
-          • AI bots fill empty slots<br>
-          • Get a code to share with players
-        </div>
-      </div>
-      
-      <div style="display:flex; gap:12px; margin-top:28px;">
-        <button class="btn btn-outline" data-close style="flex:1; padding:12px; border-radius:10px; font-size:15px;">
-          Cancel
-        </button>
-        <button class="btn btn-primary" id="createTournamentBtn" style="flex:1; padding:12px; border-radius:10px; font-size:15px;">
-          Create Tournament
-        </button>
-      </div>
-    </div>
-  `);
-
-  const createBtn = nameOv.querySelector("#createTournamentBtn") as HTMLButtonElement;
-  const nameInput = nameOv.querySelector("#tournamentName") as HTMLInputElement;
-
-  createBtn.onclick = async () => {
-    const tournamentName = (nameInput.value.trim() || `${user?.name || 'Player'}'s Tournament`).slice(0, 30);
-    nameOv.remove();
-
-    const ov = overlay(`<div class="card">
-      <div style="font-weight:700; margin-bottom:8px;">🏆 Creating tournament...</div>
-      <div class="muted">Setting up ${size}-player tournament bracket...</div>
-    </div>`);
-
-    try {
-      // Use the tournament service for reliable tournament creation
-      const { tournamentService } = await import('../tournament/TournamentService');
-      
-      const tournament = await tournamentService.createTournament({
-        name: tournamentName,
-        size: size,
-        isPublic: true,
-        allowSpectators: true
-      });
-      
-      // Extract code and tournamentId for compatibility
-      const code = tournament.tournamentId;
-      const tournamentId = tournament.tournamentId;
-      
-      ov.innerHTML = `<div class="card" style="max-width: 900px; width: 90vw;">
-        <div style="font-weight:700; margin-bottom:16px; color:#84cc16; font-size:24px; text-align:center;">🏆 Tournament Created Successfully!</div>
-        
-        <div style="background: rgba(132, 204, 22, 0.1); border: 1px solid rgba(132, 204, 22, 0.3); border-radius: 8px; padding: 16px; margin-bottom: 20px; text-align: center;">
-          <div style="font-weight: 600; margin-bottom: 8px;">Tournament Code:</div>
-          <div style="font-size: 28px; font-weight: 800; color: #84cc16; font-family: monospace; letter-spacing: 2px;">${code}</div>
-          <div style="color: #9ca3af; margin-top: 8px; font-size: 14px;">Share this code with all participants</div>
-        </div>
-
-        <div style="background: rgba(124, 58, 237, 0.1); border: 1px solid rgba(124, 58, 237, 0.3); border-radius: 8px; padding: 16px; margin-bottom: 20px;">
-          <div style="font-weight: 600; margin-bottom: 8px; color: #a855f7;">Tournament: ${tournamentName}</div>
-          <div id="tournament-status" style="color: #d1d5db; margin-bottom: 4px;">👥 Players: 1/${size} (You joined automatically)</div>
-          <div style="color: #d1d5db;">⏱️ Status: Waiting for players to join</div>
-        </div>
-
-        <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 8px; padding: 12px; margin-bottom: 16px;">
-          <div style="font-size: 14px; color: #3b82f6;">
-            <strong>📋 How it works:</strong><br>
-            • Share the code above with ${size-1} other players<br>
-            • Players use "Join Tournament" to enter with the code<br>
-            • AI bots will fill any remaining empty slots<br>
-            • Start the tournament when you're ready!<br>
-          </div>
-        </div>
-
-        <div style="display:flex; gap:12px; margin-top:20px;">
-          <button class="btn btn-outline" data-close style="flex:1;">Close</button>
-          <button class="btn btn-secondary" id="invite-players-btn" style="flex:1;">🎯 Invite Players</button>
-          <button class="btn btn-primary" id="start-tournament" style="flex:1; opacity:0.6;" disabled>Start Tournament</button>
-        </div>
-      </div>`;
-
-      // Handle invite players button
-      const inviteBtn = ov.querySelector("#invite-players-btn") as HTMLButtonElement;
-      const startBtn = ov.querySelector("#start-tournament") as HTMLButtonElement;
-      
-      let currentPlayers = 1; // Start with organizer
-      
-      const updateStatus = () => {
-        const statusDiv = ov.querySelector("#tournament-status");
-        if (statusDiv) {
-          statusDiv.textContent = `👥 Players: ${currentPlayers}/${size} ${currentPlayers === 1 ? '(You joined automatically)' : ''}`;
-        }
-        
-        // Enable start button when we have at least 4 players or allow starting with fewer
-        if (currentPlayers >= Math.min(4, size)) {
-          startBtn.disabled = false;
-          startBtn.style.opacity = '1';
-        }
-      };
-
-      inviteBtn.onclick = async () => {
-        try {
-          inviteBtn.disabled = true;
-          inviteBtn.textContent = "Loading friends...";
-
-          // Get current user's friends list
-          const friendsResponse = await (user?.id ?
-            (window as any).authService?.getFriendsList(user.id) : null);
-
-          if (!friendsResponse?.success || !friendsResponse.data?.length) {
-            alert("You don't have any friends to invite yet! Share the tournament code manually or add some friends first.");
-            return;
-          }
-
-          const friends = friendsResponse.data.filter((friend: any) => friend.status === 'online');
-
-          if (!friends.length) {
-            alert("No friends are currently online to invite. Share the tournament code manually!");
-            return;
-          }
-
-          // Create invite modal
-          const inviteModal = overlay(`<div class="card">
-            <div style="font-weight:700; margin-bottom:16px; color:#7c3aed; font-size:18px;">🎯 Invite Friends to Tournament</div>
-            <div style="margin-bottom:12px; color:#d1d5db;">Tournament Code: <span style="color:#84cc16; font-weight:600;">${code}</span></div>
-            <div style="margin-bottom:12px; color:#d1d5db;">Select friends to invite:</div>
-            <div style="max-height:200px; overflow-y:auto; margin:16px 0; border:1px solid #374151; border-radius:8px; padding:8px;">
-              ${friends.map((friend: any) => `
-                <label style="display:flex; align-items:center; gap:8px; margin:6px 0; cursor:pointer;">
-                  <input type="checkbox" value="${friend.username}" data-friend-id="${friend.id}">
-                  <div style="color:#84cc16;">●</div>
-                  <span>${friend.username}</span>
-                </label>
-              `).join('')}
-            </div>
-            <div style="display:flex; gap:12px; margin-top:20px;">
-              <button class="btn btn-outline" id="cancel-invite" style="flex:1;">Cancel</button>
-              <button class="btn btn-primary" id="send-invites" style="flex:1;">Send Invites</button>
-            </div>
-          </div>`);
-
-          const cancelBtn = inviteModal.querySelector("#cancel-invite") as HTMLButtonElement;
-          const sendBtn = inviteModal.querySelector("#send-invites") as HTMLButtonElement;
-
-          cancelBtn.onclick = () => inviteModal.remove();
-
-          sendBtn.onclick = () => {
-            const checkboxes = inviteModal.querySelectorAll<HTMLInputElement>('input[type="checkbox"]:checked');
-            const selectedFriends = Array.from(checkboxes).map(cb => ({
-              username: cb.value,
-              id: cb.getAttribute('data-friend-id')
-            }));
-
-            if (selectedFriends.length === 0) {
-              alert("Please select at least one friend to invite!");
-              return;
-            }
-
-            // Send tournament invites
-            selectedFriends.forEach(friend => {
-              if ((window as any).notifyBox) {
-                (window as any).notifyBox.showTournamentNotification('invite', {
-                  organizerName: user?.name || 'A player',
-                  tournamentName,
-                  tournamentCode: code,
-                  maxPlayers: size,
-                  invitedBy: user?.id
-                });
-              }
-            });
-
-            alert(`Tournament invitations sent to ${selectedFriends.length} friend(s)!`);
-            inviteModal.remove();
-          };
-
-        } catch (error) {
-          console.error('Error inviting friends:', error);
-          alert('Failed to load friends list. Please share the tournament code manually.');
-        } finally {
-          inviteBtn.disabled = false;
-          inviteBtn.textContent = "🎯 Invite Players";
-        }
-      };
-
-      // Handle start tournament button
-      startBtn.onclick = async () => {
-        try {
-          startBtn.disabled = true;
-          startBtn.textContent = "Starting...";
-          
-          // Start the tournament (this will fill empty slots with AI)
-          await ApiClient.startTournament(tournamentId);
-          
-          ov.remove();
-          alert(`Tournament "${tournamentName}" has been started! AI bots have filled any empty slots. Players will be notified when matches begin.`);
-          
-          // Optionally open tournament hub to manage the tournament
-          openTournamentHub();
-          
-        } catch (error: any) {
-          alert(`Failed to start tournament: ${error?.message || 'Unknown error'}`);
-          startBtn.disabled = false;
-          startBtn.textContent = "Start Tournament";
-        }
-      };
-
-      // Initial status update
-      updateStatus();
-
-      onResolveDone?.();
-    } catch (e: any) {
-      ov.innerHTML = `<div class="card">
-        <div style="font-weight:700; margin-bottom:8px;">❌ Couldn't create tournament</div>
-        <div class="muted">${e?.message || "Please try again."}</div>
-        <div style="margin-top:10px; text-align:right;"><button class="btn" data-close>Close</button></div>
-      </div>`;
-    }
-  };
-}
-
-// === Tournament Hub ===
-export async function openTournamentHub() {
-  // throws if not signed in
-  const { user } = requireLogin(overlay);
-  
-  const ov = overlay(`
-    <div class="card" style="max-width: 1200px; width: 95vw; height: 80vh; padding: 0; overflow: hidden;">
-      <div id="tournament-hub-container" style="width: 100%; height: 100%;"></div>
-    </div>
-  `);
-
-  try {
-    // Dynamically import the TournamentUI
-    const { TournamentUI } = await import('../tournament/TournamentUI');
-    const hubContainer = ov.querySelector('#tournament-hub-container') as HTMLElement;
-    
-    if (hubContainer) {
-      const tournamentUI = new TournamentUI(hubContainer);
-      await tournamentUI.show();
-      
-      // Clean up when overlay is closed
-      const originalRemove = ov.remove.bind(ov);
-      ov.remove = () => {
-        tournamentUI.destroy();
-        originalRemove();
-      };
-    }
-  } catch (error) {
-    console.error('Failed to load tournament hub:', error);
-    ov.innerHTML = `
-      <div class="card">
-        <div style="font-weight:700; margin-bottom:16px; color:#ef4444; font-size:18px;">⚠️ Tournament System Unavailable</div>
-        <div style="margin-bottom:16px; color:#d1d5db;">The tournament system is currently unavailable. Please try again later.</div>
-        <div style="margin-top:20px; text-align:right;">
-          <button class="btn btn-primary" data-close>Close</button>
-        </div>
-      </div>
-    `;
-  }
 }

@@ -126,17 +126,12 @@ export class ToastMessageModal extends BaseModal {
             const text = data.text;
             const messageId = data.id || `${from}_${text}_${Date.now()}`;
 
-            console.log(`[SocketService] Received message from ${from}: ${text}`);
-            console.log(`[SocketService] Raw message data:`, JSON.stringify(data, null, 2));
-
             if (!from || !text) {
-                console.error('[SocketService] Invalid message data received:', data);
                 return;
             }
 
             // Check if we've already processed this message
             if (this.processedMessages.has(messageId)) {
-                console.log('[SocketService] Duplicate message detected, ignoring:', messageId);
                 return;
             }
 
@@ -152,8 +147,6 @@ export class ToastMessageModal extends BaseModal {
             // Show toast notification for received messages
             this.showToast('info', 'New Message', `${from}: ${text.substring(0, 50)}${text.length > 50 ? '...' : ''}`);
 
-            // Emit event for any open chat modals to handle
-            console.log('[SocketService] Dispatching direct-message-received event');
             window.dispatchEvent(new CustomEvent('direct-message-received', {
                 detail: {
                     from: from,
@@ -162,14 +155,12 @@ export class ToastMessageModal extends BaseModal {
                     messageId: messageId
                 }
             }));
-            console.log('[SocketService] Event dispatched successfully');
     }
 
     private handleDirectMessageSent(event: Event): void {
         const customEvent = event as CustomEvent;
         const { to, text, timestamp } = customEvent.detail;
 
-        console.log(`Message sent to ${to}: ${text}`);
 
         // If this is a targeted modal and message is not to target user, ignore
         if (this.targetUser && to !== this.targetUser) {
@@ -285,7 +276,6 @@ export class ToastMessageModal extends BaseModal {
         }
 
         try {
-            console.log(`Sending message to ${this.targetUser}: ${messageText}`);
 
             // Get current user info
             const userData = localStorage.getItem('ft_pong_user_data');
@@ -454,7 +444,6 @@ export class ToastMessageModal extends BaseModal {
         this.messages = [];
         this.isModalOpen = false;
 
-        console.log(`ToastMessageModal destroyed for user: ${this.targetUser || 'general'}`);
 
         // Call parent destroy
         super.destroy();

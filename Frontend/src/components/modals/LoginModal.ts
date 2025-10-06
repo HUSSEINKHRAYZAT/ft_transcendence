@@ -287,8 +287,6 @@ export class LoginModal extends BaseModal {
 				password: password
 			});
 
-			console.log('🔐 Retry login result:', result);
-
 			if (result.success && result.user && result.token) {
 				console.log('✅ Login successful after verification!');
 				console.log('🎫 JWT Token stored:', result.token);

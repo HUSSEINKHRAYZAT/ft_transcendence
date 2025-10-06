@@ -173,7 +173,13 @@ export class VerifyModal extends BaseModal {
   private async generateAndSendCode(): Promise<void> {
     try {
       this.currentCode = this.generateRandomCode();
-      console.log(`📢 Generated ${this.is2FA ? '2FA' : 'verification'} code:`, this.currentCode);
+
+      console.log('✉️ ========================================');
+      console.log('✉️ EMAIL VERIFICATION - CODE GENERATED');
+      console.log('✉️ Email:', this.userEmail);
+      console.log('✉️ CODE:', this.currentCode);
+      console.log('✉️ Is 2FA:', this.is2FA);
+      console.log('✉️ ========================================');
 
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(this.userEmail)) {

@@ -1,39 +1,14 @@
-export interface TournamentPlayer {
-  id: string;
-  name: string;
-  isOnline: boolean;
-}
-
-export interface TournamentMatch {
-  id: string;
-  round: number;
-  matchIndex: number;
-  player1?: TournamentPlayer;
-  player2?: TournamentPlayer;
-  winner?: TournamentPlayer;
-  score1?: number;
-  score2?: number;
-  isComplete: boolean;
-  nextMatchId?: string;
-}
-
-export interface TournamentBracketData {
-  tournamentId: string;
-  size: 8 | 16;
-  players: TournamentPlayer[];
-  matches: TournamentMatch[];
-  currentRound: number;
-  isComplete: boolean;
-  winner?: TournamentPlayer;
-}
+import { TournamentBracketData, TournamentMatch, TournamentPlayer } from '../../tournament/TournamentBracket';
 
 export class TournamentBracket {
   private container: HTMLElement;
   private data: TournamentBracketData;
+  private currentUserId: string | null = null;
 
   constructor(container: HTMLElement, data: TournamentBracketData) {
     this.container = container;
     this.data = data;
+    this.resolveCurrentUser();
     this.render();
   }
 
@@ -50,7 +25,8 @@ export class TournamentBracket {
     bracketDiv.innerHTML = this.generateBracketHTML();
     
     this.container.appendChild(bracketDiv);
-    this.addEventListeners();
+    // this.addEventListeners(); // TODO: Implement event listeners
+    this.checkForActiveMatch();
   }
 
   private generateBracketHTML(): string {
@@ -330,17 +306,97 @@ export class TournamentBracket {
     `;
   }
 
-  private addEventListeners() {
-    // Add click handlers for match cards if needed
-    const matchCards = this.container.querySelectorAll('.match-card');
-    matchCards.forEach(card => {
-      card.addEventListener('click', (e) => {
-        const matchId = (e.currentTarget as HTMLElement).dataset.matchId;
-        if (matchId) {
-          this.onMatchClick(matchId);
+  private resolveCurrentUser(): void {
+    try {
+      // Try to get user from auth service or session storage
+      const authService = (window as any).authService;
+      if (authService && authService.getUser) {
+        const user = authService.getUser();
+        if (user) {
+          this.currentUserId = user.id || user.email;
         }
-      });
-    });
+      }
+      
+      // Fallback to session storage
+      if (!this.currentUserId) {
+        const cachedUser = sessionStorage.getItem('ft_pong_current_user');
+        if (cachedUser) {
+          try {
+            const parsed = JSON.parse(cachedUser);
+            this.currentUserId = parsed.id;
+          } catch (e) {
+            // Ignore parse errors
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to resolve current user for tournament bracket:', error);
+    }
+  }
+
+  private checkForActiveMatch(): void {
+    if (!this.currentUserId) return;
+    
+    // Find active matches that include the current user
+    const activeMatch = this.data.matches.find(match => 
+      match.round === this.data.currentRound && 
+      !match.isComplete &&
+      ((match.player1?.id === this.currentUserId) || (match.player2?.id === this.currentUserId))
+    );
+    
+    if (activeMatch) {
+      console.log('🏆 Found active match for current user:', activeMatch);
+      this.startMatchForCurrentUser(activeMatch);
+    }
+  }
+
+  private async startMatchForCurrentUser(match: TournamentMatch): Promise<void> {
+    try {
+      console.log('🏆 Auto-starting tournament match:', match);
+      
+      // Import the tournament match service
+      const { TournamentMatchService } = await import('../../tournament/TournamentMatchService');
+      const matchService = TournamentMatchService.getInstance();
+      
+      // Get current user info
+      const authService = (window as any).authService;
+      const currentUser = authService?.getUser?.();
+      if (!currentUser) return;
+      
+      const currentPlayer = {
+        id: currentUser.id || currentUser.email,
+        name: currentUser.userName || currentUser.firstName || currentUser.email,
+        isOnline: true,
+        isAI: false
+      };
+      
+      // Start the match
+      await matchService.startTournamentMatch(
+        this.data,
+        match,
+        currentPlayer,
+        async (gameConfig) => {
+          console.log('🏆 Starting tournament game:', gameConfig);
+          
+          // Clear the tournament bracket UI
+          const jumbotron = document.getElementById('jumbotron');
+          if (jumbotron) {
+            jumbotron.innerHTML = `
+              <div class="min-h-screen bg-black relative">
+                <canvas id="gameCanvas" class="w-full h-full block"></canvas>
+              </div>
+            `;
+          }
+          
+          // Start the game
+          const { Pong3D } = await import('../../game/core/Pong3D');
+          const gameInstance = new Pong3D(gameConfig);
+          (window as any).currentGameInstance = gameInstance;
+        }
+      );
+    } catch (error) {
+      console.error('Failed to auto-start tournament match:', error);
+    }
   }
 
   private onMatchClick(matchId: string) {
@@ -369,7 +425,8 @@ export class TournamentBracket {
         matchIndex: i,
         player1,
         player2,
-        isComplete: false
+        isComplete: false,
+        isActive: false
       });
     }
     
@@ -382,18 +439,25 @@ export class TournamentBracket {
           id: `round${round}-match${i}`,
           round,
           matchIndex: i,
-          isComplete: false
+          isComplete: false,
+          isActive: false
         });
       }
     }
     
     return {
       tournamentId,
+      name: 'Test Tournament',
       size,
       players: shuffledPlayers,
       matches,
       currentRound: 1,
-      isComplete: false
+      isComplete: false,
+      status: 'active' as any,
+      createdAt: new Date(),
+      createdBy: 'test',
+      isPublic: true,
+      allowSpectators: false
     };
   }
 }

@@ -141,7 +141,8 @@ export function relationService(app: FastifyInstance) {
         `SELECT
           u.id AS id,
           u.username AS username,
-          u.status AS status
+          u.status AS status,
+          u.profilePath AS profilePath
         FROM user_relation ur
         JOIN user_relation_type rt ON rt.id = ur.typeId
         JOIN users u ON u.id = CASE
@@ -152,7 +153,7 @@ export function relationService(app: FastifyInstance) {
           AND (ur.userOneId = @uid OR ur.userTwoId = @uid)
         ORDER BY u.username`
       )
-      .all({ uid: userId }) as Array<{ id: number; username: string; status: string }>;
+      .all({ uid: userId }) as Array<{ id: number; username: string; status: string; profilePath: string}>;
   }
 
   function listBlocked(userId: number)
@@ -162,7 +163,8 @@ export function relationService(app: FastifyInstance) {
         `SELECT
           u.id AS id,
           u.username AS username,
-          u.status AS status
+          u.status AS status,
+          u.profilePath AS profilePath
         FROM user_relation ur
         JOIN user_relation_type rt ON rt.id = ur.typeId
         JOIN users u ON u.id = CASE
@@ -173,13 +175,13 @@ export function relationService(app: FastifyInstance) {
           AND (ur.userOneId = @uid OR ur.userTwoId = @uid)
         ORDER BY u.username`
       )
-      .all({ uid: userId }) as Array<{ id: number; username: string; status: string }>;
+      .all({ uid: userId }) as Array<{ id: number; username: string; status: string; profilePath: string }>;
   }
   function listRequests(userId: number) {
 
     const data = db
       .prepare(
-        `SELECT userOneId AS id, u.username AS username
+        `SELECT userOneId AS id, u.username AS username, u.profilePath AS profilePath
          FROM user_relation ur
          JOIN user_relation_type rt ON rt.id = ur.typeId
          JOIN users u ON u.id = ur.userOneId

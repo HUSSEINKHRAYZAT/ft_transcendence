@@ -27,10 +27,68 @@ CREATE TABLE statistics (
 ); 
 CREATE INDEX idx_statistics_userId ON statistics(userId); 
 CREATE TABLE tournament ( 
-	id INTEGER PRIMARY KEY, name TEXT NOT NULL, 
+	id INTEGER PRIMARY KEY, 
+	tournamentId TEXT NOT NULL UNIQUE,
+	name TEXT NOT NULL, 
+	size INTEGER NOT NULL CHECK (size > 1),
 	nbOfPlayers INTEGER NOT NULL CHECK (nbOfPlayers > 1), 
-	createdAt TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')) 
+	status TEXT NOT NULL DEFAULT 'waiting' CHECK (status IN ('waiting', 'active', 'completed')),
+	createdBy INTEGER NOT NULL,
+	isPublic INTEGER NOT NULL DEFAULT 1,
+	allowSpectators INTEGER NOT NULL DEFAULT 1,
+	currentRound INTEGER NOT NULL DEFAULT 0,
+	winnerId INTEGER,
+	createdAt TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+	updatedAt TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+	FOREIGN KEY (createdBy) REFERENCES users(id) ON DELETE CASCADE,
+	FOREIGN KEY (winnerId) REFERENCES users(id) ON DELETE SET NULL
 ); 
+CREATE INDEX idx_tournament_tournamentId ON tournament(tournamentId);
+CREATE INDEX idx_tournament_status ON tournament(status);
+CREATE INDEX idx_tournament_createdBy ON tournament(createdBy);
+
+CREATE TABLE tournament_players (
+	id INTEGER PRIMARY KEY,
+	tournamentId INTEGER NOT NULL,
+	playerId INTEGER NOT NULL,
+	playerName TEXT NOT NULL,
+	playerIndex INTEGER NOT NULL,
+	isOnline INTEGER NOT NULL DEFAULT 1,
+	isAI INTEGER NOT NULL DEFAULT 0,
+	isEliminated INTEGER NOT NULL DEFAULT 0,
+	joinedAt TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+	UNIQUE (tournamentId, playerId),
+	UNIQUE (tournamentId, playerIndex),
+	FOREIGN KEY (tournamentId) REFERENCES tournament(id) ON DELETE CASCADE,
+	FOREIGN KEY (playerId) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE INDEX idx_tp_tournamentId ON tournament_players(tournamentId);
+CREATE INDEX idx_tp_playerId ON tournament_players(playerId);
+
+CREATE TABLE tournament_matches (
+	id INTEGER PRIMARY KEY,
+	tournamentId INTEGER NOT NULL,
+	matchId TEXT NOT NULL,
+	round INTEGER NOT NULL,
+	matchIndex INTEGER NOT NULL,
+	player1Id INTEGER,
+	player2Id INTEGER,
+	player1Score INTEGER DEFAULT 0,
+	player2Score INTEGER DEFAULT 0,
+	winnerId INTEGER,
+	status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'active', 'completed')),
+	gameId INTEGER,
+	startedAt TEXT,
+	completedAt TEXT,
+	UNIQUE (tournamentId, matchId),
+	FOREIGN KEY (tournamentId) REFERENCES tournament(id) ON DELETE CASCADE,
+	FOREIGN KEY (player1Id) REFERENCES users(id) ON DELETE SET NULL,
+	FOREIGN KEY (player2Id) REFERENCES users(id) ON DELETE SET NULL,
+	FOREIGN KEY (winnerId) REFERENCES users(id) ON DELETE SET NULL,
+	FOREIGN KEY (gameId) REFERENCES game(id) ON DELETE SET NULL
+);
+CREATE INDEX idx_tm_tournamentId ON tournament_matches(tournamentId);
+CREATE INDEX idx_tm_status ON tournament_matches(status); 
 CREATE TABLE game ( 
 	id INTEGER PRIMARY KEY, 
 	tournamentId INTEGER, 

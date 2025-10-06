@@ -27,7 +27,6 @@ export class ProfileModal extends BaseModal {
 			const user = authService.getUser();
 
 			const userDataFromStorage = localStorage.getItem('ft_pong_user_data');
-			console.log('🔍 DEBUG localStorage user data:', userDataFromStorage);
 
 			const authState = authService.getState();
 
@@ -43,7 +42,6 @@ export class ProfileModal extends BaseModal {
 			}
 
 			const currentAvatar = user.profilePath;
-			console.log('🔍 DEBUG Final currentAvatar value:', currentAvatar);
 
 			const is2FAEnabled = user.enable2fa === true || user.enable2fa === 1;
 
@@ -111,6 +109,7 @@ export class ProfileModal extends BaseModal {
 											value="${user.userName || ''}"
 											class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:border-lime-500 focus:ring-1 focus:ring-lime-500 transition-colors duration-300"
 											placeholder="${t('Enter username')}">
+									<p class="mt-1 text-xs text-gray-400">${t('Username must contain at least one digit (0-9)')}</p>
 							</div>
 
 							<div>
@@ -222,114 +221,133 @@ export class ProfileModal extends BaseModal {
 		}
 	}
 
-	private async handleProfileUpdate(event: Event): Promise<void> {
-	event.preventDefault();
+private async handleProfileUpdate(event: Event): Promise<void> {
+    event.preventDefault();
 
-	const firstNameInput = findElement('#profile-firstName') as HTMLInputElement;
-	const lastNameInput = findElement('#profile-lastName') as HTMLInputElement;
-	const usernameInput = findElement('#profile-username') as HTMLInputElement;
-	const emailInput = findElement('#profile-email') as HTMLInputElement;
-	const enable2faInput = findElement('#profile-enable2fa') as HTMLInputElement;
-	const saveBtn = findElement('#save-profile-btn') as HTMLButtonElement;
-	const errorDiv = findElement('#profile-error') as HTMLElement;
-	const successDiv = findElement('#profile-success') as HTMLElement;
+    const firstNameInput = findElement('#profile-firstName') as HTMLInputElement;
+    const lastNameInput = findElement('#profile-lastName') as HTMLInputElement;
+    const usernameInput = findElement('#profile-username') as HTMLInputElement;
+    const emailInput = findElement('#profile-email') as HTMLInputElement;
+    const enable2faInput = findElement('#profile-enable2fa') as HTMLInputElement;
+    const saveBtn = findElement('#save-profile-btn') as HTMLButtonElement;
+    const errorDiv = findElement('#profile-error') as HTMLElement;
+    const successDiv = findElement('#profile-success') as HTMLElement;
 
-	if (!firstNameInput || !lastNameInput || !usernameInput || !emailInput || !enable2faInput || !saveBtn) {
-		console.error('❌ Required form elements not found');
-		return;
-	}
+    if (!firstNameInput || !lastNameInput || !usernameInput || !emailInput || !enable2faInput || !saveBtn) {
+        console.error('❌ Required form elements not found');
+        return;
+    }
 
-	const selectedAvatarOption = document.querySelector('.avatar-option.selected');
-	const selectedAvatar = selectedAvatarOption?.getAttribute('data-avatar') || null;
+    const selectedAvatarOption = document.querySelector('.avatar-option.selected');
+    const selectedAvatar = selectedAvatarOption?.getAttribute('data-avatar') || null;
 
-	const updateData = {
-		firstName: firstNameInput.value.trim(),
-		lastName: lastNameInput.value.trim(),
-		userName: usernameInput.value.trim(),
-		email: emailInput.value.trim(),
-		profilePath: selectedAvatar,
-		enable2fa: enable2faInput.checked
-	};
+    // Get the current user to compare avatar changes
+    const currentUser = authService.getUser();
+    const currentAvatar = currentUser?.profilePath || null;
 
-	errorDiv?.classList.add('hidden');
-	successDiv?.classList.add('hidden');
+    const updateData = {
+        firstName: firstNameInput.value.trim(),
+        lastName: lastNameInput.value.trim(),
+        userName: usernameInput.value.trim(),
+        email: emailInput.value.trim(),
+        profilePath: selectedAvatar,
+        enable2fa: enable2faInput.checked
+    };
 
-	if (!updateData.firstName || !updateData.lastName || !updateData.userName || !updateData.email) {
-		this.showProfileError('Please fill in all required fields');
-		return;
-	}
+    errorDiv?.classList.add('hidden');
+    successDiv?.classList.add('hidden');
 
-	if (!this.isValidEmail(updateData.email)) {
-		this.showProfileError('Please enter a valid email address');
-		return;
-	}
+    // Validate required fields
+    if (!updateData.firstName || !updateData.lastName || !updateData.userName || !updateData.email) {
+        this.showProfileError('Please fill in all required fields');
+        return;
+    }
 
-	saveBtn.disabled = true;
-	saveBtn.textContent = t('Saving...');
+    // Validate username contains at least one digit
+    if (!this.hasDigit(updateData.userName)) {
+        this.showProfileError('Username must contain at least one digit (0-9)');
+        return;
+    }
 
-	try {
-		console.log('💾 Updating profile with data:', updateData);
+    // Validate email format
+    if (!this.isValidEmail(updateData.email)) {
+        this.showProfileError('Please enter a valid email address');
+        return;
+    }
 
-		const result = await authService.updateProfile(updateData);
-		console.log('🔍 DEBUG Profile update result:', result);
+    saveBtn.disabled = true;
+    saveBtn.textContent = t('Saving...');
 
-		if (result.success && result.user) {
-				console.log('✅ Profile updated successfully');
-				console.log('👤 Updated user from backend:', result.user);
+    try {
+        const result = await authService.updateProfile(updateData);
 
-				const currentState = authService.getState();
-				console.log('🔍 DEBUG AuthService state after update:', currentState);
-				console.log('🔍 DEBUG AuthService user after update:', currentState.user);
+        if (result.success && result.user) {
+            console.log('✅ Profile updated successfully');
+            console.log('👤 Updated user from backend:', result.user);
 
-				this.showProfileSuccess('Profile updated successfully!');
-				this.forceUIUpdate(result.user);
+            // Check if avatar was changed and send WebSocket notification
+            if (currentAvatar !== selectedAvatar) {
+                this.sendAvatarChangedNotification(selectedAvatar || '');
+            }
 
-				setTimeout(() => {
-						this.close();
-				}, 2000);
-		} else {
-				console.error('❌ Profile update failed:', result.message);
-				this.showProfileError(result.message || 'Failed to update profile');
+            // Show success message
+            this.showProfileSuccess('Profile updated successfully! Reloading page...');
+
+            // Wait 1.5 seconds to show the success message, then reload
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        } else {
+            console.error('❌ Profile update failed:', result.message);
+            this.showProfileError(result.message || 'Failed to update profile');
+            saveBtn.disabled = false;
+            saveBtn.textContent = t('Save Changes');
+        }
+    } catch (error) {
+        console.error('❌ Profile update error:', error);
+        this.showProfileError('An unexpected error occurred while updating your profile');
+        saveBtn.disabled = false;
+        saveBtn.textContent = t('Save Changes');
+    }
+}
+
+	private sendAvatarChangedNotification(newAvatar: string): void {
+		try {
+			const socketService = (window as any).socketService;
+			if (socketService && socketService.sendAvatarChanged) {
+				socketService.sendAvatarChanged(newAvatar);
+				console.log('📡 Avatar changed notification sent via WebSocket:', newAvatar);
+			} else {
+				console.warn('⚠️ SocketService not available for avatar change notification');
+			}
+		} catch (error) {
+			console.error('❌ Error sending avatar changed notification:', error);
 		}
-	} catch (error) {
-		console.error('❌ Profile update error:', error);
-		this.showProfileError('An unexpected error occurred while updating your profile');
-	} finally {
-		saveBtn.disabled = false;
-		saveBtn.textContent = t('Save Changes');
-	}
 	}
 
 	private forceUIUpdate(updatedUser: any): void {
 	console.log('🔄 forceUIUpdate called with user:', updatedUser);
 
 	const beforeState = authService.getState();
-	console.log('🔍 DEBUG AuthService state BEFORE dispatch:', beforeState);
 
 	window.dispatchEvent(new CustomEvent('auth-state-changed', {
 		detail: { isAuthenticated: true, user: updatedUser }
 	}));
 
-	console.log('🔍 DEBUG Dispatched auth-state-changed event with:', { isAuthenticated: true, user: updatedUser });
 
 	setTimeout(() => {
 		console.log('🔄 Updating navbar...');
 
 		const afterState = authService.getState();
-		console.log('🔍 DEBUG AuthService state AFTER dispatch:', afterState);
 
 		if (typeof (window as any).addBasicNavbar === 'function') {
-		console.log('🔍 DEBUG Calling addBasicNavbar()');
 		(window as any).addBasicNavbar();
 		} else {
-		console.log('❌ DEBUG addBasicNavbar function not found');
 		}
 
 		if (typeof (window as any).updateJumbotronButton === 'function') {
-		console.log('🔍 DEBUG Calling updateJumbotronButton()');
 		(window as any).updateJumbotronButton();
 		} else {
-		console.log('❌ DEBUG updateJumbotronButton function not found');
 		}
 
 		const currentAuthState = authService.getState();
@@ -359,6 +377,10 @@ export class ProfileModal extends BaseModal {
 	private isValidEmail(email: string): boolean {
 		const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 		return emailRegex.test(email);
+	}
+
+	private hasDigit(str: string): boolean {
+		return /\d/.test(str);
 	}
 
 	public static show(): void {

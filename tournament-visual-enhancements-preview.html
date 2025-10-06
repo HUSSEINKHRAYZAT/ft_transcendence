@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tournament Visual Enhancements Preview</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      color: white;
+      padding: 40px;
+      min-height: 100vh;
+    }
+    
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    
+    h1 {
+      text-align: center;
+      font-size: 48px;
+      margin-bottom: 20px;
+      background: linear-gradient(135deg, #84cc16, #65a30d);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    
+    .subtitle {
+      text-align: center;
+      color: #94a3b8;
+      margin-bottom: 60px;
+      font-size: 18px;
+    }
+    
+    .tournament-showcase {
+      display: flex;
+      gap: 32px;
+      overflow-x: auto;
+      padding: 20px 0;
+    }
+    
+    .bracket-round {
+      min-width: 280px;
+      flex-shrink: 0;
+    }
+    
+    .round-header {
+      text-align: center;
+      margin-bottom: 20px;
+      padding: 16px;
+      border-radius: 12px;
+      transition: transform 0.3s ease;
+    }
+    
+    .round-header:hover {
+      transform: translateY(-2px);
+    }
+    
+    .round-emoji {
+      font-size: 32px;
+      margin-bottom: 8px;
+    }
+    
+    .round-name {
+      font-weight: 700;
+      font-size: 20px;
+      margin-bottom: 4px;
+    }
+    
+    .round-info {
+      font-size: 12px;
+      opacity: 0.9;
+    }
+    
+    .match-card {
+      background: rgba(255, 255, 255, 0.05);
+      border: 2px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+      transition: all 0.3s ease;
+    }
+    
+    .match-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+    }
+    
+    .match-header {
+      text-align: center;
+      font-size: 12px;
+      color: #94a3b8;
+      margin-bottom: 12px;
+      font-weight: 600;
+    }
+    
+    .player {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 14px;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 8px;
+      margin: 6px 0;
+      font-weight: 600;
+    }
+    
+    .player-score {
+      font-weight: 800;
+      font-size: 18px;
+    }
+    
+    .vs {
+      text-align: center;
+      color: #64748b;
+      font-size: 12px;
+      margin: 6px 0;
+      font-weight: 600;
+    }
+    
+    .legend {
+      margin-top: 60px;
+      padding: 30px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 16px;
+      border: 2px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .legend h2 {
+      font-size: 24px;
+      margin-bottom: 20px;
+      color: #84cc16;
+    }
+    
+    .legend-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+    }
+    
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    
+    .legend-emoji {
+      font-size: 24px;
+    }
+    
+    .legend-text {
+      flex: 1;
+    }
+    
+    .legend-title {
+      font-weight: 700;
+      color: white;
+    }
+    
+    .legend-desc {
+      font-size: 13px;
+      color: #94a3b8;
+    }
+    
+    .color-swatch {
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+      border: 2px solid rgba(255, 255, 255, 0.2);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🏆 Tournament Visual Enhancements</h1>
+    <p class="subtitle">Enhanced round labels with emojis, colors, and visual indicators</p>
+    
+    <div class="tournament-showcase">
+      <!-- Round 1 / Round of 16 -->
+      <div class="bracket-round">
+        <div class="round-header" style="background: linear-gradient(135deg, #3b82f622, #3b82f611); border: 2px solid #3b82f644; box-shadow: 0 0 20px #3b82f622;">
+          <div class="round-emoji">🎮</div>
+          <div class="round-name" style="color: #3b82f6; text-shadow: 0 0 10px #3b82f688;">Round of 16</div>
+          <div class="round-info" style="color: #3b82f699;">8 matches</div>
+        </div>
+        <div class="match-card">
+          <div class="match-header">Match 1</div>
+          <div class="player">
+            <span>Player 1</span>
+            <span class="player-score">3</span>
+          </div>
+          <div class="vs">VS</div>
+          <div class="player">
+            <span>Player 2</span>
+            <span class="player-score">1</span>
+          </div>
+        </div>
+        <div class="match-card">
+          <div class="match-header">Match 2</div>
+          <div class="player">
+            <span>Player 3</span>
+            <span class="player-score">2</span>
+          </div>
+          <div class="vs">VS</div>
+          <div class="player">
+            <span>Player 4</span>
+            <span class="player-score">5</span>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Quarterfinals -->
+      <div class="bracket-round">
+        <div class="round-header" style="background: linear-gradient(135deg, #f59e0b22, #f59e0b11); border: 2px solid #f59e0b44; box-shadow: 0 0 20px #f59e0b22;">
+          <div class="round-emoji">⚔️</div>
+          <div class="round-name" style="color: #f59e0b; text-shadow: 0 0 10px #f59e0b88;">Quarterfinals</div>
+          <div class="round-info" style="color: #f59e0b99;">4 matches</div>
+        </div>
+        <div class="match-card">
+          <div class="match-header">Match 1</div>
+          <div class="player">
+            <span>Player 1</span>
+            <span class="player-score">4</span>
+          </div>
+          <div class="vs">VS</div>
+          <div class="player">
+            <span>Player 4</span>
+            <span class="player-score">2</span>
+          </div>
+        </div>
+        <div class="match-card">
+          <div class="match-header">Match 2</div>
+          <div class="player">
+            <span>Player 5</span>
+            <span class="player-score">-</span>
+          </div>
+          <div class="vs">VS</div>
+          <div class="player">
+            <span>Player 8</span>
+            <span class="player-score">-</span>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Semifinals -->
+      <div class="bracket-round">
+        <div class="round-header" style="background: linear-gradient(135deg, #8b5cf622, #8b5cf611); border: 2px solid #8b5cf644; box-shadow: 0 0 20px #8b5cf622;">
+          <div class="round-emoji">🏅</div>
+          <div class="round-name" style="color: #8b5cf6; text-shadow: 0 0 10px #8b5cf688;">Semifinals</div>
+          <div class="round-info" style="color: #8b5cf699;">2 matches</div>
+        </div>
+        <div class="match-card">
+          <div class="match-header">Match 1</div>
+          <div class="player">
+            <span>Player 1</span>
+            <span class="player-score">-</span>
+          </div>
+          <div class="vs">VS</div>
+          <div class="player">
+            <span>TBD</span>
+            <span class="player-score">-</span>
+          </div>
+        </div>
+        <div class="match-card">
+          <div class="match-header">Match 2</div>
+          <div class="player">
+            <span>TBD</span>
+            <span class="player-score">-</span>
+          </div>
+          <div class="vs">VS</div>
+          <div class="player">
+            <span>TBD</span>
+            <span class="player-score">-</span>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Finals -->
+      <div class="bracket-round">
+        <div class="round-header" style="background: linear-gradient(135deg, #ef444422, #ef444411); border: 2px solid #ef444444; box-shadow: 0 0 20px #ef444422;">
+          <div class="round-emoji">🏆</div>
+          <div class="round-name" style="color: #ef4444; text-shadow: 0 0 10px #ef444488;">Final</div>
+          <div class="round-info" style="color: #ef444499;">1 match</div>
+        </div>
+        <div class="match-card">
+          <div class="match-header">Championship Match</div>
+          <div class="player">
+            <span>TBD</span>
+            <span class="player-score">-</span>
+          </div>
+          <div class="vs">VS</div>
+          <div class="player">
+            <span>TBD</span>
+            <span class="player-score">-</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="legend">
+      <h2>Visual Enhancement Features</h2>
+      <div class="legend-grid">
+        <div class="legend-item">
+          <div class="legend-emoji">🎮</div>
+          <div class="legend-text">
+            <div class="legend-title">Round Emojis</div>
+            <div class="legend-desc">Unique emoji for each tournament stage</div>
+          </div>
+        </div>
+        
+        <div class="legend-item">
+          <div class="color-swatch" style="background: linear-gradient(135deg, #3b82f6, #2563eb);"></div>
+          <div class="legend-text">
+            <div class="legend-title">Round Colors</div>
+            <div class="legend-desc">Dynamic color schemes per round</div>
+          </div>
+        </div>
+        
+        <div class="legend-item">
+          <div class="legend-emoji">✨</div>
+          <div class="legend-text">
+            <div class="legend-title">Gradient Backgrounds</div>
+            <div class="legend-desc">Subtle gradients with glow effects</div>
+          </div>
+        </div>
+        
+        <div class="legend-item">
+          <div class="legend-emoji">📊</div>
+          <div class="legend-text">
+            <div class="legend-title">Match Count Display</div>
+            <div class="legend-desc">Shows number of matches per round</div>
+          </div>
+        </div>
+        
+        <div class="legend-item">
+          <div class="legend-emoji">💡</div>
+          <div class="legend-text">
+            <div class="legend-title">Visual Hierarchy</div>
+            <div class="legend-desc">Clear progression from early to final rounds</div>
+          </div>
+        </div>
+        
+        <div class="legend-item">
+          <div class="legend-emoji">🎨</div>
+          <div class="legend-text">
+            <div class="legend-title">Hover Effects</div>
+            <div class="legend-desc">Interactive elements with smooth transitions</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

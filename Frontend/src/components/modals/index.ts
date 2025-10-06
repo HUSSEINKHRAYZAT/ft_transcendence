@@ -13,5 +13,6 @@ export { RequestModal } from './RequestModal';
 export { ForgetPasswordModal } from './ForgetPasswordModal';
 export { StatisticsModal } from './StatisticsModal';
 export { VerifyModal } from './VerifyModal';
+export { ConfirmDialog, showConfirmDialog } from './ConfirmDialog';
 
 export { modalManager } from './ModalManager';

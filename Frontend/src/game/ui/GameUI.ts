@@ -25,7 +25,7 @@ export class GameUI {
 
     for (let i = 0; i < slots; i++) {
       const badge = document.createElement("div");
-      badge.className = `flex items-center gap-2 px-4 py-2.5 rounded-xl border transition-all duration-300 min-w-20 justify-center bg-gradient-to-br from-${colors[i]}/10 to-${colors[i]}/5 border-${colors[i]}/25`;
+      badge.className = `score-badge flex items-center gap-2 px-4 py-2.5 rounded-xl border min-w-20 justify-center bg-gradient-to-br from-${colors[i]}/10 to-${colors[i]}/5 border-${colors[i]}/25`;
       badge.style.boxShadow = `0 4px 12px ${hexColors[i]}20, inset 0 1px 0 rgba(255,255,255,0.1)`;
 
       const dot = document.createElement("span");
@@ -38,6 +38,7 @@ export class GameUI {
       const label = document.createElement("span");
       label.className = `text-xs font-semibold text-${colors[i]} tracking-wider uppercase`;
       label.textContent = ["Player 1", "Player 2", "Player 3", "Player 4"][i];
+      label.style.textShadow = `0 0 8px ${hexColors[i]}60`;
 
       const name = document.createElement("span");
       name.className = "text-xs opacity-70 text-zinc-400";
@@ -45,7 +46,7 @@ export class GameUI {
         (this.config.displayNames && this.config.displayNames[i]) || "";
 
       const score = document.createElement("span");
-      score.className = `font-black text-2xl min-w-8 text-center text-${colors[i]} leading-none`;
+      score.className = `score-value font-black text-2xl min-w-8 text-center text-${colors[i]} leading-none transform-gpu`;
       score.style.textShadow = `0 2px 8px ${hexColors[i]}40`;
       score.textContent = "0";
 
@@ -82,22 +83,36 @@ export class GameUI {
   private pulseScorer(idx: number): void {
     if (idx < 0) return;
     const badge = this.scoreElems[idx].parentElement as HTMLDivElement;
-    if (!badge) return;
+    const score = this.scoreElems[idx];
+    if (!badge || !score) return;
+    
+    // Enhanced 3D pulse effect
     badge.style.boxShadow =
-      "inset 0 0 0 1px rgba(255,255,255,.12), 0 0 16px rgba(255,255,255,.25)";
-    badge.style.transform = "scale(1.05)";
+      "inset 0 0 0 1px rgba(255,255,255,.12), 0 0 30px rgba(255,255,255,.4), 0 0 50px rgba(132, 204, 22, 0.6)";
+    badge.style.transform = "translateY(-10px) rotateX(15deg) rotateY(5deg) scale(1.15)";
+    badge.style.filter = "brightness(1.3)";
+    
+    // Score number explosion effect
+    score.style.transform = "scale(1.5) rotateZ(10deg)";
+    score.style.filter = "drop-shadow(0 0 15px currentColor)";
+    
     setTimeout(() => {
       badge.style.boxShadow = "inset 0 0 0 1px rgba(255,255,255,.08)";
-      badge.style.transform = "scale(1.0)";
-    }, 180);
+      badge.style.transform = "translateY(0px) rotateX(0deg) rotateY(0deg) scale(1.0)";
+      badge.style.filter = "brightness(1)";
+      score.style.transform = "scale(1) rotateZ(0deg)";
+      score.style.filter = "none";
+    }, 300);
   }
 
   public showWaitingOverlay(text: string): void {
     const d = markUI(document.createElement("div"));
     d.className =
-      "fixed inset-0 grid place-items-center bg-black/65 text-white z-[9999] font-sans";
-    d.innerHTML = `<div class="px-5 py-4 bg-gray-900 rounded-xl shadow-2xl border border-lime-500/20">
-      <div id="waitText" class="text-lg text-center">${text}</div>
+      "fixed inset-0 grid place-items-center bg-black/65 text-white z-[9999] font-sans backdrop-blur-sm";
+    d.innerHTML = `<div class="px-6 py-5 bg-gradient-to-br from-gray-900/95 to-gray-800/95 rounded-2xl shadow-2xl border border-lime-500/30 backdrop-blur-xl" style="box-shadow: 0 20px 50px rgba(0,0,0,0.4), 0 0 0 1px rgba(132, 204, 22, 0.2);">
+      <div class="text-xl font-semibold mb-2 text-lime-500 text-center" style="text-shadow: 0 0 15px rgba(132, 204, 22, 0.6);">⏳ Waiting for Players...</div>
+      <div class="text-sm text-center opacity-80 text-zinc-300">${text}</div>
+      <div class="mt-3 flex justify-center"><div class="w-12 h-1.5 bg-gradient-to-r from-transparent via-lime-500 to-transparent rounded-full" style="box-shadow: 0 0 10px rgba(132, 204, 22, 0.5);"></div></div>
     </div>`;
     document.body.appendChild(d);
     this.waitUI = d as HTMLDivElement;
@@ -118,9 +133,9 @@ export class GameUI {
     if (this.pauseUI) return;
     const d = markUI(document.createElement("div"));
     d.className =
-      "fixed inset-0 grid place-items-center bg-black/40 text-white z-[10000] font-sans select-none";
-    d.innerHTML = `<div class="px-5 py-3 bg-gray-900/90 rounded-xl shadow-2xl border border-white/15">
-      <div class="text-lg text-center font-semibold tracking-wide">⏸️ Paused — press <span class="font-black">P</span> to resume</div>
+      "fixed inset-0 grid place-items-center bg-black/40 text-white z-[10000] font-sans select-none backdrop-blur-sm";
+    d.innerHTML = `<div class="px-6 py-4 bg-gradient-to-br from-gray-900/95 to-gray-800/95 rounded-2xl shadow-2xl border border-white/20 backdrop-blur-xl" style="box-shadow: 0 15px 40px rgba(0,0,0,0.5);">
+      <div class="text-xl text-center font-bold tracking-wide" style="text-shadow: 0 0 15px rgba(255,255,255,0.4);">⏸️ Paused — press <span class="font-black text-lime-400" style="text-shadow: 0 0 10px rgba(132, 204, 22, 0.8);">P</span> to resume</div>
     </div>`;
     document.body.appendChild(d);
     this.pauseUI = d as HTMLDivElement;
@@ -134,8 +149,9 @@ export class GameUI {
   public showGameEndToast(text: string): void {
     const t = markUI(document.createElement("div"));
     t.className =
-      "fixed top-5 left-1/2 -translate-x-1/2 bg-black/70 text-white px-4 py-3 rounded-xl z-[10001] font-sans shadow-2xl border border-lime-500/20";
-    t.innerHTML = `${text} &nbsp; <button id="re" class="ml-2 bg-lime-500 hover:bg-lime-600 text-black px-3 py-1 rounded-lg font-semibold transition-colors">Play again</button>`;
+      "fixed top-8 left-1/2 -translate-x-1/2 bg-gradient-to-br from-black/80 to-gray-900/80 text-white px-6 py-4 rounded-2xl z-[10001] font-sans shadow-2xl border border-lime-500/30 backdrop-blur-xl";
+    t.style.boxShadow = "0 20px 50px rgba(0,0,0,0.4), 0 0 0 1px rgba(132, 204, 22, 0.2)";
+    t.innerHTML = `<span style="text-shadow: 0 0 10px rgba(132, 204, 22, 0.6); font-weight: 600;">${text}</span> &nbsp; <button id="re" class="ml-3 bg-gradient-to-r from-lime-500 to-lime-600 hover:from-lime-600 hover:to-lime-700 text-black px-4 py-2 rounded-xl font-bold" style="box-shadow: 0 4px 15px rgba(132, 204, 22, 0.4);">Play again</button>`;
     document.body.appendChild(t);
     (t.querySelector("#re") as HTMLButtonElement).onclick = () =>
       location.reload();

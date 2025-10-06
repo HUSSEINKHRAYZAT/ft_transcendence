@@ -20,9 +20,6 @@ export * from './langs';
 // Game
 export * from './game';
 
-// Menu
-export * from './menu';
-
 // Auth
 export * from './auth';
 

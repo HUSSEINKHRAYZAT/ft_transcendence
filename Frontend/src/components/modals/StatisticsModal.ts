@@ -103,7 +103,6 @@ public static showForFriend(friendId: string, friendUsername: string): void {
 }
 
 private async loadFriendStatistics(): Promise<void> {
-    console.log('DEBUG: loadFriendStatistics called with friendId:', this.friendId);
 
     if (!this.friendId) {
         console.error('DEBUG: No friendId provided');
@@ -111,24 +110,17 @@ private async loadFriendStatistics(): Promise<void> {
     }
 
     try {
-        console.log('DEBUG: Calling authService.getFriendStatistics');
         const stats = await authService.getFriendStatistics(this.friendId);
-        console.log('DEBUG: Got stats result:', stats);
 
         const loadingElement = document.getElementById('friend-stats-loading');
         const contentElement = document.getElementById('friend-stats-content');
 
-        console.log('DEBUG: Loading element found:', !!loadingElement);
-        console.log('DEBUG: Content element found:', !!contentElement);
-
         if (loadingElement) {
             loadingElement.classList.add('hidden');
-            console.log('DEBUG: Hidden loading element');
         }
 
         if (contentElement) {
             contentElement.classList.remove('hidden');
-            console.log('DEBUG: Showed content element');
         }
 
         if (stats) {
@@ -138,13 +130,10 @@ private async loadFriendStatistics(): Promise<void> {
                     const progressElement = document.getElementById('win-rate-progress');
                     if (progressElement) {
                         progressElement.style.display = 'block';
-                        console.log('DEBUG: Showed win rate progress');
                     }
                 }
-                console.log('DEBUG: Statistics update completed');
             }, 100);
         } else {
-            console.log('DEBUG: No stats returned, showing error message');
             if (contentElement) {
                 contentElement.innerHTML = `
                     <div class="text-center text-red-400 py-8">
@@ -155,7 +144,6 @@ private async loadFriendStatistics(): Promise<void> {
             }
         }
     } catch (error) {
-        console.error('DEBUG: Error in loadFriendStatistics:', error);
 
         const loadingElement = document.getElementById('friend-stats-loading');
         const contentElement = document.getElementById('friend-stats-content');
@@ -384,7 +372,6 @@ protected getModalContent(): string {
 	}
 
 protected updateStatisticsInModal(stats: UserStats): void {
-    console.log('DEBUG: updateStatisticsInModal called with:', stats); // DEBUG LINE
 
     const totalGamesElement = document.querySelector('[data-stat="total-games"]');
     const winCountElement = document.querySelector('[data-stat="win-count"]');
@@ -397,32 +384,25 @@ protected updateStatisticsInModal(stats: UserStats): void {
     const lossCount = stats.lossCount || 0;
     const winRate = totalGames > 0 ? Math.round((winCount / totalGames) * 100) : 0;
 
-    console.log('DEBUG: Calculated values - Total:', totalGames, 'Wins:', winCount, 'Losses:', lossCount, 'Rate:', winRate); // DEBUG LINE
-
     if (totalGamesElement) {
         totalGamesElement.textContent = totalGames.toString();
-        console.log('DEBUG: Updated total games'); // DEBUG LINE
     }
 
     if (winCountElement) {
         winCountElement.textContent = winCount.toString();
-        console.log('DEBUG: Updated win count'); // DEBUG LINE
     }
 
     if (lossCountElement) {
         lossCountElement.textContent = lossCount.toString();
-        console.log('DEBUG: Updated loss count'); // DEBUG LINE
     }
 
     // Update all win rate elements (there might be multiple)
     winRateElements.forEach(element => {
         element.textContent = `${winRate}%`;
-        console.log('DEBUG: Updated win rate element'); // DEBUG LINE
     });
 
     if (winRateBarElement) {
         (winRateBarElement as HTMLElement).style.width = `${winRate}%`;
-        console.log('DEBUG: Updated win rate bar'); // DEBUG LINE
     }
 }
 

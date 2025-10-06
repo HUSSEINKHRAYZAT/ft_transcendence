@@ -1,6 +1,6 @@
 services:
   user_management:
-    build: ./user-management 
+    build: ./user-management
     image: maxplushchreif/user_management:1.0.0
     container_name: user_management
     environment:
@@ -36,7 +36,7 @@ services:
     restart: unless-stopped
 
   game_microservice:
-    build: ./game-microservice 
+    build: ./game-microservice
     image: maxplushchreif/game_microservice:1.0.0
     container_name: game_microservice
     environment:
@@ -63,17 +63,17 @@ services:
       - NODE_ENV=production
       - PORT=3000
       - SMTP_HOST=smtp.gmail.com
-      - SMTP_PORT=465         
-      - SMTP_SECURE=true      
+      - SMTP_PORT=465
+      - SMTP_SECURE=true
       - SMTP_USER=42transcender@gmail.com
       - SMTP_PASS=jrlrgyfofocmliou
-      - FROM_EMAIL=42transcender@gmail.com 
+      - FROM_EMAIL=42transcender@gmail.com
       - FROM_NAME=Transcender
     ports:
       - "3002:3000"
 
-  session_microservice: 
-    build: ./session-microservice 
+  session_microservice:
+    build: ./session-microservice
     image: maxplushchreif/session_microservice:1.0.0
     container_name: session_microservice
     environment:
@@ -110,6 +110,7 @@ services:
     ports:
       - "3006:3000"
     restart: unless-stopped
+    
   realtime_microservice:
     build: ./realtime-microservice
     image: maxplushchreif/realtime_microservice:1.0.0

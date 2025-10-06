@@ -1,5 +1,5 @@
 import type { GameConfig } from "../types";
-import { clearPongUI, markUI } from "../ui";
+import { clearPongUI } from "../ui";
 import { ThemeBridge as themeBridge } from "../game";
 import { createMenuRoot } from "../menu";
 import { injectMenuStyles } from "../styles/menuStyles";
@@ -9,8 +9,6 @@ import {
   joinSocketIORoom,
   startLocal2P,
   startVsAI,
-  createTournament,
-  joinTournament,
   startVs3AI
 } from "../menu";
 
@@ -98,12 +96,23 @@ export class Menu {
           });
           return;
         }
-        if (a === "tourn") {
-          createTournament();
+
+        // Tournament actions - trigger modal functions from main.ts
+        if (a === "tournament-create") {
+          root.remove();
+          // Call the global function from main.ts
+          if ((window as any).selectGameMode) {
+            (window as any).selectGameMode('create-tournament');
+          }
           return;
         }
-        if (a === "joinTourn") {
-          joinTournament();
+        
+        if (a === "tournament-join") {
+          root.remove();
+          // Call the global function from main.ts
+          if ((window as any).selectGameMode) {
+            (window as any).selectGameMode('join-tournament');
+          }
           return;
         }
       });

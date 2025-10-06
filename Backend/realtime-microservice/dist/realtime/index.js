@@ -91,7 +91,7 @@ function broadcast(payload) {
     }
 }
 function generateRoomCode() {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    const chars = 'ABCDEFGHIJKLMNPQRSTUVWXYZ123456789';
     let code = '';
     for (let i = 0; i < 6; i++)
         code += chars[Math.floor(Math.random() * chars.length)];

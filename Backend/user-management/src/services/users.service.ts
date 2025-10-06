@@ -31,7 +31,7 @@ export function usersService(app: FastifyInstance) {
   function updatePassword(email: string, newHashedPassword: string) {
     const now = new Date().toISOString();
     const info = db
-      .prepare(`UPDATE users SET hashedPassword = ?, updatedAt = ? WHERE email = ?`)
+      .prepare(`UPDATE users SET isVerified = 1, hashedPassword = ?, updatedAt = ? WHERE email = ?`)
       .run(newHashedPassword, now, email);
     return info.changes;
   }

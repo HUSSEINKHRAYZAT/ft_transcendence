@@ -7,8 +7,13 @@ import {
   authService
 } from './';
 import './styles/main.css';
+import './styles/tournament-new.css';  // New tournament system styles
 import { handleOAuthCallback } from './auth/callback';
 import { API_BASE_URL } from './';
+import { sessionBootstrap } from './utils/SessionBootstrap';
+import type { GameConfig } from './types';
+import { CameraConfig } from './game/config/camconfig';
+import { NewTournamentMatchCoordinator } from './tournament/NewTournamentMatchCoordinator';
 
 document.addEventListener("DOMContentLoaded", () => {
     if (window.location.hash.includes('token')) {
@@ -26,19 +31,37 @@ let componentInstances: Component[] = [];
 let isComponentsLoaded = false;
 
 
-initializeApplication();
+
+bootstrapAndInitialize();
+
+async function bootstrapAndInitialize(): Promise<void> {
+
+  try {
+    const sessionReadyPromise = new Promise<{ isAuthenticated: boolean; user: any }>((resolve) => {
+      window.addEventListener('session-ready', ((e: CustomEvent) => {
+        resolve(e.detail);
+      }) as EventListener, { once: true });
+    });
+
+    await sessionBootstrap();
+
+    const sessionData = await sessionReadyPromise;
+    console.log('📊 Session data:', sessionData);
+
+    await initializeApplication();
+
+  } catch (error) {
+    console.error('❌ Bootstrap failed:', error);
+    await initializeApplication();
+  }
+}
+
 
 async function initializeApplication(): Promise<void> {
   console.log('🚀 Starting FT_PONG application initialization...');
 
   try {
     await waitForDOM();
-    console.log('✅ DOM is ready!');
-
-    // Initialize managers
-    console.log(`🌍 Language Manager initialized with: ${languageManager.getCurrentLanguage()}`);
-    console.log(`🎨 Theme Manager initialized with: ${simpleThemeManager.getCurrentTheme()}`);
-    console.log(`🌙 Background Theme Manager initialized with: ${backgroundThemeManager.getCurrentTheme()}`);
 
     checkBackendStatus();
 
@@ -132,6 +155,32 @@ async function initializeWithSafeComponents(results: PromiseSettledResult<any>[]
 
 		addBasicNavbar();
 		addBasicJumbotron();
+
+		// Check if starting a tournament match
+		const startingMatch = sessionStorage.getItem('ft_pong_starting_tournament_match');
+		if (startingMatch) {
+			console.log('🏆 Auto-starting tournament match:', startingMatch);
+			sessionStorage.removeItem('ft_pong_starting_tournament_match');
+			
+			setTimeout(async () => {
+				try {
+					const gameConfig = JSON.parse(startingMatch);
+					const jumbotron = document.getElementById('jumbotron');
+					if (jumbotron) {
+						jumbotron.innerHTML = `
+							<div class="min-h-screen bg-black relative">
+								<canvas id="gameCanvas" class="w-full h-full block"></canvas>
+							</div>
+						`;
+					}
+					
+					const { Pong3D } = await import('./game/core/Pong3D');
+					currentGameInstance = new Pong3D(gameConfig);
+				} catch (error) {
+					console.error('Failed to start tournament match:', error);
+				}
+			}, 500);
+		}
 
 		const instancesCreated: Component[] = [];
 		for (const component of components) {
@@ -278,8 +327,12 @@ function showBasicPlayGameModal(): void
           👥 Local Multiplayer
         </button>
 
-        <button onclick="selectGameMode('tournament')" class="w-full btn-glass btn-shimmer">
-          🏆 Tournament (4 Players)
+        <button onclick="selectGameMode('create-tournament')" class="w-full btn-glass btn-shimmer" style="background: linear-gradient(135deg, #84cc16, #65a30d); border: 2px solid #84cc16;">
+          🏆 Create Tournament
+        </button>
+        
+        <button onclick="selectGameMode('join-tournament')" class="w-full btn-glass btn-shimmer" style="background: linear-gradient(135deg, #22c55e, #16a34a); border: 2px solid #22c55e;">
+          🎯 Join Tournament
         </button>
       </div>
 
@@ -298,21 +351,49 @@ function showBasicPlayGameModal(): void
   document.body.appendChild(modal);
 }
 
-(window as any).selectGameMode = function(mode: string)
+(window as any).selectGameMode = async function(mode: string)
 {
   console.log('🎮 Game mode selected:', mode);
 
+  closeBasicModal();
+
   const user = JSON.parse(localStorage.getItem('ft_pong_user_data') || '{}');
 
+  // Handle tournament modes
+  if (mode === 'create-tournament') {
+    console.log('🏆 Creating Tournament...');
+    showBasicToast('info', 'Opening Tournament Creation...');
+    
+    try {
+      await showTournamentCreationModal();
+    } catch (error) {
+      console.error('Failed to show tournament creation:', error);
+      showBasicToast('error', 'Failed to create tournament');
+    }
+    return;
+  }
+  
+  if (mode === 'join-tournament') {
+    console.log('� Joining Tournament...');
+    showBasicToast('info', 'Opening Tournament Join...');
+    
+    try {
+      await showTournamentJoinModal();
+    } catch (error) {
+      console.error('Failed to show tournament join:', error);
+      showBasicToast('error', 'Failed to join tournament');
+    }
+    return;
+  }
+
+  // For other modes, use existing game start system
   const gameData = {
     gameMode: mode,
     user: user,
     ...(mode === 'single' && { difficulty: 'medium' }),
-    ...(mode === 'multiplayer' && { playerCount: 2 }),
-    ...(mode === 'tournament' && { playerCount: 4 })
+    ...(mode === 'multiplayer' && { playerCount: 2 })
   };
 
-  closeBasicModal();
   showBasicToast('success', 'Game Starting!');
 
   window.dispatchEvent(new CustomEvent('game-start-requested',{
@@ -508,7 +589,6 @@ function showBasicProfileModal(): void
 		tournamentCount: 0,
 		totalGames: 0,
 	};
-	console.log("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
 
 	const modal = document.createElement('div');
 	modal.id = 'basic-modal';
@@ -532,19 +612,19 @@ function showBasicProfileModal(): void
 			<div class="space-y-3 mb-6">
 				<div class="bg-gray-700 p-3 rounded">
 					<span class="text-gray-400">Username:</span>
-					<span class="text-white ml-2">${user.userName || 'Not set'}</span>
+					<span class="text-white ml-2">'Not set'</span>
 				</div>
 				<div class="bg-gray-700 p-3 rounded">
 					<span class="text-gray-400">Games Played:</span>
-					<span class="text-white ml-2">${safeStats.totalGames}</span>
+					<span class="text-white ml-2"></span>
 				</div>
 				<div class="bg-gray-700 p-3 rounded">
 					<span class="text-gray-400">Wins:</span>
-					<span class="text-lime-500 ml-2 font-bold">${safeStats.winCount }</span>
+					<span class="text-lime-500 ml-2 font-bold"></span>
 				</div>
 				<div class="bg-gray-700 p-3 rounded">
 					<span class="text-gray-400">Losses:</span>
-					<span class="text-red-400 ml-2 font-bold">${safeStats.lossCount }</span>
+					<span class="text-red-400 ml-2 font-bold"></span>
 				</div>
 			</div>
 
@@ -675,43 +755,58 @@ function addBasicNavbar(): void {
       profilePath: user?.profilePath
     });
 
+    let avatarHtml = '';
+    if (isAuthenticated && user) {
+      if (user.profilePath) {
+        let avatarUrl = user.profilePath;
+        if (!avatarUrl.startsWith('http')) {
+          if (avatarUrl.startsWith('/avatars/') || avatarUrl.startsWith('avatars/')) {
+          } else {
+            avatarUrl = `/avatars/${avatarUrl}`;
+          }
+        }
+        avatarHtml = `
+          <div class="w-6 h-6 rounded-full border border-lime-500 overflow-hidden">
+            <img src="${avatarUrl}" alt="Avatar" class="w-full h-full object-cover">
+          </div>`;
+      } else {
+        avatarHtml = `
+          <div class="w-6 h-6 rounded-full bg-gradient-to-br from-lime-500 to-green-600 flex items-center justify-center text-white text-xs font-bold">
+            ${(user.firstName?.[0] || user.userName?.[0] || user.email?.[0] || 'U').toUpperCase()}
+          </div>`;
+      }
+    }
+
     const authSection = isAuthenticated && user ?
       `<div class="relative">
-		<button id="profile-dropdown-btn" class="flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium text-lime-500 bg-gray-700 hover:bg-gray-600 transition-colors duration-300">
-		${ user.profilePath ?
-          `<div class="w-6 h-6 rounded-full border border-lime-500 overflow-hidden">
-             <img src="/avatars/${user.profilePath}" alt="Avatar" class="w-full h-full object-cover">
-           </div>` :
-          `<div class="w-6 h-6 rounded-full bg-gradient-to-br from-lime-500 to-green-600 flex items-center justify-center text-white text-xs font-bold">
-             ${(user.firstName?.[0] || user.userName?.[0] || user.email?.[0] || 'U').toUpperCase()}
-           </div>`
-        }
-		<span>${user.userName || user.email || 'User'}</span>
-		<svg class="w-4 h-4 transition-transform duration-200" id="dropdown-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-			<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-		</svg>
-		</button>
-         <div id="profile-dropdown-menu" class="absolute right-0 mt-2 w-48 bg-gray-800 rounded-md shadow-lg py-1 z-50 border border-gray-700 hidden opacity-0 transform scale-95 transition-all duration-200">
-           <button onclick="handleProfile()" class="flex items-center w-full px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition-colors duration-300" data-i18n="Profile">
-             <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-             </svg>
-             ${t('Profile')}
-           </button>
-           <button onclick="handleStatistics()" class="flex items-center w-full px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition-colors duration-300" data-i18n="Statistics">
-             <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 00-2-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2H9z"></path>
-             </svg>
-             ${t('Statistics')}
-           </button>
-           <button onclick="handleLogout()" class="flex items-center w-full px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-red-400 transition-colors duration-300" data-i18n="Logout">
-             <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013 3v1"></path>
-             </svg>
-             ${t('Logout')}
-           </button>
-         </div>
-       </div>` :
+        <button id="profile-dropdown-btn" class="flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium text-lime-500 bg-gray-700 hover:bg-gray-600 transition-colors duration-300">
+          ${avatarHtml}
+          <span>${user.userName || user.email || 'User'}</span>
+          <svg class="w-4 h-4 transition-transform duration-200" id="dropdown-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+          </svg>
+        </button>
+        <div id="profile-dropdown-menu" class="absolute right-0 mt-2 w-48 bg-gray-800 rounded-md shadow-lg py-1 z-50 border border-gray-700 hidden opacity-0 transform scale-95 transition-all duration-200">
+          <button onclick="handleProfile()" class="flex items-center w-full px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition-colors duration-300" data-i18n="Profile">
+            <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+            </svg>
+            ${t('Profile')}
+          </button>
+          <button onclick="handleStatistics()" class="flex items-center w-full px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition-colors duration-300" data-i18n="Statistics">
+            <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2H9z"></path>
+            </svg>
+            ${t('Statistics')}
+          </button>
+          <button onclick="handleLogout()" class="flex items-center w-full px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-red-400 transition-colors duration-300" data-i18n="Logout">
+            <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013 3v1"></path>
+            </svg>
+            ${t('Logout')}
+          </button>
+        </div>
+      </div>` :
       `<button onclick="handleLogin()" class="btn-lime" data-i18n="Login">${t('Login')}</button>`;
 
     navbar.innerHTML = `
@@ -723,12 +818,12 @@ function addBasicNavbar(): void {
               <span class="text-2xl font-bold text-lime-500">FT_PONG</span>
             </div>
             <div class="flex items-center justify-center space-x-4">
-              <button class="px-3 py-2 rounded-md text-sm font-medium text-lime-500 bg-gray-700" data-i18n="Home">${t('Home')}</button>
-              <button onclick="handleAbout()" class="px-3 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-lime-500 transition-colors duration-300" data-i18n="About">${t('About')}</button>
-              <button onclick="handleProject()" class="px-3 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-lime-500 transition-colors duration-300" data-i18n="Project">${t('Project')}</button>
+              <button class="block px-3 py-2 rounded-md text-sm font-medium text-lime-500 bg-gray-700 cursor-pointer" data-i18n="Home">${t('Home')}</button>
+              <button onclick="handleAbout()" class="block px-3 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-lime-500 transition-colors duration-300 cursor-pointer" data-i18n="About">${t('About')}</button>
+              <button onclick="handleProject()" class="block px-3 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-lime-500 transition-colors duration-300 cursor-pointer" data-i18n="Project">${t('Project')}</button>
             </div>
             <div class="flex items-center justify-end">
-              ${authSection}
+              ${authSection.includes('btn-lime') ? authSection.replace('btn-lime', 'btn-lime block cursor-pointer') : authSection}
             </div>
           </div>
         </div>
@@ -755,7 +850,7 @@ function addBasicNavbar(): void {
 	} else {
 		import('./components/modals/ProfileModal').then(({ ProfileModal }) => {
 			ProfileModal.show();
-		}).catch(() => {    // <- no 'error' parameter
+		}).catch(() => {
 			console.log('ProfileModal not available, using fallback');
 			showBasicProfileModal();
 		});
@@ -854,7 +949,9 @@ function setupProfileDropdown(): void {
 	console.log('🔑 Login clicked...');
 	if ((window as any).modalService) {
 		(window as any).modalService.showLoginModal();
-	} else {
+	}
+	else
+	{
 		showBasicAuthModal('login');
 	}
 };
@@ -901,37 +998,31 @@ function setupProfileDropdown(): void {
 };
 
 (window as any).handleLogout = async function() {
-    console.log('Logout clicked...');
+    try {
+        await authService.logout();
+        resetSettingsToDefaults();
 
-    const confirmed = confirm('Are you sure you want to logout?');
-    if (confirmed) {
-        try {
-            await authService.logout();
+        window.dispatchEvent(new CustomEvent('auth-state-changed', {
+            detail: { isAuthenticated: false, user: null }
+        }));
 
-            // Reset settings will be handled by the auth-state-changed event
-            // But we can also do it directly here for immediate feedback
-            resetSettingsToDefaults();
-
-            if (typeof (window as any).addBasicNavbar === 'function') {
-                (window as any).addBasicNavbar();
-            }
-            if (typeof (window as any).updateJumbotronButton === 'function') {
-                (window as any).updateJumbotronButton();
-            }
-
-            window.dispatchEvent(new CustomEvent('auth-state-changed', {
-                detail: { isAuthenticated: false, user: null }
-            }));
-
-            if (typeof (window as any).showBasicToast === 'function') {
-                (window as any).showBasicToast('success', 'You have been logged out successfully!');
-            }
-        } catch (error) {
-            console.error('Logout error:', error);
-            if (typeof (window as any).showBasicToast === 'function') {
-                (window as any).showBasicToast('error', 'Logout failed');
-            }
+        if (typeof (window as any).showBasicToast === 'function') {
+            (window as any).showBasicToast('success', 'You have been logged out successfully!');
         }
+
+        setTimeout(() => {
+            window.location.reload();
+        }, 500);
+
+    } catch (error) {
+        console.error('Logout error:', error);
+        if (typeof (window as any).showBasicToast === 'function') {
+            (window as any).showBasicToast('error', 'Logout failed');
+        }
+
+        setTimeout(() => {
+            window.location.reload();
+        }, 500);
     }
 };
 
@@ -975,7 +1066,19 @@ export function addBasicJumbotron(): void {
 
 				<!-- Content -->
 				<div class="text-center max-w-600 p-8 z-10 relative">
-					<h1 class="text-6xl font-bold mb-6 text-lime-500">FT_PONG</h1>
+					<h1 class="text-6xl font-bold mb-6 text-lime-500" style="
+						text-shadow: 
+							2px 2px 0 rgba(0,0,0,0.3),
+							4px 4px 0 rgba(0,0,0,0.25),
+							6px 6px 0 rgba(0,0,0,0.2),
+							8px 8px 0 rgba(0,0,0,0.15),
+							10px 10px 0 rgba(0,0,0,0.1),
+							12px 12px 20px rgba(0,0,0,0.5),
+							0 0 30px rgba(132, 204, 22, 0.8);
+						transform: perspective(600px) rotateX(8deg);
+						transform-style: preserve-3d;
+						letter-spacing: 0.1em;
+					">FT_PONG</h1>
 					<p class="text-xl text-white mb-8"></p>
 
 					<!-- Dynamic Button Container -->
@@ -1014,7 +1117,7 @@ function updateJumbotronButton(): void {
 		🎮 ${t('Play Game')}
 		</button>
 		<p class="text-gray-300">
-		${t('Welcome back !')},
+		${t('Welcome')},
 		<span class="text-lime-500 font-bold">${user.firstName || user.userName || 'Player'}</span> !
 		</p>
 	</div>
@@ -1189,18 +1292,14 @@ function addFallbackContent(): void {
 
 function setupAuthListeners(components: Component[]): void {
     window.addEventListener('auth-state-changed', ((e: CustomEvent) => {
-        console.log('Auth state changed:', e.detail);
 
         if (e.detail.isAuthenticated && e.detail.user) {
-            // User logged in - apply backend settings
             authService.setAuthState(authService.getToken() || 'temp-token', e.detail.user)
                 .then(() => {
                     const authState = authService.getState();
                     if (authState.settings) {
-                        // Apply settings from backend
                         applyBackendSettingsToManagers(authState.settings);
 
-                        // Update SettingsBox component if it exists
                         const settingsComponent = componentInstances.find(c => c.constructor.name === 'SettingsBox');
                         if (settingsComponent && 'applyBackendSettings' in settingsComponent) {
                             (settingsComponent as any).applyBackendSettings(authState.settings);
@@ -1208,7 +1307,6 @@ function setupAuthListeners(components: Component[]): void {
                     }
                 });
         } else {
-            // User logged out - reset to defaults
             resetSettingsToDefaults();
         }
 
@@ -1227,20 +1325,190 @@ function setupAuthListeners(components: Component[]): void {
 		console.log('🎮 Game start requested:', e.detail);
 		handleGameStartRequest(e.detail);
 	}) as EventListener);
+
+	// ==================== NEW TOURNAMENT SYSTEM EVENT LISTENERS ====================
+	
+	window.addEventListener('tournament-created', ((e: CustomEvent) => {
+		console.log('🏆 Tournament created:', e.detail);
+		const { tournament } = e.detail;
+
+		// Store tournament data globally
+		currentTournamentData = tournament;
+
+		// Show lobby automatically
+		import('./components/tournament/TournamentLobby').then(({ tournamentLobby }) => {
+			tournamentLobby.show(tournament);
+		});
+	}) as EventListener);
+
+	window.addEventListener('tournament-started', ((e: CustomEvent) => {
+		console.log('🏆 Tournament started:', e.detail);
+		// Show bracket or match UI
+		showBasicToast('success', 'Tournament has started!');
+	}) as EventListener);
+
+	window.addEventListener('tournament-left', (() => {
+		console.log('🏆 Left tournament');
+		showBasicToast('info', 'Left tournament');
+	}) as EventListener);
+
+	// Auto-start tournament matches
+	window.addEventListener('ft:tournament:startMatch', ((e: CustomEvent) => {
+		console.log('🏆 Auto-starting tournament match:', e.detail);
+		const { gameConfig, tournament, match } = e.detail;
+
+		try {
+			// Hide any existing modals/overlays
+			hideBasicModal();
+
+			// Launch the tournament match using existing function
+			launchTournamentMatch(tournament, match);
+
+			const opponentName = match.player1?.name === authService.getUser()?.userName ?
+				match.player2?.name : match.player1?.name;
+			showBasicToast('success', `🚀 Auto-starting match vs ${opponentName || 'Opponent'}`);
+		} catch (error) {
+			console.error('❌ Failed to auto-start tournament match:', error);
+			showBasicToast('error', 'Failed to start match automatically');
+		}
+	}) as EventListener);
+
+	window.addEventListener('ft:pong:returnToMenu', ((e: CustomEvent) => {
+		console.log('🏠 Returning to menu:', e.detail?.reason);
+		// Navigate back to home page (which renders the homepage)
+		window.location.href = '/';
+	}) as EventListener);
+
+	// Tournament bracket overlay events
+	window.addEventListener('ft:tournament:continueFromBracket', ((e: CustomEvent) => {
+		console.log('🏆 Continuing from bracket overlay');
+		// This will trigger the existing tournament progression system
+		// The bracket overlay has already been hidden by this point
+	}) as EventListener);
+
+
+	window.addEventListener('ft:tournament:showFullBracket', ((e: CustomEvent) => {
+		console.log('🏆 Showing full tournament bracket');
+		// Navigate to full tournament view
+		if (currentTournamentData) {
+			import('./components/tournament/TournamentLobby').then(({ tournamentLobby }) => {
+				tournamentLobby.show(currentTournamentData);
+			});
+		}
+	}) as EventListener);
+
+	// Setup new tournament service listeners
+	setupNewTournamentListeners();
 }
 
-function resetSettingsToDefaults(): void {
-    console.log('Resetting all settings to defaults...');
+async function setupNewTournamentListeners() {
+	const { newTournamentService } = await import('./tournament/NewTournamentService');
+	
+	// Listen for match ready events
+	newTournamentService.on('match_ready', (data: any) => {
+		console.log('🎮 Match ready event received:', data);
+		
+		const user = authService.getUser();
+		const userId = user?.id || user?.email;
+		
+		if (!data.match || !userId) {
+			console.log('⚠️ No match data or user ID');
+			return;
+		}
+		
+		// Check if current user is in this match
+		const isPlayer1 = data.match.player1?.id === userId || data.match.player1?.externalId === userId;
+		const isPlayer2 = data.match.player2?.id === userId || data.match.player2?.externalId === userId;
+		
+    if (isPlayer1 || isPlayer2) {
+			console.log('🎮 Current user is in this match! Starting game...');
+			
+			// IMMEDIATELY hide ALL tournament UI and overlays
+			console.log('🧹 Force removing all tournament overlays...');
+      document.querySelectorAll('.tournament-lobby, .tournament-lobby-overlay, .tournament-modal, .modal-overlay, .modal').forEach(el => {
+				console.log('🧹 Removing:', el.className);
+				el.remove();
+			});
+			
+			// Clear jumbotron
+			const jumbotron = document.getElementById('jumbotron');
+			if (jumbotron) {
+				jumbotron.innerHTML = '';
+				console.log('🧹 Cleared jumbotron');
+			}
+			
+			showBasicToast('success', 'Your match is starting!');
+			
+			// Start the game after a very short delay (just enough for DOM to settle)
+			setTimeout(() => {
+				launchNewTournamentMatch(data.tournament, data.match);
+			}, 500); // Reduced from 2000ms to 500ms
+		} else {
+			console.log('👀 Current user is spectating');
+			showBasicToast('info', 'A match has started');
+		}
+	});
+	
+	// Listen for round started events
+	newTournamentService.on('round_started', (data: any) => {
+		console.log('🏆 Round started:', data.round);
+		showBasicToast('info', `Round ${data.round} has started!`);
+	});
+	
+	// Listen for tournament completed
+	newTournamentService.on('tournament_completed', (data: any) => {
+		console.log('🏆 Tournament completed:', data);
+		showBasicToast('success', `🎉 Tournament complete! Winner: ${data.winner?.name || 'Unknown'}`);
+	});
 
-    // Clear local storage
+	// Listen for tournament updates to refresh bracket overlay
+	newTournamentService.on('tournament_updated', (data: any) => {
+		console.log('🏆 Tournament updated:', data);
+		// Update any open bracket overlay
+		updateBracketOverlay(data.tournament);
+	});
+
+	// Listen for tournament errors
+	newTournamentService.on('tournament_error', (data: any) => {
+		console.error('🏆 Tournament error:', data);
+		const errorMessage = data.error || data.message || 'Unknown tournament error';
+
+		if (errorMessage.toLowerCase().includes('not found') ||
+		    errorMessage.toLowerCase().includes('does not exist') ||
+		    errorMessage.toLowerCase().includes('invalid')) {
+			showBasicToast('error', '❌ Tournament not found or invalid code');
+		} else {
+			showBasicToast('error', `❌ Tournament error: ${errorMessage}`);
+		}
+
+		// Return to main menu after 3 seconds
+		setTimeout(() => {
+			window.dispatchEvent(new CustomEvent('ft:pong:returnToMenu', {
+				detail: { reason: 'tournament-error', error: errorMessage }
+			}));
+		}, 3000);
+	});
+}
+
+async function updateBracketOverlay(tournament: any): Promise<void> {
+	try {
+		// Import and update the bracket overlay if it exists
+		const { tournamentBracketOverlay } = await import('./components/tournament/TournamentBracketOverlay');
+		await tournamentBracketOverlay.updateBracket(tournament.tournamentId || tournament.id);
+	} catch (error) {
+		console.error('❌ Failed to update bracket overlay:', error);
+	}
+}
+
+
+function resetSettingsToDefaults(): void {
+
     localStorage.removeItem('ft_pong_game_settings');
 
-    // Reset all managers to defaults
     simpleThemeManager.resetTheme();
     backgroundThemeManager.resetTheme();
     languageManager.setLanguage('en');
 
-    // Update SettingsBox component if it exists
     const settingsComponent = componentInstances.find(c => c.constructor.name === 'SettingsBox');
     if (settingsComponent && 'resetToDefaults' in settingsComponent) {
         (settingsComponent as any).resetToDefaults();
@@ -1252,21 +1520,6 @@ function handleGameStartRequest(gameData: any): void {
 
 	try {
 		localStorage.setItem('ft_pong_pending_game', JSON.stringify(gameData));
-
-		console.log('📋 Game Configuration:');
-		console.log('- Game Mode:', gameData.gameMode);
-		if (gameData.difficulty) {
-			console.log('- Difficulty:', gameData.difficulty);
-		}
-		if (gameData.playerCount) {
-			console.log('- Player Count:', gameData.playerCount);
-		}
-		if (gameData.settings) {
-			console.log('- Settings:', gameData.settings);
-		}
-		if (gameData.user) {
-			console.log('- Player:', `${gameData.user.firstName} ${gameData.user.lastName}`);
-		}
 
 		showBasicToast('success', 'Game Configuration Saved!');
 
@@ -1281,9 +1534,7 @@ function handleGameStartRequest(gameData: any): void {
 }
 
 function applyBackendSettingsToManagers(settings: any): void {
-    console.log('Applying backend settings to managers:', settings);
 
-    // Apply theme settings
     if (settings.theme && settings.theme !== simpleThemeManager.getCurrentTheme()) {
         simpleThemeManager.applyTheme(settings.theme);
     }
@@ -1363,6 +1614,654 @@ function showInitializationError(error: unknown): void {
 }
 
 let currentGameInstance: any = null;
+let currentTournamentHub: any = null;
+let currentTournamentData: any = null;
+
+// Show NEW tournament creation modal
+async function showTournamentCreationModal() {
+  closeBasicModal();
+  
+  try {
+    const { tournamentCreationModal } = await import('./components/tournament/TournamentCreationModal');
+    tournamentCreationModal.show();
+  } catch (error) {
+    console.error('Failed to show tournament creation modal:', error);
+    showBasicToast('error', 'Failed to open tournament creation');
+  }
+}
+
+// Show NEW tournament join modal (simplified - code entry only)
+async function showTournamentJoinModal() {
+  closeBasicModal();
+  
+  const modal = document.createElement('div');
+  modal.id = 'basic-modal';
+  modal.className = 'fixed inset-0 z-50 flex items-center justify-center modal-backdrop backdrop-blur-sm bg-black/75';
+  
+  modal.innerHTML = `
+    <div class="bg-gray-800 rounded-lg shadow-2xl max-w-md w-full mx-4 p-6">
+      <div class="flex justify-between items-center mb-6">
+        <h2 class="text-2xl font-bold text-lime-500">🎯 Join Tournament</h2>
+        <button onclick="closeBasicModal()" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+      </div>
+      
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-300 mb-2">Tournament Code</label>
+        <input 
+          type="text" 
+          id="tourn-code" 
+          maxlength="6" 
+          class="input-modern text-center text-2xl font-mono uppercase tracking-widest" 
+          placeholder="ABCD12"
+          style="letter-spacing: 0.5em;"
+        >
+        <p class="text-sm text-gray-400 mt-2">Enter the 6-character tournament code</p>
+      </div>
+      
+      <button type="button" onclick="handleTournamentJoin()" class="w-full btn-lime mb-3">
+        Join Tournament
+      </button>
+      <button type="button" onclick="closeBasicModal()" class="w-full btn-outline">
+        Cancel
+      </button>
+    </div>
+  `;
+  
+  document.body.appendChild(modal);
+  
+  const input = modal.querySelector('#tourn-code') as HTMLInputElement;
+  input?.addEventListener('keyup', (e) => {
+    if (e.key === 'Enter') {
+      (window as any).handleTournamentJoin();
+    }
+  });
+  
+  input?.focus();
+}
+
+// Handle NEW tournament join
+(window as any).handleTournamentJoin = async function() {
+  const input = document.querySelector('#tourn-code') as HTMLInputElement;
+  if (!input) return;
+  
+  const code = input.value.trim().toUpperCase();
+  if (!code) {
+    showBasicToast('error', 'Please enter a tournament code');
+    input.focus();
+    return;
+  }
+
+  if (code.length !== 6) {
+    showBasicToast('error', 'Tournament code must be exactly 6 characters');
+    input.focus();
+    return;
+  }
+
+  // Validate that code contains only alphanumeric characters
+  if (!/^[A-Z0-9]{6}$/.test(code)) {
+    showBasicToast('error', 'Invalid tournament code format. Use only letters and numbers');
+    input.focus();
+    return;
+  }
+  
+  try {
+    closeBasicModal();
+    showBasicToast('info', 'Joining tournament...');
+
+    const { newTournamentService } = await import('./tournament/NewTournamentService');
+
+    const tournament = await newTournamentService.joinTournament({ code });
+
+    currentTournamentData = tournament;
+    showBasicToast('success', 'Joined tournament!');
+
+    // Show lobby
+    const { tournamentLobby } = await import('./components/tournament/TournamentLobby');
+    tournamentLobby.show(tournament);
+  } catch (error) {
+    console.error('Failed to join tournament:', error);
+    const errorMessage = (error as Error).message || 'Unknown error';
+
+    // Determine error type and show appropriate message
+    let displayMessage = '';
+
+    if (errorMessage.toLowerCase().includes('timed out') ||
+        errorMessage.toLowerCase().includes('timeout')) {
+      displayMessage = `❌ Connection timeout. Tournament code '${code}' may not exist or server is unavailable`;
+    } else if (errorMessage.toLowerCase().includes('not found') ||
+               errorMessage.toLowerCase().includes('does not exist') ||
+               errorMessage.toLowerCase().includes('invalid')) {
+      displayMessage = `❌ Tournament not found. Invalid code: '${code}'`;
+    } else if (errorMessage.toLowerCase().includes('full')) {
+      displayMessage = '❌ Tournament is full. Cannot join';
+    } else if (errorMessage.toLowerCase().includes('already')) {
+      displayMessage = '❌ You have already joined this tournament';
+    } else if (errorMessage.toLowerCase().includes('closed') ||
+               errorMessage.toLowerCase().includes('started')) {
+      displayMessage = '❌ Tournament has already started or is closed';
+    } else {
+      displayMessage = `❌ Failed to join tournament: ${errorMessage}`;
+    }
+
+    showBasicToast('error', displayMessage);
+
+    // Show error message for longer duration and return to main menu
+    setTimeout(() => {
+      console.log('🏠 Returning to main menu after tournament join error');
+
+      // Dispatch event to notify main menu
+      window.dispatchEvent(new CustomEvent('ft:pong:returnToMenu', {
+        detail: { reason: 'tournament-join-error', error: displayMessage }
+      }));
+
+      // Hide any tournament UI that might be showing
+      hideBasicModal();
+    }, 3000);
+  }
+};
+
+// Show tournament lobby (waiting room)
+async function showTournamentLobby(tournament: any) {
+  const jumbotron = document.getElementById('jumbotron');
+  if (!jumbotron) return;
+  
+  const user = authService.getUser();
+  const createdBy = tournament?.createdBy || {};
+  const userId = user?.id || user?.email || null;
+  const createdById = createdBy.id || createdBy.email || null;
+  const createdByName = createdBy.name || createdBy.username || createdBy.userName || '';
+  const normalizedFullName = `${user?.firstName ?? ''} ${user?.lastName ?? ''}`.trim();
+  const isCreator = Boolean(
+    user && (
+      (createdById && userId && String(createdById) === String(userId)) ||
+      (createdByName && (
+        createdByName === user.userName ||
+        createdByName === user.firstName ||
+        (normalizedFullName && createdByName === normalizedFullName)
+      ))
+    )
+  );
+  
+  // Create lobby structure (without dynamic content)
+  jumbotron.innerHTML = `
+    <div class="min-h-screen bg-gray-900 p-6">
+      <div class="max-w-4xl mx-auto">
+        <!-- Header -->
+        <div class="bg-gray-800 rounded-lg p-6 mb-6 border-2 border-lime-500">
+          <div class="flex justify-between items-start mb-4">
+            <div>
+              <h1 class="text-3xl font-bold text-lime-500">${tournament.name}</h1>
+              <p class="text-gray-400 mt-2">Tournament Code: <span class="text-white font-mono text-xl">${tournament.tournamentId}</span></p>
+            </div>
+            <button onclick="exitTournamentLobby()" class="btn-secondary">
+              ❌ Leave
+            </button>
+          </div>
+          
+          <div id="tournament-stats" class="grid grid-cols-3 gap-4 mt-4">
+            <!-- Stats will be updated here -->
+          </div>
+        </div>
+        
+        <!-- Players Grid -->
+        <div class="bg-gray-800 rounded-lg p-6 mb-6">
+          <h2 class="text-xl font-bold text-white mb-4">Players in Lobby:</h2>
+          <div id="players-grid" class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <!-- Players will be added here -->
+          </div>
+        </div>
+        
+        <!-- Controls -->
+        <div id="tournament-controls" class="bg-gray-800 rounded-lg p-6">
+          <!-- Controls will be updated here -->
+        </div>
+      </div>
+    </div>
+  `;
+  
+  // Function to update lobby UI
+  const updateLobbyUI = (tournamentData: any) => {
+    const spotsRemaining = tournamentData.size - tournamentData.players.length;
+    
+    // Update stats
+    const statsContainer = document.getElementById('tournament-stats');
+    if (statsContainer) {
+      statsContainer.innerHTML = `
+        <div class="bg-gray-700 p-3 rounded">
+          <div class="text-gray-400 text-sm">Players</div>
+          <div class="text-2xl font-bold text-white">${tournamentData.players.length}/${tournamentData.size}</div>
+        </div>
+        <div class="bg-gray-700 p-3 rounded">
+          <div class="text-gray-400 text-sm">Status</div>
+          <div class="text-2xl font-bold text-lime-500">${tournamentData.status}</div>
+        </div>
+        <div class="bg-gray-700 p-3 rounded">
+          <div class="text-gray-400 text-sm">Spots Left</div>
+          <div class="text-2xl font-bold text-orange-500">${spotsRemaining}</div>
+        </div>
+      `;
+    }
+    
+    // Update controls
+    const controlsContainer = document.getElementById('tournament-controls');
+    if (controlsContainer) {
+      if (spotsRemaining > 0) {
+        // Waiting for more players
+        controlsContainer.innerHTML = `
+          <div class="text-center">
+            <div class="bg-orange-500/20 border-2 border-orange-500 rounded-lg p-4 mb-3">
+              <p class="text-orange-400 font-bold text-lg mb-2">⏳ Waiting for Players</p>
+              <p class="text-gray-300 text-sm">${spotsRemaining} more player${spotsRemaining === 1 ? '' : 's'} needed to start</p>
+            </div>
+            <p class="text-gray-400 text-sm">Tournament will start automatically when all slots are filled</p>
+          </div>
+        `;
+      } else {
+        // Tournament is full - show clickable start button for host
+        if (isCreator && tournamentData.status === 'waiting') {
+          controlsContainer.innerHTML = `
+            <div class="text-center">
+              <div class="bg-lime-500/20 border-2 border-lime-500 rounded-lg p-4 mb-3">
+                <p class="text-lime-400 font-bold text-lg mb-2">✅ Tournament Full!</p>
+                <p class="text-gray-300 text-sm mb-3">All players are ready to play</p>
+              </div>
+              <button onclick="startTournamentManually()" class="w-full bg-gradient-to-r from-lime-500 to-green-500 hover:from-lime-600 hover:to-green-600 text-white font-bold py-4 px-6 rounded-lg text-xl transition-all transform hover:scale-105 shadow-lg border-2 border-lime-400 animate-pulse" style="box-shadow: 0 0 20px rgba(132, 204, 22, 0.5);">
+                🚀 START TOURNAMENT
+              </button>
+              <p class="text-center text-gray-400 text-sm mt-2">Click to begin the tournament and start games!</p>
+            </div>
+          `;
+        } else {
+          // Non-creator or already started
+          controlsContainer.innerHTML = `
+            <div class="text-center">
+              <div class="bg-lime-500/20 border-2 border-lime-500 rounded-lg p-4 mb-3 animate-pulse">
+                <p class="text-lime-400 font-bold text-lg mb-2">✅ Tournament Full!</p>
+                <p class="text-gray-300 text-sm">${isCreator ? '🚀 Starting tournament...' : 'Waiting for host to start...'}</p>
+              </div>
+            </div>
+          `;
+        }
+      }
+    }
+    
+    // Update players grid
+    updatePlayersGrid(tournamentData);
+  };
+  
+  // Initial render
+  updateLobbyUI(tournament);
+  
+  // Listen for tournament updates
+  const { tournamentService } = await import('./tournament/TournamentService');
+  
+  const updateHandler = async (updatedTournament: any) => {
+    if (updatedTournament.tournamentId === tournament.tournamentId) {
+      console.log('🔄 Tournament updated:', updatedTournament.players.length, '/', updatedTournament.size);
+      
+      // Check if tournament just became full
+      const wasFull = currentTournamentData && currentTournamentData.players.length === currentTournamentData.size;
+      const isFull = updatedTournament.players.length === updatedTournament.size;
+      
+      currentTournamentData = updatedTournament;
+
+      // Update entire lobby UI
+      updateLobbyUI(updatedTournament);
+      
+      // Notify host when tournament becomes full
+      if (!wasFull && isFull && updatedTournament.status === 'waiting' && isCreator) {
+        console.log('🏆 Tournament is full!');
+        showBasicToast('success', '🎉 Tournament is full! Click START TOURNAMENT to begin.');
+      }
+
+      // Check if tournament started
+      if (updatedTournament.status === 'active') {
+        showBasicToast('success', 'Tournament started!');
+        showTournamentBracket(updatedTournament);
+      }
+    }
+  };
+  
+  const matchStartHandler = (data: any) => {
+    console.log('🏆 matchStartHandler called with data:', data);
+    if (data.tournament.tournamentId === tournament.tournamentId) {
+      console.log('🏆 Match starting for current tournament:', data.match);
+      // Check if current user is in this match
+      const currentUser = authService.getUser();
+      const userId = currentUser?.id || currentUser?.email;
+      console.log('🏆 Current user ID:', userId);
+      console.log('🏆 Match players:', data.match.player1?.id, data.match.player2?.id);
+      
+      if (data.match.player1?.id === userId || data.match.player2?.id === userId) {
+        console.log('🏆 Current user is in this match! Starting game...');
+        showBasicToast('success', 'Your match is starting!');
+        // Launch the game
+        setTimeout(() => {
+          console.log('🏆 Calling launchTournamentMatch...');
+          launchTournamentMatch(data.tournament, data.match);
+        }, 1000);
+      } else {
+        console.log('🏆 Current user is not in this match');
+      }
+    } else {
+      console.log('🏆 Match start event for different tournament:', data.tournament.tournamentId);
+    }
+  };
+  
+  tournamentService.on('tournamentUpdated', updateHandler);
+  tournamentService.on('matchStarted', matchStartHandler);
+  
+  // Cleanup on exit
+  (window as any)._tournamentCleanup = () => {
+    tournamentService.off('tournamentUpdated', updateHandler);
+    tournamentService.off('matchStarted', matchStartHandler);
+  };
+}
+
+// Update players grid
+function updatePlayersGrid(tournament: any) {
+  const grid = document.getElementById('players-grid');
+  if (!grid) return;
+  
+  const spotsRemaining = tournament.size - tournament.players.length;
+  
+  grid.innerHTML = tournament.players.map((player: any) => `
+    <div class="bg-lime-900/30 border-2 border-lime-500 rounded-lg p-4 text-center">
+      <div class="text-3xl mb-2">👤</div>
+      <div class="text-white font-bold truncate">${player.name}</div>
+      <div class="text-xs text-gray-400 mt-1">Player</div>
+    </div>
+  `).join('') +
+  
+  Array(spotsRemaining).fill(0).map(() => `
+    <div class="bg-gray-700 border-2 border-dashed border-gray-600 rounded-lg p-4 text-center opacity-50">
+      <div class="text-3xl mb-2">➕</div>
+      <div class="text-gray-500 font-bold">Waiting...</div>
+      <div class="text-xs text-gray-600 mt-1">Empty Slot</div>
+    </div>
+  `).join('');
+}
+
+// Manual start function for host
+(window as any).startTournamentManually = async function() {
+  console.log('🏆 startTournamentManually() called, currentTournamentData:', currentTournamentData);
+  if (!currentTournamentData) {
+    console.error('🏆 No current tournament data!');
+    showBasicToast('error', 'No tournament data available');
+    return;
+  }
+  
+  if (currentTournamentData.status !== 'waiting') {
+    console.log('🏆 Tournament already started:', currentTournamentData.status);
+    showBasicToast('info', 'Tournament already in progress');
+    return;
+  }
+  
+  try {
+    console.log('🏆 Manually starting tournament:', currentTournamentData.tournamentId);
+    showBasicToast('info', 'Starting tournament...');
+    
+    const { tournamentService } = await import('./tournament/TournamentService');
+    const result = await tournamentService.startTournament(currentTournamentData.tournamentId);
+    console.log('🏆 Tournament started successfully:', result);
+    
+    showBasicToast('success', '🚀 Tournament started!');
+  } catch (error) {
+    console.error('Failed to start tournament:', error);
+    showBasicToast('error', `Failed to start tournament: ${(error as Error).message || 'Unknown error'}`);
+  }
+};
+
+(window as any).exitTournamentLobby = function() {
+  if ((window as any)._tournamentCleanup) {
+    (window as any)._tournamentCleanup();
+  }
+  currentTournamentData = null;
+  addBasicJumbotron();
+};
+
+// Show tournament bracket while waiting
+async function showTournamentBracket(tournament: any) {
+  const jumbotron = document.getElementById('jumbotron');
+  if (!jumbotron) return;
+
+  jumbotron.innerHTML = `
+    <div class="min-h-screen bg-gray-900 p-6">
+      <div class="max-w-6xl mx-auto">
+        <div class="bg-gray-800 rounded-lg p-6 mb-6 border-2 border-lime-500">
+          <div class="flex justify-between items-center">
+            <h1 class="text-3xl font-bold text-lime-500">${tournament.name}</h1>
+            <div class="text-gray-400">Round ${tournament.currentRound}</div>
+          </div>
+        </div>
+
+        <div id="tournament-bracket" class="bg-gray-800 rounded-lg p-6">
+          <!-- Bracket will be rendered here -->
+        </div>
+      </div>
+    </div>
+  `;
+  
+  // Import and render bracket
+  try {
+    const { TournamentBracket } = await import('./tournament/TournamentBracket');
+    const bracketContainer = document.getElementById('tournament-bracket');
+    if (bracketContainer) {
+      new TournamentBracket(bracketContainer as HTMLElement, tournament);
+    }
+  } catch (error) {
+    console.error('Failed to render bracket:', error);
+  }
+}
+
+// Launch tournament match
+async function launchTournamentMatch(tournament: any, match: any) {
+  console.log('🏆 launchTournamentMatch called with tournament:', tournament.tournamentId, 'match:', match.id);
+  try {
+    const { TournamentMatchService } = await import('./tournament/TournamentMatchService');
+    const matchService = TournamentMatchService.getInstance();
+    console.log('🏆 TournamentMatchService imported successfully');
+    
+    const currentUser = authService.getUser();
+    console.log('🏆 Current user from authService:', currentUser);
+    if (!currentUser) {
+      console.error('🏆 No current user found!');
+      return;
+    }
+    
+    const currentPlayer = {
+      id: currentUser.id || currentUser.email,
+      name: currentUser.userName || currentUser.firstName || currentUser.email,
+      isOnline: true,
+      isAI: false
+    };
+    console.log('🏆 Current player object:', currentPlayer);
+    
+    console.log('🏆 Calling matchService.startTournamentMatch...');
+    await matchService.startTournamentMatch(
+      tournament,
+      match,
+      currentPlayer,
+      async (gameConfig) => {
+        console.log('🏆 Game config callback received:', gameConfig);
+        
+        // Clear jumbotron
+        const jumbotron = document.getElementById('jumbotron');
+        if (jumbotron) {
+          console.log('🏆 Clearing jumbotron for game...');
+          jumbotron.innerHTML = `
+            <div class="min-h-screen bg-black relative">
+              <canvas id="gameCanvas" class="w-full h-full block"></canvas>
+            </div>
+          `;
+        }
+        
+        // Start the game
+        console.log('🏆 Importing Pong3D...');
+        const { Pong3D } = await import('./game/core/Pong3D');
+        console.log('🏆 Creating Pong3D instance...');
+        currentGameInstance = new Pong3D(gameConfig);
+        console.log('🏆 Pong3D game started successfully!');
+      }
+    );
+  } catch (error) {
+    console.error('Failed to start tournament match:', error);
+    showBasicToast('error', 'Failed to start match');
+  }
+}
+
+// Launch match for NEW tournament system (simplified like Host 2P)
+async function launchNewTournamentMatch(tournament: any, match: any) {
+  console.log('🎮 launchNewTournamentMatch - Simple approach like Host 2P');
+  
+  try {
+    const currentUser = authService.getUser();
+    if (!currentUser) {
+      console.error('❌ No current user found!');
+      return;
+    }
+    
+    // Determine which player is current user
+    const userId = currentUser.id || currentUser.email;
+    const isPlayer1 = match.player1?.id === userId || match.player1?.externalId === userId;
+    const opponent = isPlayer1 ? match.player2 : match.player1;
+    
+    console.log('🎮 Starting game - Current user vs', opponent?.name);
+    
+  // Simple config like Host 2P - NO aggressive UI cleanup, NO canvas manipulation
+    const { clearPongUI } = await import('./ui');
+    clearPongUI();
+
+    // Prepare jumbotron similar to Host 2P so the canvas sits at the top
+    const jumbotron = document.getElementById('jumbotron');
+    if (jumbotron) {
+      jumbotron.innerHTML = `
+        <div class="min-h-screen bg-black relative">
+          <canvas id="gameCanvas" class="w-full h-full block"></canvas>
+        </div>
+      `;
+    } else {
+      document.getElementById('gameCanvas')?.remove();
+    }
+
+    const toastStatus = (message: string, type: 'info' | 'success' | 'error' = 'info') => {
+      try {
+        showBasicToast(type, message);
+      } catch (err) {
+        console.log(`Toast (${type}):`, message, err);
+      }
+    };
+
+    let gameConfig: GameConfig;
+
+    try {
+      gameConfig = await NewTournamentMatchCoordinator.prepareMatchGameConfig({
+        tournament: { id: tournament.id, maxGoals: tournament.maxGoals },
+        match,
+        onStatus: toastStatus
+      });
+    } catch (err) {
+      console.error('❌ Failed to prepare tournament match config:', err);
+      toastStatus('Falling back to local match.', 'error');
+      gameConfig = {
+        playerCount: 2,
+        connection: 'local',
+        winScore: tournament.maxGoals || 5,
+        currentUser,
+        displayNames: [
+          currentUser.userName || currentUser.firstName || 'You',
+          opponent?.name || 'Opponent'
+        ],
+        skipCountdown: true,
+        tournament: {
+          id: tournament.id,
+          matchId: match.id,
+          round: match.round,
+          matchIndex: match.matchIndex || match.matchNumber || 0
+        }
+      } as GameConfig;
+    }
+
+    console.log('🎮 Tournament match game config:', gameConfig);
+
+    CameraConfig.radius = 19;
+
+    const { Pong3D } = await import('./game/core/Pong3D');
+    console.log('🎮 Creating Pong3D instance (tournament)...');
+    currentGameInstance = new Pong3D(gameConfig);
+    
+    console.log('✅ Tournament match started!');
+    
+    // Listen for game end to report results
+    // TODO: Implement game end callback to report winner to backend
+    
+  } catch (error) {
+    console.error('❌ Failed to start tournament match:', error);
+    showBasicToast('error', 'Failed to start match');
+  }
+}
+
+// OLD TOURNAMENT HUB - DEPRECATED (Using new modal system instead)
+/*
+async function launchTournamentHub() {
+	console.log('🏆 Launching Tournament Hub...');
+
+	try {
+		// Clean up any existing game or tournament
+		if (currentGameInstance) {
+			await cleanupGame();
+		}
+		if (currentTournamentHub) {
+			currentTournamentHub.destroy?.();
+			currentTournamentHub = null;
+		}
+
+		// Import tournament UI
+		const { TournamentUI } = await import('./tournament/TournamentUI');
+
+		const jumbotron = document.getElementById('jumbotron');
+		if (!
+			onStartGame: async (gameConfig) => {
+				console.log('🏆 Starting tournament game with config:', gameConfig);
+				try {
+					// Close tournament hub UI
+					if (currentTournamentHub) {
+						currentTournamentHub.destroy?.();
+						currentTournamentHub = null;
+					}
+
+					// Start the game with the tournament config
+					const { Pong3D } = await import('./game/core/Pong3D');
+					currentGameInstance = new Pong3D(gameConfig);
+					
+					console.log('✅ Tournament game started successfully');
+				} catch (error) {
+					console.error('❌ Failed to start tournament game:', error);
+					showBasicToast('error', 'Failed to start game');
+					// Reopen tournament hub on error
+					await launchTournamentHub();
+				}
+			},
+			onClose: () => {
+				console.log('🏆 Closing tournament hub');
+				if (currentTournamentHub) {
+					currentTournamentHub.destroy?.();
+					currentTournamentHub = null;
+				}
+				// Return to home
+				addBasicJumbotron();
+			}
+		});
+
+		console.log('✅ Tournament Hub launched successfully');
+	} catch (error) {
+		console.error('❌ Failed to launch Tournament Hub:', error);
+		showBasicToast('error', 'Failed to launch Tournament Hub');
+		// Return to home on error
+		addBasicJumbotron();
+	}
+}
+*/
 
 async function start3DPongGame() {
 	console.log('🎮 Starting 3D Pong game...');
@@ -1394,12 +2293,9 @@ async function start3DPongGame() {
 		const exitBtn = document.getElementById('exit-game');
 		if (exitBtn) {
 			exitBtn.addEventListener('click', async () => {
-				// Call the same exit functionality as ESC key
 				if (currentGameInstance && typeof currentGameInstance.exitGame === 'function') {
-					// Use the game's built-in exit method (same as ESC key)
 					await currentGameInstance.exitGame();
 				} else {
-					// Fallback to manual cleanup if exitGame method is not available
 					await cleanupGame();
 					addBasicJumbotron();
 				}
@@ -1498,8 +2394,6 @@ function showOfflineMode() {
       <button onclick="this.parentElement.parentElement.remove()" class="ml-2 text-white hover:text-gray-200">&times;</button>
     </div>
   `;
-//   document.body.appendChild(notification);
-
   setTimeout(() => {
     if (notification.parentElement) {
       notification.remove();

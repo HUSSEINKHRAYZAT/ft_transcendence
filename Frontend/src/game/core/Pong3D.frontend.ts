@@ -226,30 +226,13 @@ export function endAndToast(self: any, text: string) {
   t.className =
     "fixed top-5 left-1/2 -translate-x-1/2 bg-black/70 text-white px-4 py-3 rounded-xl z-[10001] font-sans shadow-2xl border border-lime-500/20";
   
-  // Create countdown display
-  const countdownSpan = document.createElement("span");
-  countdownSpan.id = "countdown";
-  countdownSpan.className = "text-yellow-400 font-bold";
-  countdownSpan.textContent = "3";
-  
-  t.innerHTML = `${text} &nbsp; <span class="text-gray-300">Auto-exit in:</span> <span id="countdown-placeholder" class="text-yellow-400 font-bold">3</span>s &nbsp; <button id="re" class="ml-2 bg-lime-500 hover:bg-lime-600 text-black px-3 py-1 rounded-lg font-semibold transition-colors">Play again</button>`;
+  t.innerHTML = `${text} &nbsp; <button id="return-menu-btn" class="ml-2 bg-lime-500 hover:bg-lime-600 text-black px-3 py-1 rounded-lg font-semibold transition-colors">Return to Menu</button>`;
   document.body.appendChild(t);
   
-  // Set up countdown
-  const countdownElement = t.querySelector("#countdown-placeholder");
-  let timeLeft = 3;
-  const countdownInterval = setInterval(() => {
-    timeLeft--;
-    if (countdownElement) {
-      countdownElement.textContent = timeLeft.toString();
-    }
-    if (timeLeft <= 0) {
-      clearInterval(countdownInterval);
-    }
-  }, 1000);
-  
-  (t.querySelector("#re") as HTMLButtonElement).onclick = () => {
-    clearInterval(countdownInterval);
-    location.reload();
+  (t.querySelector("#return-menu-btn") as HTMLButtonElement).onclick = () => {
+    t.remove();
+    window.dispatchEvent(new CustomEvent('ft:pong:returnToMenu', {
+      detail: { reason: 'game-ended' }
+    }));
   };
 }

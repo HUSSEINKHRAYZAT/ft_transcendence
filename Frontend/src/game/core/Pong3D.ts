@@ -1,6 +1,7 @@
 import {
   ArcRotateCamera,
   Color3,
+  Color4,
   DirectionalLight,
   Engine,
   HemisphericLight,
@@ -28,12 +29,23 @@ import {
   safeParse,
   shinyMat,
 } from "../utils/helpers";
+import { showConfirmDialog } from "../../components/modals/ConfirmDialog";
 import { SHAPES, SHAPE_WEIGHTS } from "../config/constants";
 import { themeBridge, type GameThemeColors } from "../utils/ThemeBridge";
 import { socketManager } from "../../services/SocketManager";
 import { GameCountdown } from "../ui/GameCountdown";
 import { CameraConfig } from "../config/camconfig";
 import * as Frontend from "./Pong3D.frontend";
+import { GameBackgroundEffects } from "../effects/GameBackgroundEffects";
+
+type TournamentResultSummary = {
+  tournamentId: string;
+  matchId: string;
+  winnerIdx: number;
+  scores: number[];
+  players?: Array<{ id?: string; name?: string; side?: string }>;
+  isWinner: boolean;
+};
 
 
 
@@ -84,6 +96,9 @@ export class Pong3D {
   private themeUnsubscribe?: () => void;
   private floorTextureIndex?: number;
 
+  // Background effects system
+  private backgroundEffects?: GameBackgroundEffects;
+
   // Chat system removed
 
   private ballRadius = 0.2;
@@ -105,6 +120,8 @@ export class Pong3D {
   private requiredGuests = 0; // 1 (2P) or 3 (4P)
   private connectedGuests = 0;
   private waitUI?: HTMLDivElement;
+  private latestTournamentSummary: TournamentResultSummary | null = null;
+  private tournamentOverlay: HTMLElement | null = null;
 
   // camera “always my paddle on the left”:
   private baseAlpha = Math.PI / 2; // default
@@ -142,9 +159,17 @@ export class Pong3D {
 
     this.engine = new Engine(canvas, true);
     this.scene = new Scene(this.engine);
-    // Initialize theme system
+    
+    // Initialize theme system first
     this.currentGameTheme = themeBridge.getCurrentTheme();
     this.scene.clearColor = this.currentGameTheme.background;
+    
+    // Set ambient color for better overall scene brightness
+    this.scene.ambientColor = new Color3(0.4, 0.4, 0.4); // Increased ambient light
+    
+    // Initialize background effects with theme color
+    const primaryHex = `#${Math.round(this.currentGameTheme.primary.r * 255).toString(16).padStart(2, '0')}${Math.round(this.currentGameTheme.primary.g * 255).toString(16).padStart(2, '0')}${Math.round(this.currentGameTheme.primary.b * 255).toString(16).padStart(2, '0')}`;
+    this.backgroundEffects = new GameBackgroundEffects(primaryHex);
 
     // Listen for theme changes
     this.themeUnsubscribe = themeBridge.onThemeChange((newTheme) => {
@@ -200,11 +225,8 @@ export class Pong3D {
     window.addEventListener("keydown", onKey(true));
     window.addEventListener("keyup", onKey(false));
 
-    // Handle window close/exit - report game results before closing
-    window.addEventListener("beforeunload", this.handleWindowClose.bind(this));
-    window.addEventListener("unload", this.handleWindowClose.bind(this));
-    
     // Handle visibility change (tab switch/minimize)
+    // Note: beforeunload handler removed - players should use ESC key to exit gracefully
     document.addEventListener("visibilitychange", this.handleVisibilityChange.bind(this));
 
     // Remote role
@@ -351,6 +373,12 @@ export class Pong3D {
       this.themeUnsubscribe = undefined;
     }
 
+    // Clean up background effects
+    if (this.backgroundEffects) {
+      this.backgroundEffects.destroy();
+      this.backgroundEffects = undefined;
+    }
+
     // Chat system removed
 
     // Stop all audio to prevent loops
@@ -389,6 +417,13 @@ export class Pong3D {
   }
 
   private async startGameWithCountdown() {
+    if (this.config.skipCountdown) {
+      console.log("⏭️ Skipping countdown overlay (config.skipCountdown)");
+      this.gameState.matchReady = true;
+      this.resetBall(Math.random() < 0.5 ? 1 : -1);
+      return;
+    }
+
     // Show countdown before starting the game
     const countdown = new GameCountdown({
       onComplete: () => {
@@ -416,6 +451,16 @@ export class Pong3D {
     }
 
     // For WebSocket games (2P), show countdown and then start
+    if (this.config.skipCountdown) {
+      console.log("⏭️ beginMatch skipping countdown");
+      this.gameState.matchReady = true;
+      this.resetBall(Math.random() < 0.5 ? 1 : -1);
+      if (this.isHost) {
+        this.sendRemoteMessage({ t: "start" } as RemoteMsg);
+      }
+      return;
+    }
+
     const countdown = new GameCountdown({
       onComplete: () => {
         this.gameState.matchReady = true;
@@ -435,19 +480,22 @@ export class Pong3D {
     const width = 20;
     const height = this.config.playerCount === 4 ? 20 : 10;
 
-    // Lights
-    new HemisphericLight("hemi", new Vector3(0, 1, 0), this.scene);
+    // Lights - Increased brightness for better visibility
+    const hemi = new HemisphericLight("hemi", new Vector3(0, 1, 0), this.scene);
+    hemi.intensity = 1.2; // Increased ambient lighting
     const dir = new DirectionalLight("dir", new Vector3(0, -1, 1), this.scene);
-    dir.intensity = 0.9;
+    dir.intensity = 1.5; // Increased directional lighting for tournament visibility
 
     // Field (picture floor)
     const textures = [
-      "/textures/floor.png",
+      "/textures/floor.jpeg",
       "/textures/floor1.jpg",
       "/textures/floor2.jpg",
       "/textures/floor3.jpg",
       "/textures/floor4.jpg",
-      "/textures/floor5.jpg"
+      "/textures/floor5.jpg",
+      "/textures/floor6.png",
+      "/textures/floor7.png"
     ];
 
     // Floor texture selection
@@ -1097,7 +1145,29 @@ this.rightWall = wall(
         
         // End the game immediately when any player leaves during gameplay
         this.gameState.matchReady = false;
-        this.endAndToast("Game ended - Player disconnected");
+        
+        // For tournament matches, handle disconnection specially
+        if (this.config.tournament) {
+          console.log('🏆 Tournament match - opponent disconnected');
+          // Determine if local player wins by forfeit
+          const localPlayerIndex = this.getLocalControlledIndices()[0] || 0;
+          const localPlayerName = this.getPlayerName(localPlayerIndex);
+          
+          // Award victory to remaining player by forfeit
+          const newScores = [...this.gameState.scores];
+          if (localPlayerIndex === 0) {
+            newScores[0] = this.config.winScore || 5;
+            newScores[1] = 0;
+          } else {
+            newScores[0] = 0;
+            newScores[1] = this.config.winScore || 5;
+          }
+          (this.gameState as any).scores = newScores;
+          
+          this.endAndToast(`Opponent disconnected - ${localPlayerName} wins by forfeit!`);
+        } else {
+          this.endAndToast("Game ended - Player disconnected");
+        }
       } else if (this.isHost) {
         // If game hasn't started yet, just update the waiting status
         this.connectedGuests = Math.max(0, this.connectedGuests - 1);
@@ -1176,14 +1246,20 @@ this.rightWall = wall(
         this.hideWaitingOverlay();
         
         // Show countdown for all Socket.IO players simultaneously  
-        const countdown = new GameCountdown({
-          onComplete: () => {
-            console.log(`🎮 Player ${this.isHost ? 'host' : 'guest'} countdown complete - starting game`);
-            this.gameState.matchReady = true;
-            this.resetBall(Math.random() < 0.5 ? 1 : -1);
-          },
-        });
-        countdown.start(); // Synchronized countdown for all players
+        if (this.config.skipCountdown) {
+          console.log("⏭️ game_started skipping countdown");
+          this.gameState.matchReady = true;
+          this.resetBall(Math.random() < 0.5 ? 1 : -1);
+        } else {
+          const countdown = new GameCountdown({
+            onComplete: () => {
+              console.log(`🎮 Player ${this.isHost ? 'host' : 'guest'} countdown complete - starting game`);
+              this.gameState.matchReady = true;
+              this.resetBall(Math.random() < 0.5 ? 1 : -1);
+            },
+          });
+          countdown.start(); // Synchronized countdown for all players
+        }
       } else {
         console.log(`🎮 Player received game_started but game already ready`);
       }
@@ -1269,9 +1345,36 @@ this.rightWall = wall(
         ? `🏠 Game ended by Host - ${stateMsg.exitedBy || 'Host'} left the game` 
         : `🔗 Game ended by Joiner - ${stateMsg.exitedBy || 'Joiner'} left the game`;
       
+      // For tournament matches, don't show toast or reload
+      if (this.config.tournament) {
+        console.log("🏆 Tournament match - opponent exited. Checking for forfeit...");
+        // The opponent left, so local player wins by forfeit
+        const localPlayerIndex = this.getLocalControlledIndices()[0] || 0;
+        
+        // Create tournament summary for forfeit win
+        const summary: TournamentResultSummary = {
+          tournamentId: this.config.tournament.id,
+          matchId: this.config.tournament.matchId,
+          scores: [localPlayerIndex === 0 ? (this.config.winScore || 5) : 0, 
+                   localPlayerIndex === 1 ? (this.config.winScore || 5) : 0],
+          winnerIdx: localPlayerIndex,
+          players: (this.config.tournament.players || []).map((player, idx) => ({
+            id: player.id,
+            name: player.name,
+            side: player.side ?? (idx === 0 ? 'left' : 'right'),
+          })),
+          isWinner: true,
+        };
+        
+        this.latestTournamentSummary = summary;
+
+        void this.showTournamentWinnerScreen(summary);
+        return;
+      }
+      
       this.endAndToast(exitMessage);
       
-      // Auto-return to menu after 3 seconds
+      // Auto-return to menu after 3 seconds (non-tournament only)
       setTimeout(() => {
         console.log("🕐 3 seconds elapsed - exiting game session automatically");
         this.gameState.matchReady = false;
@@ -1299,13 +1402,49 @@ this.rightWall = wall(
         this.handleGameEndAudio(stateMsg.winnerIdx);
       }
 
-      // Auto-exit after 3 seconds
-      setTimeout(() => {
-        console.log("🕐 3 seconds elapsed - ending game session automatically");
-        this.gameState.matchReady = false;
+      // Check if this is a tournament match
+      if (this.config.tournament) {
+        console.log("🏆 Tournament match ended");
         this.stopAllAudio();
-        window.location.reload();
-      }, 3000);
+        
+        const summary: TournamentResultSummary = {
+          tournamentId: this.config.tournament.id,
+          matchId: this.config.tournament.matchId,
+          scores: [...this.gameState.scores],
+          winnerIdx: stateMsg.winnerIdx,
+          players: (this.config.tournament.players || []).map((player, idx) => ({
+            id: player.id,
+            name: player.name,
+            side: player.side ?? (idx === 0 ? 'left' : 'right'),
+          })),
+          isWinner: isLocalWinner,
+        };
+
+        this.latestTournamentSummary = summary;
+
+        try {
+          sessionStorage.setItem('ft_pong_tournament_match_ended', JSON.stringify(summary));
+        } catch (error) {
+          console.warn('Unable to cache tournament result summary:', error);
+        }
+
+        this.dispatchTournamentMatchEvent(isLocalWinner ? 'victory' : 'eliminated', summary, 'auto');
+
+        // Show appropriate screen based on match outcome
+        if (isLocalWinner) {
+          void this.showTournamentWinnerScreen(summary);
+        } else {
+          this.showTournamentGameOverScreen(summary);
+        }
+      } else {
+        // Non-tournament game: auto-exit after 3 seconds
+        setTimeout(() => {
+          console.log("🕐 3 seconds elapsed - ending game session automatically");
+          this.gameState.matchReady = false;
+          this.stopAllAudio();
+          window.location.reload();
+        }, 3000);
+      }
       return;
     }
 
@@ -1407,13 +1546,19 @@ this.rightWall = wall(
           if (!this.gameState.matchReady) {
             this.hideWaitingOverlay();
             // Show countdown for joiner too
-            const countdown = new GameCountdown({
-              onComplete: () => {
-                this.gameState.matchReady = true;
-                this.resetBall(Math.random() < 0.5 ? 1 : -1);
-              },
-            });
-            countdown.start(); // Fire and forget, synchronized with host
+            if (this.config.skipCountdown) {
+              console.log("⏭️ Guest received start - skipping countdown");
+              this.gameState.matchReady = true;
+              this.resetBall(Math.random() < 0.5 ? 1 : -1);
+            } else {
+              const countdown = new GameCountdown({
+                onComplete: () => {
+                  this.gameState.matchReady = true;
+                  this.resetBall(Math.random() < 0.5 ? 1 : -1);
+                },
+              });
+              countdown.start(); // Fire and forget, synchronized with host
+            }
           }
           return;
         }
@@ -1709,6 +1854,11 @@ this.rightWall = wall(
     this.ballVelocity.y -= 0.008;
     this.ball.position.addInPlace(this.ballVelocity);
 
+    // Update background effects with ball position
+    const ballScreenX = ((this.ball.position.x + width/2) / width) * 100;
+    const ballScreenY = ((this.ball.position.z + height/2) / height) * 100;
+    this.backgroundEffects?.updateBallPosition(ballScreenX, ballScreenY);
+
     ensureMinHorizontalSpeed(this.ballVelocity, this.minHorizontalSpeed);
 
     // Ground
@@ -1765,6 +1915,11 @@ this.rightWall = wall(
         this.gameState.obstacleAfterHit = false;
         flashPaddle(p);
         this.playHit("paddle"); // SOUND
+        
+        // Trigger background effects for ball hit
+        const ballScreenX = ((this.ball.position.x + width/2) / width) * 100;
+        const ballScreenY = ((this.ball.position.z + height/2) / height) * 100;
+        this.backgroundEffects?.onBallHit(ballScreenX, ballScreenY);
       }
     }
     for (let idx = 2; idx < Math.min(4, this.paddles.length); idx++) {
@@ -1791,6 +1946,11 @@ this.rightWall = wall(
         this.gameState.obstacleAfterHit = false;
         flashPaddle(p);
         this.playHit("paddle"); // SOUND
+        
+        // Trigger background effects for ball hit
+        const ballScreenX = ((this.ball.position.x + width/2) / width) * 100;
+        const ballScreenY = ((this.ball.position.z + height/2) / height) * 100;
+        this.backgroundEffects?.onBallHit(ballScreenX, ballScreenY);
       }
     }
 
@@ -1853,6 +2013,9 @@ this.rightWall = wall(
           this.gameState.addScore(this.gameState.lastHitter);
           this.gameState.lastScorer = this.gameState.lastHitter;
           this.updateScoreUI();
+          
+          // Trigger background effects for scoring
+          this.backgroundEffects?.onScore(this.gameState.lastHitter);
 
           // Chat system removed
 
@@ -1888,6 +2051,10 @@ this.rightWall = wall(
             this.ball.position.z
           );
           this.updateScoreUI();
+          
+          // Trigger background effects for scoring
+          this.backgroundEffects?.onScore(0);
+          
           const winResult = this.gameState.isWinConditionMet();
           if (winResult.hasWinner) {
             this.finishAndReport(winResult.winner);
@@ -1908,6 +2075,10 @@ this.rightWall = wall(
             this.ball.position.z
           );
           this.updateScoreUI();
+          
+          // Trigger background effects for scoring
+          this.backgroundEffects?.onScore(1);
+          
           const winResult = this.gameState.isWinConditionMet();
           if (winResult.hasWinner) {
             this.finishAndReport(winResult.winner);
@@ -2113,7 +2284,12 @@ this.rightWall = wall(
     if (this.isHost || this.isGuest) {
       const playerName = this.getPlayerName(this.getLocalControlledIndices()[0] || 0);
       const playerRole = this.isHost ? "Host" : "Joiner";
-      const confirmed = confirm(`Are you sure you want to exit the game?\n\nThis will end the match for all players.`);
+      const confirmed = await showConfirmDialog(
+        `This will end the match for all players.`,
+        'Exit Game?',
+        'Yes, Exit',
+        'Stay in Game'
+      );
 
       if (!confirmed) {
         return; // Player cancelled, don't exit
@@ -2312,13 +2488,54 @@ this.rightWall = wall(
       }
     }
 
-    // Wait 3 seconds then automatically exit session
-    setTimeout(() => {
-      console.log("🕐 3 seconds elapsed - ending game session automatically");
-      this.gameState.matchReady = false;
+    // Handle tournament match end for host
+    if (this.config.tournament) {
+      console.log("🏆 Tournament match ended (host) - showing tournament UI");
       this.stopAllAudio();
-      window.location.reload();
-    }, 3000);
+      
+      const isLocalWinner = this.getLocalControlledIndices().includes(winnerIdx);
+      const summary: TournamentResultSummary = {
+        tournamentId: this.config.tournament.id,
+        matchId: this.config.tournament.matchId,
+        scores: [...this.gameState.scores],
+        winnerIdx: winnerIdx,
+        players: (this.config.tournament.players || []).map((player: any, idx: number) => ({
+          id: player.id,
+          name: player.name,
+          side: player.side ?? (idx === 0 ? 'left' : 'right'),
+        })),
+        isWinner: isLocalWinner,
+      };
+
+      this.latestTournamentSummary = summary;
+
+      try {
+        sessionStorage.setItem('ft_pong_tournament_match_ended', JSON.stringify(summary));
+      } catch (error) {
+        console.warn('Unable to cache tournament result summary:', error);
+      }
+
+      this.dispatchTournamentMatchEvent(isLocalWinner ? 'victory' : 'eliminated', summary, 'auto');
+
+      // Show appropriate screen based on match outcome
+      if (isLocalWinner) {
+        void this.showTournamentWinnerScreen(summary);
+      } else {
+        this.showTournamentGameOverScreen(summary);
+      }
+      
+      return; // Don't continue with non-tournament logic
+    }
+
+    // Wait 3 seconds then automatically exit session (NON-TOURNAMENT ONLY)
+    if (!this.config.tournament) {
+      setTimeout(() => {
+        console.log("🕐 3 seconds elapsed - ending game session automatically");
+        this.gameState.matchReady = false;
+        this.stopAllAudio();
+        window.location.reload();
+      }, 3000);
+    }
 
     // Chat system removed
 
@@ -2329,22 +2546,8 @@ this.rightWall = wall(
     if (this.isHost) {
       const scores = [...this.gameState.scores];
       try {
-        if (this.config.tournament) {
-          const t = this.config.tournament;
-          const leftScore = scores[0] || 0,
-            rightScore = scores[1] || 0;
-          const winnerUserId = winnerIdx === 0 ? t.leftUserId : t.rightUserId;
-          await ApiClient.reportTournamentMatch({
-            tournamentId: t.tournamentId,
-            round: t.round,
-            matchIndex: t.matchIndex,
-            leftUserId: t.leftUserId,
-            rightUserId: t.rightUserId,
-            leftScore,
-            rightScore,
-            winnerUserId,
-          });
-        } else if (this.config.matchId) {
+        // Tournament support
+        if (this.config.matchId) {
           const winnerUserId = this.config.currentUser?.id || null;
           await ApiClient.postMatchResult({
             matchId: this.config.matchId,
@@ -2352,12 +2555,1010 @@ this.rightWall = wall(
             scores,
           });
         }
+
+        // Handle tournament match completion
+        const tMeta: any = (this.config as any).tournament; // safe cast to avoid TS narrowing to never
+        if (tMeta && tMeta.id && tMeta.matchId) {
+          try {
+            const { tournamentService } = await import("../../tournament/TournamentService");
+
+            // Determine winner ID
+            const winScore = this.config.winScore || 5;
+            const winners = this.gameState.scores
+              .map((score, idx) => ({ score, idx }))
+              .filter(({ score }) => score === winScore);
+
+            if (winners.length === 1) {
+              const wIdx = winners[0].idx;
+              const players = tMeta.players || [];
+              const winner = players[wIdx];
+
+              if (winner && winner.id) {
+                await tournamentService.completeMatch(
+                  tMeta.id,
+                  tMeta.matchId,
+                  winner.id,
+                  this.gameState.scores[0] || 0,
+                  this.gameState.scores[1] || 0
+                );
+
+                console.log(`Tournament match completed: ${winner.name} wins ${this.gameState.scores[0]}-${this.gameState.scores[1]}`);
+              }
+            }
+          } catch (error) {
+            console.error('Failed to complete tournament match:', error);
+          }
+        }
       } catch {}
     }
   }
 
   private endAndToast(text: string) {
-  Frontend.endAndToast(this, text);
+    // For tournament matches, don't show the generic "Return to Menu" toast
+    // Tournament matches handle their own UI (winner screen, loser screen, etc.)
+    if (this.config.tournament) {
+      console.log(`🏆 Tournament match ended: ${text} - Handled by tournament UI`);
+
+      // Ensure ALL players get redirected to tournament brackets after 15 seconds
+      // This is a safety fallback in case bracket overlay fails
+      setTimeout(() => {
+        console.log('🏆 Fallback tournament redirect after 15 seconds');
+        window.dispatchEvent(new CustomEvent('ft:tournament:showTournamentHub', {
+          detail: {
+            action: 'fallback_redirect',
+            source: 'endAndToast_timeout'
+          }
+        }));
+      }, 15000);
+
+      return;
+    }
+
+    Frontend.endAndToast(this, text);
+  }
+
+  /* ---------------- TOURNAMENT SCREENS ---------------- */
+
+  private async showTournamentGameOverScreen(summary: TournamentResultSummary) {
+    console.log('❌ Showing Game Over screen for loser - will transition to bracket');
+
+    this.latestTournamentSummary = summary;
+    this.engine.stopRenderLoop();
+    this.cleanupTournamentOverlay();
+
+    const [scoreLeft = 0, scoreRight = 0] = summary.scores ?? [];
+
+    const overlay = document.createElement('div');
+    overlay.id = 'tournament-game-over-overlay';
+    overlay.className = 'tournament-overlay';
+    overlay.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.95);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 10000;
+    `;
+
+    overlay.innerHTML = `
+      <div style="text-align: center; animation: fadeIn 1s;">
+        <div style="font-size: 120px; margin-bottom: 30px;">💀</div>
+        <h1 style="color: #ef4444; font-size: 72px; font-weight: bold; margin-bottom: 20px; text-shadow: 0 0 30px rgba(239, 68, 68, 0.8);">
+          GAME OVER
+        </h1>
+        <p style="color: #94a3b8; font-size: 24px; margin-bottom: 24px;">
+          You have been eliminated from the tournament
+        </p>
+        <p style="color: #64748b; font-size: 20px; margin-bottom: 40px;">
+          Final Score: <strong>${scoreLeft}</strong> - <strong>${scoreRight}</strong>
+        </p>
+      </div>
+
+      <style>
+        @keyframes fadeIn {
+          from { opacity: 0; transform: scale(0.9); }
+          to { opacity: 1; transform: scale(1); }
+        }
+      </style>
+    `;
+
+    document.body.appendChild(overlay);
+    this.tournamentOverlay = overlay;
+
+    // Show game over message for 2 seconds, then return to main menu
+    setTimeout(() => {
+      console.log('❌ Loser returning to main menu after 2 seconds');
+      
+      // Clean up overlay
+      if (overlay.parentElement) {
+        overlay.parentElement.removeChild(overlay);
+      }
+      this.tournamentOverlay = null;
+      
+      // Stop game and return to main menu
+      this.gameState.matchReady = false;
+      this.stopAllAudio();
+      window.location.reload();
+    }, 2000);
+  }
+
+  private async showTournamentWinnerScreen(summary: TournamentResultSummary) {
+    console.log('🏆 Showing Victory screen - will transition to bracket');
+
+    this.latestTournamentSummary = summary;
+
+    if (summary.isWinner) {
+      await this.reportTournamentMatchCompletion(summary);
+    }
+
+    this.engine.stopRenderLoop();
+    this.cleanupTournamentOverlay();
+
+    const [scoreLeft = 0, scoreRight = 0] = summary.scores ?? [];
+    const players = summary.players ?? [];
+    const winner = players[summary.winnerIdx]?.name || 'You';
+
+    const overlay = document.createElement('div');
+    overlay.id = 'tournament-winner-overlay';
+    overlay.className = 'tournament-overlay';
+    overlay.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.95);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 10000;
+    `;
+
+    overlay.innerHTML = `
+      <div style="text-align: center; animation: fadeIn 1s;">
+        <div style="font-size: 120px; margin-bottom: 30px;">🏆</div>
+        <h1 style="color: #84cc16; font-size: 72px; font-weight: bold; margin-bottom: 20px; text-shadow: 0 0 30px rgba(132, 204, 22, 0.8);">
+          VICTORY!
+        </h1>
+        <p style="color: #94a3b8; font-size: 24px; margin-bottom: 24px;">
+          ${winner} wins the match!
+        </p>
+        <p style="color: #64748b; font-size: 20px; margin-bottom: 40px;">
+          Final Score: <strong>${scoreLeft}</strong> - <strong>${scoreRight}</strong>
+        </p>
+        <p id="transition-message" style="color: #84cc16; font-size: 18px; margin-bottom: 20px;">
+          Loading tournament bracket...
+        </p>
+      </div>
+
+      <style>
+        @keyframes fadeIn {
+          from { opacity: 0; transform: scale(0.9); }
+          to { opacity: 1; transform: scale(1); }
+        }
+      </style>
+    `;
+
+    document.body.appendChild(overlay);
+    this.tournamentOverlay = overlay;
+
+    // Show victory message for 2 seconds, then show bracket
+    setTimeout(async () => {
+      console.log('🏆 Winner viewing tournament bracket');
+      
+      try {
+        // Clear the overlay content and show bracket
+        overlay.innerHTML = '';
+        overlay.style.background = 'rgba(0, 0, 0, 0.95)';
+        overlay.style.padding = '40px 20px';
+        overlay.style.overflowY = 'auto';
+        
+        // Show bracket/next match screen
+        this.checkForNextTournamentMatch(overlay, summary);
+      } catch (error) {
+        console.error('❌ Failed to show bracket:', error);
+      }
+    }, 2000);
+  }
+
+  private async reportTournamentMatchCompletion(summary: TournamentResultSummary) {
+    if (!summary.isWinner) {
+      return;
+    }
+
+    try {
+      const { tournamentService } = await import('../../tournament/TournamentService');
+      const [score1 = 0, score2 = 0] = summary.scores ?? [];
+      const winner = summary.players?.[summary.winnerIdx] ?? this.config.tournament?.players?.[summary.winnerIdx];
+
+      if (!winner?.id) {
+        console.warn('🏆 Cannot determine winner ID for match completion');
+        return;
+      }
+
+      await tournamentService.completeMatch(
+        summary.tournamentId,
+        summary.matchId,
+        winner.id,
+        score1,
+        score2
+      );
+
+      console.log('✅ Match completion reported successfully');
+    } catch (error) {
+      console.error('❌ Failed to report match completion:', error);
+    }
+  }
+
+  private async checkForNextTournamentMatch(overlay: HTMLElement, summary?: TournamentResultSummary) {
+    try {
+      const matchSummary = summary ?? this.getCachedTournamentSummary();
+      if (!matchSummary) {
+        this.showBracketWaitingScreen(overlay);
+        return;
+      }
+
+      console.log('🏆[loop-fix] Checking for next tournament match...');
+      const { tournamentService } = await import('../../tournament/TournamentService');
+      const tournament = await tournamentService.getTournament(matchSummary.tournamentId);
+
+      if (tournament.status === 'completed' || tournament.isComplete) {
+        this.showTournamentCompleteScreen(overlay);
+        return;
+      }
+
+      const { authService } = await import('../../');
+      const currentUser = authService.getUser();
+      const userId = currentUser?.id || currentUser?.email;
+
+      // Identify the just-finished match to enforce round advancement
+      const prevMatch = tournament.matches.find((m: any) => m.id === matchSummary.matchId);
+      const prevRound = prevMatch?.round ?? -1;
+
+      // Active match = not complete & actively flagged (backend uses isActive)
+      const activeMatch = tournament.matches.find((m: any) =>
+        !m.isComplete && m.isActive && (m.player1?.id === userId || m.player2?.id === userId) && m.round > prevRound
+      );
+      if (activeMatch) {
+        console.log('🚀[loop-fix] Active next-round match found -> auto start path', { matchId: activeMatch.id, round: activeMatch.round, prevRound });
+        this.autoStartNextMatch(overlay, tournament, activeMatch);
+        return;
+      }
+
+      // Pending next match (both players assigned, not complete, not active yet, higher round)
+      const pendingNext = tournament.matches.find((m: any) =>
+        !m.isComplete && !m.isActive && (m.player1 && m.player2) && (m.player1.id === userId || m.player2.id === userId) && m.round > prevRound
+      );
+      if (pendingNext) {
+        const isPlayer1 = pendingNext.player1?.id === userId;
+        console.log('⏳[loop-fix] Pending next-round match located', { matchId: pendingNext.id, round: pendingNext.round, prevRound, isPlayer1 });
+        // Both players see same ready screen (host/guest distinction handled in ready logic)
+        this.showNextMatchScreen(overlay, tournament, pendingNext);
+        return;
+      }
+
+      console.log('⌛[loop-fix] No next-round match yet -> bracket waiting');
+      this.showBracketWaitingScreen(overlay, tournament);
+    } catch (error) {
+      console.error('❌[loop-fix] Failed to check next match:', error);
+      this.showBracketWaitingScreen(overlay);
+    }
+  }
+
+  private async showNextMatchScreen(overlay: HTMLElement, tournament: any, match: any) {
+    this.tournamentOverlay = overlay;
+    
+    // Clear overlay and show bracket with ready button
+    overlay.innerHTML = '';
+    overlay.style.background = 'rgba(0, 0, 0, 0.95)';
+    overlay.style.padding = '40px 20px';
+    overlay.style.overflowY = 'auto';
+    
+    const container = document.createElement('div');
+    container.style.cssText = 'max-width: 1400px; margin: 0 auto;';
+    
+    const opponent = match.player1?.id === (this.config.currentUser?.id || this.config.currentUser?.email) 
+      ? match.player2 
+      : match.player1;
+    
+    container.innerHTML = `
+      <div style="text-align: center; margin-bottom: 32px;">
+        <div style="font-size: 80px; margin-bottom: 16px;">🏆</div>
+        <h1 style="color: #84cc16; font-size: 48px; font-weight: bold; margin-bottom: 16px; text-shadow: 0 0 20px rgba(132, 204, 22, 0.5);">
+          Victory!
+        </h1>
+        <p style="color: #94a3b8; font-size: 20px; margin-bottom: 24px;">
+          You won your match! Get ready for your next opponent
+        </p>
+        <h2 style="color: #84cc16; font-size: 32px; font-weight: bold; margin-bottom: 12px;">
+          Next Match: vs ${opponent?.name || 'Opponent'}
+        </h2>
+        <p id="ready-status" style="color: #64748b; font-size: 18px; margin-bottom: 24px;">
+          Click "Ready" when you're prepared to play
+        </p>
+      </div>
+
+      <div id="tournament-bracket-container" style="
+        width: 100%;
+        background: rgba(15, 23, 42, 0.9);
+        border: 2px solid rgba(132, 204, 22, 0.3);
+        border-radius: 16px;
+        padding: 24px;
+        margin-bottom: 24px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+      ">
+        <div style="text-align: center; color: #64748b; padding: 40px;">
+          <div style="font-size: 48px; margin-bottom: 16px;">⏳</div>
+          <div style="font-size: 18px;">Loading tournament bracket...</div>
+        </div>
+      </div>
+
+      <div style="text-align: center;">
+        <button id="ready-btn" style="
+          padding: 20px 60px;
+          font-size: 24px;
+          font-weight: bold;
+          color: white;
+          background: linear-gradient(135deg, #84cc16, #65a30d);
+          border: none;
+          border-radius: 12px;
+          cursor: pointer;
+          transition: all 0.3s;
+          box-shadow: 0 8px 24px rgba(132, 204, 22, 0.3);
+        ">
+          ✓ Ready to Play
+        </button>
+      </div>
+    `;
+    
+    overlay.appendChild(container);
+    await this.renderTournamentBracket(tournament);
+    
+    // Set up ready button handler
+    const readyBtn = container.querySelector('#ready-btn') as HTMLButtonElement;
+    const readyStatus = container.querySelector('#ready-status');
+    let isReady = false;
+    
+    readyBtn?.addEventListener('click', async () => {
+      if (isReady) return;
+      
+      isReady = true;
+      readyBtn.disabled = true;
+      readyBtn.style.background = 'linear-gradient(135deg, #64748b, #475569)';
+      readyBtn.innerHTML = '✓ Waiting for opponent...';
+      
+      if (readyStatus) {
+        readyStatus.innerHTML = `
+          <div style="display: flex; align-items: center; justify-content: center; gap: 12px;">
+            <div style="
+              width: 20px;
+              height: 20px;
+              border: 2px solid #374151;
+              border-top-color: #84cc16;
+              border-radius: 50%;
+              animation: spin 1s linear infinite;
+            "></div>
+            <span style="color: #84cc16;">You're ready! Waiting for ${opponent?.name || 'opponent'}...</span>
+          </div>
+          <style>
+            @keyframes spin {
+              from { transform: rotate(0deg); }
+              to { transform: rotate(360deg); }
+            }
+          </style>
+        `;
+      }
+      
+      // Mark player as ready
+      try {
+        const { tournamentService } = await import('../../tournament/TournamentService');
+        await tournamentService.markPlayerReady(tournament.tournamentId, match.id);
+        console.log('✅ Marked as ready for match:', match.id);
+      } catch (error) {
+        console.error('❌ Failed to mark ready:', error);
+      }
+    });
+    
+    // Listen for when both players are ready
+    this.setupBothPlayersReadyListener(overlay, tournament, match);
+  }
+
+  private async setupBothPlayersReadyListener(overlay: HTMLElement, tournament: any, match: any) {
+    const { tournamentService } = await import('../../tournament/TournamentService');
+    const { authService } = await import('../../');
+    
+    const currentUser = authService.getUser();
+    const userId = currentUser?.id || currentUser?.email;
+    const isPlayer1 = match.player1?.id === userId;
+    
+    const handleBothReady = ({ matchId, players }: any) => {
+      if (matchId !== match.id) return;
+      
+      console.log('🎮 Both players ready! Starting match...', players);
+      tournamentService.off('bothPlayersReady', handleBothReady);
+      
+      // Show transition and start match
+      const readyStatus = overlay.querySelector('#ready-status');
+      if (readyStatus) {
+        readyStatus.innerHTML = `
+          <div style="color: #84cc16; font-size: 20px; font-weight: bold; animation: pulse 1s infinite;">
+            🎮 Both players ready! Starting match...
+          </div>
+        `;
+      }
+      
+      setTimeout(() => {
+        // Both players call startNextTournamentMatch
+        // The TournamentMatchService handles host/guest logic internally
+        // Player1 becomes host and creates room
+        // Player2 becomes guest and waits for room announcement
+        console.log(`🏆 ${isPlayer1 ? 'Player 1 (Host)' : 'Player 2 (Guest)'} starting match flow`);
+        this.startNextTournamentMatch(tournament, match);
+      }, 1500);
+    };
+    
+    tournamentService.on('bothPlayersReady', handleBothReady);
+    
+    // Clean up listener if overlay is removed
+    const overlayObserver = new MutationObserver(() => {
+      if (!document.body.contains(overlay)) {
+        tournamentService.off('bothPlayersReady', handleBothReady);
+        overlayObserver.disconnect();
+      }
+    });
+    overlayObserver.observe(document.body, { childList: true, subtree: true });
+  }
+
+  private async showBracketWaitingScreen(overlay: HTMLElement, tournament?: any) {
+    this.tournamentOverlay = overlay;
+    let statusEl = overlay.querySelector('#tournament-status');
+    let actionEl = overlay.querySelector('#tournament-action');
+    
+    // Create structure if it doesn't exist
+    if (!statusEl || !actionEl) {
+      overlay.innerHTML = `
+        <div style="max-width: 1400px; margin: 0 auto; padding: 20px;">
+          <div id="tournament-status"></div>
+          <div id="tournament-action"></div>
+        </div>
+      `;
+      statusEl = overlay.querySelector('#tournament-status');
+      actionEl = overlay.querySelector('#tournament-action');
+    }
+    
+    if (statusEl) {
+      statusEl.innerHTML = `
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 16px;">
+          <div style="font-size: 80px; margin-bottom: 8px;">🏆</div>
+          <div style="font-size: 42px; font-weight: bold; color: #84cc16; text-shadow: 0 0 20px rgba(132, 204, 22, 0.5);">
+            Victory!
+          </div>
+          <div style="font-size: 20px; color: #94a3b8; margin-bottom: 8px;">
+            You won your match! Waiting for other matches to complete...
+          </div>
+          <div style="font-size: 16px; color: #64748b; font-style: italic;">
+            You'll be automatically notified when your next match is ready
+          </div>
+        </div>
+      `;
+    }
+    
+    if (actionEl) {
+      actionEl.innerHTML = `
+        <div id="tournament-bracket-container" style="
+          width: 100%;
+          max-width: 1200px;
+          max-height: 70vh;
+          overflow: auto;
+          background: rgba(15, 23, 42, 0.9);
+          border: 2px solid rgba(132, 204, 22, 0.3);
+          border-radius: 16px;
+          padding: 24px;
+          margin: 24px auto;
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        ">
+          <div style="text-align: center; color: #64748b; padding: 40px;">
+            <div style="font-size: 48px; margin-bottom: 16px;">⏳</div>
+            <div style="font-size: 18px;">Loading tournament bracket...</div>
+          </div>
+        </div>
+        <div style="display: flex; gap: 16px; justify-content: center; margin-top: 20px;">
+          <button id="refresh-bracket-btn" style="
+            padding: 14px 36px;
+            font-size: 16px;
+            font-weight: bold;
+            color: #84cc16;
+            background: rgba(132, 204, 22, 0.1);
+            border: 2px solid rgba(132, 204, 22, 0.4);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+          ">
+            � Refresh Bracket
+          </button>
+          <button id="exit-tournament-btn" style="
+            padding: 14px 36px;
+            font-size: 16px;
+            font-weight: bold;
+            color: #ef4444;
+            background: rgba(239, 68, 68, 0.1);
+            border: 2px solid rgba(239, 68, 68, 0.4);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+          ">
+            ❌ Exit Tournament
+          </button>
+        </div>
+      `;
+      
+      // Render bracket if tournament data available
+      if (tournament) {
+        this.renderTournamentBracket(tournament);
+      }
+      
+      const exitBtn = actionEl.querySelector('#exit-tournament-btn');
+      exitBtn?.addEventListener('click', async () => {
+        const confirmed = await import('../../components/modals/ConfirmDialog').then(m => 
+          m.showConfirmDialog(
+            'Are you sure you want to leave the tournament?',
+            'Exit Tournament',
+            'Yes, Exit',
+            'Stay'
+          )
+        );
+        if (confirmed) {
+          const summary = this.getCachedTournamentSummary();
+          void this.finishTournamentMatch(summary?.isWinner ? 'victory' : 'eliminated', summary || undefined);
+        }
+      });
+      
+      const refreshBtn = actionEl.querySelector('#refresh-bracket-btn');
+      refreshBtn?.addEventListener('click', async () => {
+        try {
+          const summary = this.getCachedTournamentSummary();
+          if (!summary) return;
+          
+          const { tournamentService } = await import('../../tournament/TournamentService');
+          const updatedTournament = await tournamentService.getTournament(summary.tournamentId);
+          
+          this.renderTournamentBracket(updatedTournament);
+          
+          // Show brief feedback
+          const btn = refreshBtn as HTMLButtonElement;
+          const originalText = btn.innerHTML;
+          btn.innerHTML = '✅ Updated!';
+          btn.disabled = true;
+          setTimeout(() => {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+          }, 1500);
+        } catch (error) {
+          console.error('❌ Failed to refresh bracket:', error);
+        }
+      });
+    }
+    
+    // Set up real-time WebSocket listeners for bracket updates
+    const { tournamentService } = await import('../../tournament/TournamentService');
+    const { authService } = await import('../../');
+    
+    const handleTournamentUpdate = (updatedTournament: any) => {
+      // Only update if overlay is still visible
+      if (!document.body.contains(overlay)) return;
+      
+      console.log('🔄 Real-time bracket update received');
+      this.renderTournamentBracket(updatedTournament);
+      
+      // Check if tournament is completed
+      if (updatedTournament.status === 'completed') {
+        tournamentService.off('tournamentUpdated', handleTournamentUpdate);
+        tournamentService.off('matchCompleted', handleMatchCompleted);
+        if (pollingInterval) clearInterval(pollingInterval);
+        this.showTournamentCompleteScreen(overlay);
+        return;
+      }
+      
+      // Check for active match for this player
+      const currentUser = authService.getUser();
+      const userId = currentUser?.id || currentUser?.email;
+      
+      const activeMatch = updatedTournament.matches.find((m: any) =>
+        m.isActive &&
+        (m.player1?.id === userId || m.player2?.id === userId)
+      );
+      
+      if (activeMatch) {
+        tournamentService.off('tournamentUpdated', handleTournamentUpdate);
+        tournamentService.off('matchCompleted', handleMatchCompleted);
+        if (pollingInterval) clearInterval(pollingInterval);
+        if (statusEl) {
+          statusEl.innerHTML = `
+            <div style="font-size: 28px; color: #84cc16; font-weight: bold; animation: pulse 1s infinite;">
+              🎮 Your next match is ready!
+            </div>
+          `;
+        }
+        // Show ready screen with slight delay for dramatic effect
+        setTimeout(() => {
+          this.showNextMatchScreen(overlay, updatedTournament, activeMatch);
+        }, 1500);
+      }
+    };
+    
+    const handleMatchCompleted = ({ tournament: updatedTournament }: any) => {
+      console.log('✅ Match completed event received');
+      handleTournamentUpdate(updatedTournament);
+    };
+    
+    // Subscribe to real-time events
+    tournamentService.on('tournamentUpdated', handleTournamentUpdate);
+    tournamentService.on('matchCompleted', handleMatchCompleted);
+    
+    // AGGRESSIVE POLLING: Fetch tournament state every 2 seconds as backup
+    const summary = this.getCachedTournamentSummary();
+    let pollingInterval: any = null;
+    
+    if (summary) {
+      console.log('🔄 Starting aggressive polling (every 2 seconds) for tournament updates');
+      pollingInterval = setInterval(async () => {
+        try {
+          // Check if overlay still exists
+          if (!document.body.contains(overlay)) {
+            if (pollingInterval) clearInterval(pollingInterval);
+            return;
+          }
+          
+          // Fetch latest tournament state
+          const updatedTournament = await tournamentService.getTournament(summary.tournamentId);
+          
+          // Update bracket display
+          this.renderTournamentBracket(updatedTournament);
+          console.log('🔄 Polling: Bracket updated');
+          
+          // Check for tournament completion
+          if (updatedTournament.status === 'completed') {
+            if (pollingInterval) clearInterval(pollingInterval);
+            tournamentService.off('tournamentUpdated', handleTournamentUpdate);
+            tournamentService.off('matchCompleted', handleMatchCompleted);
+            this.showTournamentCompleteScreen(overlay);
+            return;
+          }
+          
+          // Check for active match
+          const currentUser = authService.getUser();
+          const userId = currentUser?.id || currentUser?.email;
+          
+          const activeMatch = updatedTournament.matches.find((m: any) =>
+            m.isActive &&
+            (m.player1?.id === userId || m.player2?.id === userId)
+          );
+          
+          if (activeMatch) {
+            if (pollingInterval) clearInterval(pollingInterval);
+            tournamentService.off('tournamentUpdated', handleTournamentUpdate);
+            tournamentService.off('matchCompleted', handleMatchCompleted);
+            console.log('🎮 Polling detected: Next match is ready!');
+            
+            if (statusEl) {
+              statusEl.innerHTML = `
+                <div style="font-size: 28px; color: #84cc16; font-weight: bold; animation: pulse 1s infinite;">
+                  🎮 Your next match is ready!
+                </div>
+              `;
+            }
+            
+            setTimeout(() => {
+              this.showNextMatchScreen(overlay, updatedTournament, activeMatch);
+            }, 1500);
+          }
+        } catch (error) {
+          console.error('❌ Polling error:', error);
+        }
+      }, 2000); // Poll every 2 seconds
+    }
+    
+    // Clean up event listeners and polling when overlay is removed
+    const overlayObserver = new MutationObserver(() => {
+      if (!document.body.contains(overlay)) {
+        tournamentService.off('tournamentUpdated', handleTournamentUpdate);
+        tournamentService.off('matchCompleted', handleMatchCompleted);
+        if (pollingInterval) clearInterval(pollingInterval);
+        overlayObserver.disconnect();
+        console.log('🧹 Cleaned up bracket WebSocket listeners and polling');
+      }
+    });
+    overlayObserver.observe(document.body, { childList: true, subtree: true });
+  }
+
+  private showTournamentCompleteScreen(overlay: HTMLElement) {
+    this.tournamentOverlay = overlay;
+    const statusEl = overlay.querySelector('#tournament-status');
+    const actionEl = overlay.querySelector('#tournament-action');
+    
+    if (statusEl) {
+      statusEl.innerHTML = `
+        <div style="font-size: 32px; margin-bottom: 20px;">🎊🏆🎊</div>
+        <div style="color: #84cc16;">You won the tournament!</div>
+      `;
+    }
+    
+    if (actionEl) {
+      actionEl.innerHTML = `
+        <button id="exit-tournament-btn" style="
+          padding: 20px 60px;
+          font-size: 24px;
+          font-weight: bold;
+          color: white;
+          background: linear-gradient(135deg, #84cc16, #65a30d);
+          border: none;
+          border-radius: 12px;
+          cursor: pointer;
+          transition: all 0.3s;
+        ">
+          🏠 Return Home
+        </button>
+      `;
+      
+      const btn = actionEl.querySelector('#exit-tournament-btn');
+      btn?.addEventListener('click', () => {
+        const summary = this.getCachedTournamentSummary();
+        void this.finishTournamentMatch('victory', summary || undefined);
+      });
+    }
+  }
+
+  private getCachedTournamentSummary(): TournamentResultSummary | null {
+    if (this.latestTournamentSummary) {
+      return this.latestTournamentSummary;
+    }
+
+    try {
+      const raw = sessionStorage.getItem('ft_pong_tournament_match_ended');
+      if (!raw) return null;
+      return JSON.parse(raw) as TournamentResultSummary;
+    } catch (error) {
+      console.warn('Failed to restore cached tournament summary:', error);
+      return null;
+    }
+  }
+
+  private cleanupTournamentOverlay() {
+    if (this.tournamentOverlay) {
+      try {
+        this.tournamentOverlay.remove();
+      } catch {}
+      this.tournamentOverlay = null;
+    }
+  }
+
+  private dispatchTournamentMatchEvent(
+    outcome: 'victory' | 'eliminated',
+    summary: TournamentResultSummary,
+    source: 'auto' | 'action'
+  ) {
+    try {
+      window.dispatchEvent(new CustomEvent('ft:tournament:matchFinished', {
+        detail: { outcome, summary, source },
+      }));
+    } catch (error) {
+      console.warn('Failed to dispatch tournament match event:', error);
+    }
+  }
+
+  private finishTournamentMatch(
+    outcome: 'victory' | 'eliminated',
+    summary?: TournamentResultSummary
+  ) {
+    const effectiveSummary = summary ?? this.getCachedTournamentSummary();
+
+    if (effectiveSummary) {
+      this.latestTournamentSummary = effectiveSummary;
+      this.dispatchTournamentMatchEvent(outcome, effectiveSummary, 'action');
+    }
+
+    this.cleanupTournamentOverlay();
+    this.stopAllAudio();
+    this.dispose();
+  }
+
+  private async renderTournamentBracket(tournament: any) {
+    try {
+      const container = document.getElementById('tournament-bracket-container');
+      if (!container) return;
+      
+      const { TournamentBracket } = await import('../../tournament/TournamentBracket');
+      new TournamentBracket(container as HTMLElement, tournament);
+    } catch (error) {
+      console.error('❌ Failed to render bracket:', error);
+    }
+  }
+
+  private async showEliminatedPlayerBracketView(overlay: HTMLElement, tournament: any) {
+    overlay.innerHTML = `
+      <div style="max-width: 1400px; margin: 0 auto;">
+        <div style="text-align: center; margin-bottom: 32px;">
+          <h1 style="color: #ef4444; font-size: 42px; font-weight: bold; margin-bottom: 12px;">
+            You've been eliminated
+          </h1>
+          <p style="color: #94a3b8; font-size: 20px; margin-bottom: 24px;">
+            Watch the tournament bracket to see who advances
+          </p>
+        </div>
+
+        <div id="tournament-bracket-container" style="
+          width: 100%;
+          background: rgba(15, 23, 42, 0.9);
+          border: 2px solid rgba(239, 68, 68, 0.3);
+          border-radius: 16px;
+          padding: 24px;
+          margin-bottom: 24px;
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        ">
+          <div style="text-align: center; color: #64748b; padding: 40px;">
+            <div style="font-size: 48px; margin-bottom: 16px;">⏳</div>
+            <div style="font-size: 18px;">Loading tournament bracket...</div>
+          </div>
+        </div>
+
+        <div style="text-align: center;">
+          <button id="exit-tournament-btn" style="
+            padding: 16px 48px;
+            font-size: 18px;
+            font-weight: bold;
+            color: white;
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+          ">
+            🚪 Leave Tournament
+          </button>
+        </div>
+      </div>
+    `;
+
+    this.tournamentOverlay = overlay;
+    await this.renderTournamentBracket(tournament);
+
+    // Set up real-time WebSocket listeners for bracket updates
+    const { tournamentService } = await import('../../tournament/TournamentService');
+    
+    const handleEliminatedUpdate = (updatedTournament: any) => {
+      // Only update if overlay is still visible
+      if (!document.body.contains(overlay)) return;
+      
+      console.log('🔄 Real-time bracket update for eliminated player');
+      this.renderTournamentBracket(updatedTournament);
+      
+      // Check if tournament is completed
+      if (updatedTournament.status === 'completed') {
+        tournamentService.off('tournamentUpdated', handleEliminatedUpdate);
+        tournamentService.off('matchCompleted', handleEliminatedMatchCompleted);
+        
+        // Show tournament completed message
+        const container = overlay.querySelector('#tournament-bracket-container');
+        if (container) {
+          container.innerHTML = `
+            <div style="text-align: center; padding: 40px;">
+              <div style="font-size: 64px; margin-bottom: 20px;">🏆</div>
+              <div style="color: #84cc16; font-size: 32px; font-weight: bold; margin-bottom: 16px;">
+                Tournament Complete!
+              </div>
+              <div style="color: #94a3b8; font-size: 20px;">
+                Winner: ${updatedTournament.winner?.name || 'Unknown'}
+              </div>
+            </div>
+          `;
+        }
+      }
+    };
+    
+    const handleEliminatedMatchCompleted = ({ tournament: updatedTournament }: any) => {
+      console.log('✅ Match completed event received (eliminated player view)');
+      handleEliminatedUpdate(updatedTournament);
+    };
+    
+    // Subscribe to real-time events
+    tournamentService.on('tournamentUpdated', handleEliminatedUpdate);
+    tournamentService.on('matchCompleted', handleEliminatedMatchCompleted);
+    
+    // Clean up event listeners when overlay is removed
+    const overlayObserver = new MutationObserver(() => {
+      if (!document.body.contains(overlay)) {
+        tournamentService.off('tournamentUpdated', handleEliminatedUpdate);
+        tournamentService.off('matchCompleted', handleEliminatedMatchCompleted);
+        overlayObserver.disconnect();
+        console.log('🧹 Cleaned up eliminated player bracket WebSocket listeners');
+      }
+    });
+    overlayObserver.observe(document.body, { childList: true, subtree: true });
+
+    overlay.querySelector('#exit-tournament-btn')?.addEventListener('click', async () => {
+      const confirmed = await import('../../components/modals/ConfirmDialog').then(m => 
+        m.showConfirmDialog(
+          'Are you sure you want to leave the tournament?',
+          'Leave Tournament',
+          'Yes, Leave',
+          'Stay'
+        )
+      );
+      
+      if (confirmed) {
+        console.log('🚪 Eliminated player leaving tournament');
+        
+        // Disconnect from tournament
+        try {
+          const { newTournamentService } = await import('../../tournament/NewTournamentService');
+          newTournamentService.leaveTournament();
+          console.log('✅ Successfully disconnected from tournament');
+        } catch (error) {
+          console.warn('⚠️ Failed to disconnect from tournament:', error);
+        }
+        
+        // Clean up and return to main menu
+        this.cleanupTournamentOverlay();
+        this.stopAllAudio();
+        this.dispose();
+        
+        try {
+          sessionStorage.removeItem('ft_pong_tournament_match_ended');
+        } catch (error) {
+          console.warn('Failed to clear cached tournament summary:', error);
+        }
+        
+        window.location.reload();
+      }
+    });
+  }
+
+  private async startNextTournamentMatch(tournament: any, match: any) {
+    try {
+      console.log('🎮 Starting next tournament match:', match);
+      
+      // Clean up current game
+      this.dispose();
+      
+      // Import and start match service
+      const { TournamentMatchService } = await import('../../tournament/TournamentMatchService');
+      const { authService } = await import('../../');
+      
+      const matchService = TournamentMatchService.getInstance();
+      const currentUser = authService.getUser();
+      
+      if (!currentUser) {
+        throw new Error('User not authenticated');
+      }
+      
+      const currentPlayer = {
+        id: currentUser.id || currentUser.email,
+        name: currentUser.userName || currentUser.firstName || currentUser.email,
+        isOnline: true,
+        isAI: false
+      };
+      
+      await matchService.startTournamentMatch(
+        tournament,
+        match,
+        currentPlayer,
+        (gameConfig) => {
+          console.log('🏆 Starting next match with config:', gameConfig);
+          // Reload to start fresh game
+          sessionStorage.setItem('ft_pong_starting_tournament_match', JSON.stringify(gameConfig));
+          window.location.reload();
+        }
+      );
+    } catch (error) {
+      console.error('❌ Failed to start next match:', error);
+      window.location.reload();
+    }
   }
 
   /* ---------------- AUDIO ---------------- */
@@ -2537,21 +3738,14 @@ this.rightWall = wall(
     if (this.config.connection === "ai") return [0];
     if (this.config.connection === "local") return [0, 1];
     if (this.config.connection === "remoteHost") return [0];
-    if (this.config.connection === "remoteGuest") return []; // guest sends input only
+    if (this.config.connection === "remoteGuest") return [1]; // guest controls paddle 1 (right side)
     if (this.config.connection === "remote4Host") return [0];
-    if (this.config.connection === "remote4Guest") return []; // 4P guest sends input only
+    if (this.config.connection === "remote4Guest") return [1]; // 4P guest controls paddle 1
     if (this.config.connection === "ai3") return [0];
     return [0];
   }
 
-  private handleWindowClose(event: BeforeUnloadEvent) {
-    // For multiplayer games, notify other players and report results
-    // (removed) — arrow-left/right mapping disabled; arrow-only mode enforced
-    event.preventDefault();
-    const message = "Are you sure you want to leave the game? This will end the match for all players.";
-    event.returnValue = message;
-    return message;
-  }
+  // Note: handleWindowClose removed - use ESC key to exit game gracefully with custom dialog
 
   private handleVisibilityChange() {
     // Pause the game when the tab becomes hidden in multiplayer
@@ -2578,26 +3772,8 @@ this.rightWall = wall(
           // If tie, no winner (-1)
         }
 
-        // Report results to backend if there's a clear winner
-        if (this.config.tournament && winnerIdx >= 0) {
-          const t = this.config.tournament;
-          const leftScore = scores[0] || 0;
-          const rightScore = scores[1] || 0;
-          const winnerUserId = winnerIdx === 0 ? t.leftUserId : t.rightUserId;
-          
-          await ApiClient.reportTournamentMatch({
-            tournamentId: t.tournamentId,
-            round: t.round,
-            matchIndex: t.matchIndex,
-            leftUserId: t.leftUserId,
-            rightUserId: t.rightUserId,
-            leftScore,
-            rightScore,
-            winnerUserId,
-          });
-          
-          console.log("🏆 Tournament match results reported due to game interruption");
-        } else if (this.config.matchId && winnerIdx >= 0) {
+        // Tournament support removed - now handle match results if needed
+        if (this.config.matchId && winnerIdx >= 0) {
           const winnerUserId = this.config.currentUser?.id || null;
           await ApiClient.postMatchResult({
             matchId: this.config.matchId,

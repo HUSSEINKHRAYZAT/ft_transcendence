@@ -48,10 +48,12 @@ export type deleteRelationBodyTS = Static<typeof deleteRelationBody>;
 export const Friend = Type.Object({
   id: Type.Number(),
   username: Type.String(),
-  status: Type.String()
+  status: Type.String(),
+  profilePath : Type.String(),
 });
 
 export const FriendRequest = Type.Object({
   id: Type.Number(),
   username: Type.String(),
+  profilePath : Type.String(),
 });

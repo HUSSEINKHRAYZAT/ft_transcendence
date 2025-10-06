@@ -16,7 +16,7 @@ interface ChatMessage {
 
 export class FriendsBox {
     private container: HTMLElement | null = null;
-    private blockedUsersModal: BlockedUsersModal; // this is for blocked users
+    private blockedUsersModal: BlockedUsersModal;
     private isRendered: boolean = false;
     private unsubscribeLanguageChange?: () => void;
     private requestModal: RequestModal;
@@ -28,12 +28,15 @@ export class FriendsBox {
     private chatMessages: Map<string, ChatMessage[]> = new Map();
     private processedMessageIds: Set<string> = new Set();
     private lastMessageContent: Map<string, string> = new Map();
+    private refreshTimeout: number | null = null;
 
     private boundHandleFriendStatusChange!: (event: Event) => void;
     private boundHandleDirectMessageReceived!: (event: Event) => void;
     private boundHandleDirectMessageSent!: (event: Event) => void;
     private boundHandleFriendsListChanged!: () => void;
     private boundHandleThemeChange!: (event: Event) => void;
+    private boundHandleSocketReconnected!: (event: Event) => void;
+    private boundHandleCloseChatIfActive!: (event: Event) => void;
 
     constructor() {
         this.container = document.getElementById("friends-box");
@@ -49,6 +52,12 @@ export class FriendsBox {
         this.boundHandleFriendsListChanged = () => {
             this.loadAndRenderFriends().catch(() => {});
         };
+        this.boundHandleSocketReconnected = () => {
+            this.handleReconnection();
+            this.loadAndRenderFriends().catch(() => {});
+        };
+
+        this.boundHandleCloseChatIfActive = this.handleCloseChatIfActive.bind(this);
 
         this.unsubscribeLanguageChange = languageManager.onLanguageChange(() => {
             if (this.isRendered) {
@@ -63,7 +72,8 @@ export class FriendsBox {
         window.addEventListener('friend-status-change', this.boundHandleFriendStatusChange);
         window.addEventListener('direct-message-received', this.boundHandleDirectMessageReceived);
         window.addEventListener('direct-message-sent', this.boundHandleDirectMessageSent);
-
+        window.addEventListener('socket-reconnected', this.boundHandleSocketReconnected);
+        window.addEventListener('close-chat-if-active', this.boundHandleCloseChatIfActive); // NEW
         this.loadMessagesFromStorage();
     }
 
@@ -81,11 +91,15 @@ export class FriendsBox {
         this.updateFriendStatus(username, status);
 
         if (this.isRendered) {
-            setTimeout(() => {
+            if (this.refreshTimeout) {
+                clearTimeout(this.refreshTimeout);
+            }
+            this.refreshTimeout = window.setTimeout(() => {
                 this.loadAndRenderFriends().catch(err => {
                     console.error("Error refreshing friends list after status change:", err);
                 });
-            }, 5000);
+                this.refreshTimeout = null;
+            }, 300);
         }
     }
 
@@ -105,6 +119,10 @@ export class FriendsBox {
         }
 
         this.processedMessageIds.add(msgId);
+        if (this.processedMessageIds.size > 500) {
+            const first = this.processedMessageIds.values().next().value;
+            this.processedMessageIds.delete(first);
+        }
         this.lastMessageContent.set(messageKey, text);
 
         const message: ChatMessage = {
@@ -127,7 +145,6 @@ export class FriendsBox {
 
         const friendExists = this.friendsData.some(f => f.username === from);
         if (!friendExists) {
-            console.log(`Received message from ${from} who is not in friends list. Refreshing list.`);
             this.loadAndRenderFriends().catch(err => {
                 console.error("Error refreshing friends list after message:", err);
             });
@@ -137,50 +154,48 @@ export class FriendsBox {
     }
 
     private handleDirectMessageSent(event: Event): void {
-        const customEvent = event as CustomEvent;
-        const { to, text, messageId, timestamp } = customEvent.detail;
+            const customEvent = event as CustomEvent;
+            const { to, text, messageId, timestamp } = customEvent.detail;
 
-        console.log(`📤 Message sent to: ${to} - "${text}"`);
+            console.log(`📤 Message sent to: ${to} - "${text}"`);
 
-        // Enhanced duplicate detection for sent messages
-        const msgId = messageId || `sent_${Date.now()}`;
-        const messageKey = `${to}_sent`;
-        const lastMessage = this.lastMessageContent.get(messageKey);
+            const msgId = messageId || `sent_${Date.now()}`;
+            const messageKey = `${to}_sent`;
+            const lastMessage = this.lastMessageContent.get(messageKey);
 
-        // Check for duplicate sent messages
-        if (this.processedMessageIds.has(msgId) || lastMessage === text) {
-            console.log('📤 Duplicate sent message detected, ignoring');
-            return;
+            if (this.processedMessageIds.has(msgId) || lastMessage === text) {
+                console.log('📤 Duplicate sent message detected, ignoring');
+                return;
+            }
+
+            this.processedMessageIds.add(msgId);
+            if (this.processedMessageIds.size > 500) {
+                const first = this.processedMessageIds.values().next().value;
+                this.processedMessageIds.delete(first);
+            }
+            this.lastMessageContent.set(messageKey, text);
+
+            const message: ChatMessage = {
+                id: msgId,
+                from: 'me',
+                to: to,
+                text: text,
+                timestamp: timestamp ? new Date(timestamp) : new Date(),
+                isOwn: true
+            };
+
+            this.addMessageToChat(to, message);
+
+            if (this.activeChatUser === to) {
+                this.renderChatMessages();
+                setTimeout(() => {
+                    const chatMessages = document.getElementById('chat-messages');
+                    if (chatMessages) {
+                        chatMessages.scrollTop = chatMessages.scrollHeight;
+                    }
+                }, 100);
+            }
         }
-
-        this.processedMessageIds.add(msgId);
-        this.lastMessageContent.set(messageKey, text);
-
-        // Add sent message to chat history
-        const message: ChatMessage = {
-            id: msgId,
-            from: 'me',
-            to: to,
-            text: text,
-            timestamp: timestamp ? new Date(timestamp) : new Date(),
-            isOwn: true
-        };
-
-        this.addMessageToChat(to, message);
-
-        // If chat is active for this user, display the message immediately
-        if (this.activeChatUser === to) {
-            this.renderChatMessages();
-
-            // Scroll to bottom after a short delay to ensure DOM is updated
-            setTimeout(() => {
-                const chatMessages = document.getElementById('chat-messages');
-                if (chatMessages) {
-                    chatMessages.scrollTop = chatMessages.scrollHeight;
-                }
-            }, 100);
-        }
-    }
 
     private addMessageToChat(username: string, message: ChatMessage): void {
         if (!this.chatMessages.has(username)) {
@@ -189,7 +204,6 @@ export class FriendsBox {
 
         const messages = this.chatMessages.get(username)!;
 
-        // Check if this exact message already exists (additional safety check)
         const isDuplicate = messages.some(msg =>
             msg.text === message.text &&
             msg.isOwn === message.isOwn &&
@@ -203,7 +217,6 @@ export class FriendsBox {
 
         messages.push(message);
 
-        // Keep only last 50 messages per user
         if (messages.length > 50) {
             messages.splice(0, messages.length - 50);
         }
@@ -214,7 +227,6 @@ export class FriendsBox {
     private incrementPendingMessageCount(username: string): void {
         const currentCount = this.pendingMessages.get(username) || 0;
         this.pendingMessages.set(username, currentCount + 1);
-        console.log(`Incremented message count for ${username} to ${currentCount + 1}`);
     }
 
     private clearPendingMessageCount(username: string): void {
@@ -253,21 +265,14 @@ export class FriendsBox {
     }
 
     private updateFriendStatus(username: string, status: string): void {
-        console.log(`Updating friend status for ${username} to ${status}`);
 
-        // Check if friend already exists in friendsData to prevent duplicates
         const friendIndex = this.friendsData.findIndex(f => f.username === username);
         if (friendIndex !== -1) {
-            // Friend exists, just update status
             this.friendsData[friendIndex].status = status;
         } else {
-            // Friend doesn't exist in our data, don't add them here
-            // Let the friends list refresh handle adding new friends
-            console.log(`Friend ${username} not found in current friends list`);
             return;
         }
 
-        // Update UI for existing friend cards
         const friendCards = this.container?.querySelectorAll('.friend-card') || [];
         friendCards.forEach((card) => {
             const usernameElement = card.querySelector('.friend-username');
@@ -307,14 +312,12 @@ export class FriendsBox {
             return;
         }
 
-        console.log("Rendering FriendsBox component...");
 
         try {
             this.updateContent();
             this.setupEventListeners();
             await this.loadAndRenderFriends();
             this.isRendered = true;
-            console.log("FriendsBox component rendered successfully");
         } catch (error) {
             console.error("Error rendering FriendsBox:", error);
         }
@@ -424,10 +427,7 @@ export class FriendsBox {
 
 
     private handleViewFriendStats(friendId: string, friendUsername: string): void {
-    console.warn(`Viewing statistics for friend: ${friendUsername} (ID: ${friendId})`);
-    console.warn('Friend ID type:', typeof friendId, 'Value:', friendId);
 
-    // Import and show statistics modal for friend
     if ((window as any).StatisticsModal) {
         (window as any).StatisticsModal.showForFriend(friendId, friendUsername);
     } else {
@@ -449,7 +449,7 @@ export class FriendsBox {
     private setupEventListeners(): void {
         const signinBtn = document.getElementById("friends-signin");
         const requestsBtn = document.getElementById("friend-requests");
-        const blockedUsersBtn = document.getElementById("blocked-users"); // Add this line
+        const blockedUsersBtn = document.getElementById("blocked-users");
         const searchInput = document.getElementById("friends-search") as HTMLInputElement;
         const chatForm = document.getElementById("chat-form") as HTMLFormElement;
         const closeChatBtn = document.getElementById("close-chat");
@@ -466,7 +466,6 @@ export class FriendsBox {
             requestsBtn.addEventListener("click", () => this.showRequestsModal());
         }
 
-        // Add this block for blocked users button
         if (blockedUsersBtn) {
             blockedUsersBtn.addEventListener("click", () => this.showBlockedUsersModal());
         }
@@ -486,6 +485,8 @@ export class FriendsBox {
         if (addFriendForm) {
             addFriendForm.addEventListener("submit", (e) => this.handleAddFriendSubmit(e));
         }
+
+        
     }
 
     private async showBlockedUsersModal(): Promise<void> {
@@ -549,7 +550,6 @@ export class FriendsBox {
             console.error('Error sending friend request:', err);
             this.showNotification(t('Could not send request') + ': ' + err.message, 'error');
         } finally {
-            // Re-enable form
             submitBtn.disabled = false;
             submitBtn.textContent = t('Add');
             input.disabled = false;
@@ -575,7 +575,6 @@ export class FriendsBox {
 
         this.notificationContainer.insertAdjacentHTML('beforeend', notificationHtml);
 
-        // Auto-remove notification after 5 seconds
         setTimeout(() => {
             const notification = document.getElementById(notificationId);
             if (notification) {
@@ -606,13 +605,10 @@ export class FriendsBox {
     }
 
     private handleChatFriend(friendUsername: string): void {
-        console.log(`Toggling chat with ${friendUsername}`);
 
         if (this.activeChatUser === friendUsername) {
-            // Close the chat if it's already open for this user
             this.closeChatInterface();
         } else {
-            // Open chat for this user
             this.openChatInterface(friendUsername);
         }
     }
@@ -620,10 +616,8 @@ export class FriendsBox {
     private openChatInterface(username: string): void {
         this.activeChatUser = username;
 
-        // Clear pending message count
         this.clearPendingMessageCount(username);
 
-        // Show chat interface
         const chatInterface = document.getElementById('chat-interface');
         const chatHeader = document.getElementById('chat-header');
 
@@ -631,10 +625,8 @@ export class FriendsBox {
             chatInterface.classList.remove('hidden');
             chatHeader.textContent = `Chat with ${username}`;
 
-            // Render existing messages
             this.renderChatMessages();
 
-            // Focus on input
             const chatInput = document.getElementById('chat-input') as HTMLInputElement;
             if (chatInput) {
                 chatInput.focus();
@@ -651,11 +643,9 @@ export class FriendsBox {
             if (usernameElement) {
                 const usernameText = usernameElement.textContent;
                 if (usernameText) {
-                    // Extract username (remove @ symbol)
                     const username = usernameText.replace('@', '');
 
                     if (seenUsernames.has(username)) {
-                        // This is a duplicate, remove it
                         console.log(`🔍 Removing duplicate friend card for ${username}`);
                         card.remove();
                     } else {
@@ -668,21 +658,17 @@ export class FriendsBox {
 
     private closeChatInterface(): void {
         if (this.activeChatUser) {
-            // Clear messages for the current active chat user
             console.log(`🗑️ Clearing messages for ${this.activeChatUser}`);
             this.chatMessages.delete(this.activeChatUser);
 
-            // Clear processed message IDs for this user
             const userMessageIds = Array.from(this.processedMessageIds).filter(id =>
                 id.includes(this.activeChatUser!) || id.startsWith(`${this.activeChatUser}_`)
             );
             userMessageIds.forEach(id => this.processedMessageIds.delete(id));
 
-            // Clear last message content for this user
             this.lastMessageContent.delete(`${this.activeChatUser}_received`);
             this.lastMessageContent.delete(`${this.activeChatUser}_sent`);
 
-            // Save the updated state to storage
             this.saveMessagesToStorage();
 
             console.log(`✅ Messages cleared for ${this.activeChatUser}`);
@@ -709,13 +695,11 @@ export class FriendsBox {
             return;
         }
 
-        // Sort messages by timestamp to ensure correct order
         const sortedMessages = [...messages].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
 
         const messagesHtml = sortedMessages.map(msg => this.renderSingleMessage(msg)).join('');
         chatMessages.innerHTML = messagesHtml;
 
-        // Scroll to bottom
         setTimeout(() => {
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }, 10);
@@ -834,7 +818,6 @@ export class FriendsBox {
     }
 
     private showLoginModal(): void {
-        console.log("FriendsBox: Trying to show login modal");
         if ((window as any).modalService && (window as any).modalService.showLoginModal) {
             (window as any).modalService.showLoginModal();
         } else {
@@ -952,134 +935,164 @@ export class FriendsBox {
         }
     }
 
-    private setupFriendCardListeners(): void {
-        // Setup remove friend listeners
-        const removeButtons = this.container?.querySelectorAll('.remove-friend-btn') || [];
-        removeButtons.forEach((btn) => {
-            btn.addEventListener('click', (e) => {
-                e.preventDefault();
-                const username = btn.getAttribute('data-username');
-                if (username) {
-                    this.handleRemoveFriend(username);
-                }
-            });
+private setupFriendCardListeners(): void {
+    // Setup remove friend listeners
+    const removeButtons = this.container?.querySelectorAll('.remove-friend-btn') || [];
+    removeButtons.forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const username = btn.getAttribute('data-username');
+            if (username) {
+                this.handleRemoveFriend(username);
+            }
         });
+    });
 
-        // Setup chat listeners
-        const chatButtons = this.container?.querySelectorAll('.chat-friend-btn') || [];
-        chatButtons.forEach((btn) => {
-            btn.addEventListener('click', (e) => {
-                e.preventDefault();
-                const username = btn.getAttribute('data-username');
-                if (username) {
-                    this.handleChatFriend(username);
-                }
-            });
+    // Setup chat listeners
+    const chatButtons = this.container?.querySelectorAll('.chat-friend-btn') || [];
+    chatButtons.forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+
+            // Check if button is disabled (offline user)
+            if ((btn as HTMLButtonElement).disabled) {
+                return;
+            }
+
+            const username = btn.getAttribute('data-username');
+            if (username) {
+                this.handleChatFriend(username);
+            }
         });
+    });
 
-        // Setup statistics listeners
-        const statsButtons = this.container?.querySelectorAll('.stats-friend-btn') || [];
-        statsButtons.forEach((btn) => {
-            btn.addEventListener('click', (e) => {
-                e.preventDefault();
-                const friendId = btn.getAttribute('data-friend-id');
-                const friendUsername = btn.getAttribute('data-username');
-                if (friendId && friendUsername) {
-                    this.handleViewFriendStats(friendId, friendUsername);
-                }
-            });
+    // Setup statistics listeners
+    const statsButtons = this.container?.querySelectorAll('.stats-friend-btn') || [];
+    statsButtons.forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const friendId = btn.getAttribute('data-friend-id');
+            const friendUsername = btn.getAttribute('data-username');
+            if (friendId && friendUsername) {
+                this.handleViewFriendStats(friendId, friendUsername);
+            }
         });
-    }
+    });
 
-    private renderFriendCard(friend: any): string {
-        const username = (friend.username || "").toString();
-        const friendId = (friend.id || friend.userId || "").toString(); // Get friend ID
-        const firstName = (friend.firstName || "").toString();
-        const lastName = (friend.lastName || "").toString();
-        const profilePath = friend.profilePath;
-        const status = (friend.status || "offline").toString().toLowerCase();
+    // NEW: Setup block user listeners
+    const blockButtons = this.container?.querySelectorAll('.block-friend-btn') || [];
+    blockButtons.forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const username = btn.getAttribute('data-username');
+            if (username) {
+                this.handleBlockFriend(username);
+            }
+        });
+    });
+}
 
-        const displayName = [firstName, lastName].filter(Boolean).join(" ").trim() || username || "Unknown";
-        const initials = this.initialsFrom(displayName);
-        const isOnline = status === "online";
-        const pendingCount = this.pendingMessages.get(username) || 0;
-        const isChatActive = this.activeChatUser === username;
+private renderFriendCard(friend: any): string {
+    const username = (friend.username || "").toString();
+    const friendId = (friend.id || friend.userId || "").toString();
+    const firstName = (friend.firstName || "").toString();
+    const lastName = (friend.lastName || "").toString();
+    const profilePath = friend.profilePath;
+    const status = (friend.status || "offline").toString().toLowerCase();
 
-        const color = this.colorFor(username);
+    const displayName = [firstName, lastName].filter(Boolean).join(" ").trim() || username || "Unknown";
+    const initials = this.initialsFrom(displayName);
+    const isOnline = status === "online";
+    const pendingCount = this.pendingMessages.get(username) || 0;
+    const isChatActive = this.activeChatUser === username;
 
-        // Create avatar display
-        let avatarHtml = '';
-        if (profilePath) {
-            const fullAvatarPath = profilePath.startsWith('avatars/') ? profilePath : `avatars/${profilePath}`;
-            avatarHtml = `
-                <img src="${this.escape(fullAvatarPath)}"
-                    alt="${this.escape(displayName)}"
-                    class="w-8 h-8 rounded-full object-cover"
-                    onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                <div class="w-8 h-8 ${color} rounded-full flex items-center justify-center text-white font-bold text-sm" style="display: none;">
-                    ${initials}
-                </div>
-            `;
-        } else {
-            avatarHtml = `
-                <div class="w-8 h-8 ${color} rounded-full flex items-center justify-center text-white font-bold text-sm">
-                    ${initials}
-                </div>
-            `;
-        }
+    const color = this.colorFor(username);
 
-        return `
-            <div class="friend-card flex items-center justify-between bg-gray-700 p-3 rounded ${isChatActive ? 'ring-2 ring-lime-500' : ''}">
-                <div class="flex items-center">
-                    <div class="status-circle w-3 h-3 rounded-full ${isOnline ? 'bg-green-500' : 'bg-red-500'} mr-3"></div>
-                    ${avatarHtml}
-                    <div class="ml-3">
-                        <p class="friend-name text-sm font-medium text-white">${this.escape(displayName)}</p>
-                        <p class="friend-username text-xs text-gray-400">@${this.escape(username)}</p>
-                    </div>
-                </div>
-
-                <div class="friend-actions flex items-center gap-2">
-                    ${pendingCount > 0 ? `
-                        <div class="message-indicator bg-red-500 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">
-                            ${pendingCount}
-                        </div>
-                    ` : ''}
-
-                    <button
-                        class="stats-friend-btn p-1 hover:opacity-70 transition-opacity duration-300 text-purple-400"
-                        data-friend-id="${this.escape(friendId)}"
-                        data-username="${this.escape(username)}"
-                        title="${t('View Statistics')}"
-                    >
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                        </svg>
-                    </button>
-
-                    <button
-                        class="chat-friend-btn p-1 hover:opacity-70 transition-opacity duration-300 ${isChatActive ? 'text-lime-400' : 'text-blue-400'}"
-                        data-username="${this.escape(username)}"
-                        title="${t('Chat')}"
-                    >
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
-                        </svg>
-                    </button>
-
-                    <button
-                        class="remove-friend-btn p-1 hover:opacity-70 transition-opacity duration-300"
-                        data-username="${this.escape(username)}"
-                        title="${t('Remove Friend')}"
-                    >
-                        <svg class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                        </svg>
-                    </button>
-                </div>
+    // Create avatar display (keep existing avatar code)
+    let avatarHtml = '';
+    if (profilePath) {
+        const fullAvatarPath = profilePath.startsWith('avatars/') ? profilePath : `avatars/${profilePath}`;
+        avatarHtml = `
+            <img src="${this.escape(fullAvatarPath)}"
+                alt="${this.escape(displayName)}"
+                class="w-8 h-8 rounded-full object-cover"
+                onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+            <div class="w-8 h-8 ${color} rounded-full flex items-center justify-center text-white font-bold text-sm" style="display: none;">
+                ${initials}
+            </div>
+        `;
+    } else {
+        avatarHtml = `
+            <div class="w-8 h-8 ${color} rounded-full flex items-center justify-center text-white font-bold text-sm">
+                ${initials}
             </div>
         `;
     }
+
+    return `
+        <div class="friend-card flex items-center justify-between bg-gray-700 p-3 rounded ${isChatActive ? 'ring-2 ring-lime-500' : ''}">
+            <div class="flex items-center">
+                <div class="status-circle w-3 h-3 rounded-full ${isOnline ? 'bg-green-500' : 'bg-red-500'} mr-3"></div>
+                ${avatarHtml}
+                <div class="ml-3">
+                    <p class="friend-name text-sm font-medium text-white">${this.escape(displayName)}</p>
+                    <p class="friend-username text-xs text-gray-400">@${this.escape(username)}</p>
+                </div>
+            </div>
+
+            <div class="friend-actions flex items-center gap-2">
+                ${pendingCount > 0 ? `
+                    <div class="message-indicator bg-red-500 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">
+                        ${pendingCount}
+                    </div>
+                ` : ''}
+
+                <button
+                    class="stats-friend-btn p-1 hover:opacity-70 transition-opacity duration-300 text-purple-400"
+                    data-friend-id="${this.escape(friendId)}"
+                    data-username="${this.escape(username)}"
+                    title="${t('View Statistics')}"
+                >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                    </svg>
+                </button>
+
+                <button
+                    class="chat-friend-btn p-1 transition-opacity duration-300 ${!isOnline ? 'opacity-50 cursor-not-allowed text-red-400' : (isChatActive ? 'text-lime-400 hover:opacity-70' : 'text-blue-400 hover:opacity-70')}"
+                    data-username="${this.escape(username)}"
+                    title="${isOnline ? t('Chat') : t('User is offline')}"
+                    ${!isOnline ? 'disabled' : ''}
+                >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                    </svg>
+                </button>
+
+                <!-- NEW BLOCK BUTTON -->
+                <button
+                    class="block-friend-btn p-1 hover:opacity-70 transition-opacity duration-300 text-orange-400"
+                    data-username="${this.escape(username)}"
+                    title="${t('Block User')}"
+                >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path>
+                    </svg>
+                </button>
+
+                <button
+                    class="remove-friend-btn p-1 hover:opacity-70 transition-opacity duration-300"
+                    data-username="${this.escape(username)}"
+                    title="${t('Remove Friend')}"
+                >
+                    <svg class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    `;
+}
 
     private initialsFrom(name: string): string {
         return name
@@ -1120,39 +1133,86 @@ export class FriendsBox {
         return div.innerHTML;
     }
 
-destroy(): void {
-    // Unsubscribe from language changes
-    if (this.unsubscribeLanguageChange) {
-        this.unsubscribeLanguageChange();
+ destroy(): void {
+        if (this.unsubscribeLanguageChange) {
+            this.unsubscribeLanguageChange();
+        }
+
+        window.removeEventListener('friend-status-change', this.boundHandleFriendStatusChange);
+        window.removeEventListener('direct-message-received', this.boundHandleDirectMessageReceived);
+        window.removeEventListener('direct-message-sent', this.boundHandleDirectMessageSent);
+        window.removeEventListener('friends-list-changed', this.boundHandleFriendsListChanged);
+        window.removeEventListener('theme-changed', this.boundHandleThemeChange);
+        window.removeEventListener('socket-reconnected', this.boundHandleSocketReconnected);
+
+        if (this.requestModal) {
+            this.requestModal.destroy();
+        }
+        if (this.blockedUsersModal) {
+            this.blockedUsersModal.destroy();
+        }
+
+        this.activeChatUser = null;
+        this.chatMessages.clear();
+        this.pendingMessages.clear();
+        this.processedMessageIds.clear();
+
+        if (this.container) {
+            this.container.innerHTML = "";
+        }
+        this.isRendered = false;
     }
 
-    // Remove event listeners
-    window.removeEventListener('friend-status-change', this.boundHandleFriendStatusChange);
-    window.removeEventListener('direct-message-received', this.boundHandleDirectMessageReceived);
-    window.removeEventListener('direct-message-sent', this.boundHandleDirectMessageSent);
-    window.removeEventListener('friends-list-changed', this.boundHandleFriendsListChanged);
-    window.removeEventListener('theme-changed', this.boundHandleThemeChange);
-
-    // Cleanup request modal
-    if (this.requestModal) {
-        this.requestModal.destroy();
+    private async handleBlockFriend(friendUsername: string): Promise<void> {
+    const me = this.getCurrentUser();
+    if (!me?.userName) {
+        alert(t('Please sign in first.'));
+        return;
     }
 
-    // Cleanup blocked users modal
-    if (this.blockedUsersModal) {
-        this.blockedUsersModal.destroy();
+    if (!confirm(t('Are you sure you want to block') + ` ${friendUsername}? ${t('This will remove them from your friends list and prevent them from contacting you.')}`)) {
+        return;
     }
 
-    // Clear chat state
-    this.activeChatUser = null;
-    this.chatMessages.clear();
-    this.pendingMessages.clear();
-    this.processedMessageIds.clear();
+    try {
+        const response = await authService.blockUserFromRequest(me.userName, friendUsername);
 
-    if (this.container) {
-        this.container.innerHTML = "";
+        if (response.success) {
+            this.showNotification(t('User blocked successfully'), 'success');
+
+            // Close chat if blocking the active chat user
+            if (this.activeChatUser === friendUsername) {
+                this.closeChatInterface();
+            }
+
+            // Refresh friends list
+            await this.loadAndRenderFriends();
+
+            // Dispatch event to notify other components
+            window.dispatchEvent(new CustomEvent('friends-list-changed'));
+        } else {
+            if (response.message?.includes('404')) {
+                this.showNotification(t('User not found'), 'error');
+            } else {
+                this.showNotification(t('Failed to block user:') + ' ' + response.message, 'error');
+            }
+        }
+    } catch (err: any) {
+        console.error('Error blocking user:', err);
+        this.showNotification(t('Failed to block user:') + ' ' + err.message, 'error');
     }
-    this.isRendered = false;
-    console.log("FriendsBox component destroyed");
+}
+
+private handleCloseChatIfActive(event: Event): void {
+    const customEvent = event as CustomEvent;
+    const { username } = customEvent.detail;
+
+    // Check if the chat is currently active with this user
+    if (this.activeChatUser === username) {
+        this.closeChatInterface();
+
+        // Show a notification to inform the user
+        this.showNotification(`Chat closed: ${username} is now offline`, 'info');
+    }
 }
 }

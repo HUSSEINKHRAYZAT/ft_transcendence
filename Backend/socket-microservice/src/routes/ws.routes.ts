@@ -136,7 +136,82 @@ const routes: FastifyPluginAsync = async (app) => {
 
           if (msg?.type === 'ping') {
             ws.send(JSON.stringify({ type: 'pong' }));
-          } else if (msg?.type === 'direct-message') {
+          }
+
+          // FIXED: friend-accepted now expects targetUsername instead of 'to'
+          else if (msg?.type === 'friend-accepted') {
+            const targetUsername = String(msg.targetUsername || '').trim();
+            if (!targetUsername) {
+              ws.send(JSON.stringify({ type: 'error', error: 'Invalid friend-accepted payload' }));
+              return;
+            }
+
+            // Notify the target user that their friend request was accepted
+            const recipients = conns.get(targetUsername);
+            if (recipients && recipients.size > 0) {
+              for (const peer of recipients) {
+                try {
+                  peer.send(JSON.stringify({
+                    type: 'friend-accepted',
+                    username, // Who accepted the request
+                  }));
+                } catch {}
+              }
+            }
+          }
+
+          // FIXED: user-blocked now expects targetUsername instead of 'to'
+          else if (msg?.type === 'user-blocked') {
+            const targetUsername = String(msg.targetUsername || '').trim();
+            if (!targetUsername) {
+              ws.send(JSON.stringify({ type: 'error', error: 'Invalid user-blocked payload' }));
+              return;
+            }
+
+            // Notify the target user that they've been blocked
+            const recipients = conns.get(targetUsername);
+            if (recipients && recipients.size > 0) {
+              for (const peer of recipients) {
+                try {
+                  peer.send(JSON.stringify({
+                    type: 'user-blocked',
+                    username, // Who blocked them
+                  }));
+                } catch {}
+              }
+            }
+          }
+
+          // Avatar changed - notify all friends
+          else if (msg?.type === 'avatar-changed') {
+            const newAvatar = String(msg.avatar || '').trim();
+            if (!newAvatar) {
+              ws.send(JSON.stringify({ type: 'error', error: 'Invalid avatar payload' }));
+              return;
+            }
+
+            // Get all friends and notify them
+            const friends = await getFriends(userId);
+
+            for (const friendUsername of friends) {
+              const recipients = conns.get(friendUsername);
+              if (recipients && recipients.size > 0) {
+                for (const peer of recipients) {
+                  try {
+                    peer.send(JSON.stringify({
+                      type: 'avatar-changed',
+                      username,
+                      avatar: newAvatar,
+                    }));
+                  } catch {}
+                }
+              }
+            }
+          }
+
+          // Direct message
+          else if (msg?.type === 'direct-message')
+          {
             const to = String(msg.to || '').trim();
             const messageText = String(msg.text || '').trim();
 

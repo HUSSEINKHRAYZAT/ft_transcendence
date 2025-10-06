@@ -55,7 +55,6 @@ export function mapBackendUserToUser(raw: any): User {
         throw new Error("Invalid user payload from server.");
     }
 
-    console.log('Raw backend user data:', JSON.stringify(u, null, 2));
 
     // Extract properties with all possible aliases
     const userId = u.id || u.sub || u.user_id || "";
@@ -95,7 +94,6 @@ export function mapBackendUserToUser(raw: any): User {
         enable2fa: Boolean(u.twoFactorEnabled || u.two_factor_enabled || u.enable2fa),
     };
 
-    console.log('Mapped user data:', JSON.stringify(mappedUser, null, 2));
 
     if (!mappedUser.id || !mappedUser.email) {
         console.error('Mapping failed - missing required fields:', mappedUser);
@@ -223,7 +221,6 @@ export class AuthService {
 			}
 
 			const data = await response.json();
-			console.log('Response from /auth/me:', data);
 			return data;
 		} catch (error) {
 			console.error('Network error calling /auth/me:', error);
@@ -282,7 +279,6 @@ async createSettingsAPI(username: string): Promise<boolean> {
         });
 
         if (response.ok) {
-            console.log(`Settings created for user: ${username}`);
 
             // Fetch the created settings and store locally
             const settings = await this.settingsAPI(username);
@@ -320,7 +316,6 @@ async updateUserSettings(settings: {
         });
 
         if (response.ok) {
-            console.log(`Settings updated for user: ${settings.username}`);
 
             // Update local state with new settings
             const updatedSettings = await this.settingsAPI(settings.username);
@@ -515,42 +510,47 @@ private async settingsAPI(username: string): Promise<any | null> {
 
 
 	private async setAuthState_statistics(userId: string): Promise<UserStats | null> {
-		console.log("Token state:", this.state.token);
 		const raw = localStorage.getItem(STORAGE_KEYS.USER_STATISTICS);
 		return raw ? JSON.parse(raw) as UserStats : await this.statisticsAPI(userId);
 	}
 
+	public async clearAuthState(): Promise<void> {
+		const userId = this.state.user?.id;
 
-public clearAuthState(): void {
-    const userId = this.state.user?.id;
-    if (userId) {
-        this.socketService?.disconnect(userId);
-    }
+		// Try to gracefully disconnect and set offline BEFORE clearing tokens
+		if (userId) {
+			try {
+				await this.socketService?.disconnect(userId);
+			} catch (err) {
+				console.error("Error disconnecting socket during clearAuthState:", err);
+			}
+		}
 
-    this.state = {
-        isAuthenticated: false,
-        isLoading: false,
-        token: null,
-        user: null,
-        statistics: null,
-        settings: null
-    };
+		this.state = {
+			isAuthenticated: false,
+			isLoading: false,
+			token: null,
+			user: null,
+			statistics: null,
+			settings: null
+		};
 
-    this.clearStoredAuth();
+		this.clearStoredAuth();
 
-    // Reset themes to default when unauthenticated
-    if (typeof window !== 'undefined') {
-        const simpleThemeManager = (window as any).simpleThemeManager;
-        const backgroundThemeManager = (window as any).backgroundThemeManager;
+		// Reset themes to default when unauthenticated
+		if (typeof window !== 'undefined') {
+			const simpleThemeManager = (window as any).simpleThemeManager;
+			const backgroundThemeManager = (window as any).backgroundThemeManager;
 
-        if (simpleThemeManager) {
-            simpleThemeManager.resetTheme();
-        }
-        if (backgroundThemeManager) {
-            backgroundThemeManager.resetTheme();
-        }
-    }
-}
+			if (simpleThemeManager) {
+				simpleThemeManager.resetTheme();
+			}
+			if (backgroundThemeManager) {
+				backgroundThemeManager.resetTheme();
+			}
+		}
+	}
+
 	private clearStoredAuth(): void {
 		localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
 		localStorage.removeItem(STORAGE_KEYS.USER_DATA);
@@ -580,11 +580,6 @@ public clearAuthState(): void {
 			backgroundTheme: String(raw.backgroundTheme ?? "dark"),
 			language: String(raw.languageCode ?? raw.language ?? "en")
 		};
-
-		console.log(
-			"Mapped settings:",
-			JSON.stringify(mappedSettings, null, 2)
-		);
 
 		return mappedSettings;
 	}
@@ -642,7 +637,6 @@ public clearAuthState(): void {
 	): Promise<AuthResponse> {
 		const endpoint = `${API_BASE_URL}/auth/login`;
 		try {
-			console.log('Login attempt for:', credentials.email);
 
 			const res = await fetch(endpoint, {
 				method: "POST",
@@ -656,11 +650,10 @@ public clearAuthState(): void {
 				}),
 			});
 
-			console.log('Login response status:', res.status);
 
 			// Handle 303 - Email Not Verified
 			if (res.status === 303) {
-				console.log('User not verified (303) - need email for verification');
+
 
 				try {
 					const emailResponse = await fetch(`${API_BASE_URL}/users/getEmail`, {
@@ -678,7 +671,6 @@ public clearAuthState(): void {
 						const emailData = await emailResponse.json();
 						const userEmail = emailData.email || emailData.userEmail;
 
-						console.log('Got email for verification:', userEmail);
 
 						return {
 							success: false,
@@ -702,13 +694,10 @@ public clearAuthState(): void {
 
 			// Handle 202 - 2FA Required
 			if (res.status === 202) {
-				console.log('2FA verification required (202)');
 
 				try {
 					// Get the response data first
 					const responseData = await res.json().catch(() => ({}));
-					console.log('2FA response data:', responseData);
-
 					// Get the user's email for 2FA verification
 					const emailResponse = await fetch(`${API_BASE_URL}/users/getEmail`, {
 						method: "POST",
@@ -725,7 +714,6 @@ public clearAuthState(): void {
 						const emailData = await emailResponse.json();
 						const userEmail = emailData.email || emailData.userEmail;
 
-						console.log('Got email for 2FA verification:', userEmail);
 
 						// Store ALL the login data needed for completing auth after 2FA
 						const tempToken = responseData.tempToken || responseData.token;
@@ -772,7 +760,6 @@ public clearAuthState(): void {
 			}
 
 			const data = await res.json();
-			console.log("Login success (200) - response data:", data);
 
 			if (!data.token) {
 				return { success: false, message: "No token received from server" };
@@ -801,7 +788,6 @@ public clearAuthState(): void {
 				// Emit event for components to refresh
 				globalEventManager.emit(AppEvent.STATISTICS_UPDATED, stats);
 
-				console.log('Statistics refreshed successfully');
 				return stats;
 			}
 			return null;
@@ -811,21 +797,25 @@ public clearAuthState(): void {
 		}
 		}
 
-	public async setStatus(status: string, userId: string): Promise<boolean> {
+	public async setStatus(status: string, userId: string, opts?: { keepalive?: boolean }): Promise<boolean> {
 		const mode = status.toLowerCase();
 
 		try {
-			const token = localStorage.getItem("ft_pong_auth_token");
-			console.warn("the token here is", token);
+			// Use in-memory token to avoid race conditions with localStorage clearing
+			const token = this.state.token;
+			if (!token) {
+				console.warn("setStatus called without an auth token");
+				return false;
+			}
+
 			const response = await fetch(`${API_BASE_URL}/users/${userId}`, {
 				method: 'PATCH',
 				headers: {
 					'Authorization': `Bearer ${token}`,
 					'Content-Type': 'application/json',
 				},
-				body: JSON.stringify({
-					status: mode
-				}),
+				body: JSON.stringify({ status: mode }),
+				keepalive: opts?.keepalive === true, // allow keepalive when called on unload
 			});
 
 			if (!response.ok) {
@@ -834,10 +824,11 @@ public clearAuthState(): void {
 				return false;
 			}
 
-			const result = await response.json();
+			await response.json().catch(() => ({}));
 			return true;
 
 		} catch (error) {
+			console.error("setStatus error:", error);
 			return false;
 		}
 	}
@@ -890,7 +881,6 @@ public clearAuthState(): void {
 				};
 			}
 
-			console.log('Completing 2FA login locally (no backend API call needed)');
 
 			// Parse the stored user data
 			const userData = JSON.parse(tempUserData);
@@ -915,10 +905,6 @@ public clearAuthState(): void {
 
 			// Emit login event
 			globalEventManager.emit(AppEvent.AUTH_LOGIN, user);
-
-			console.log('2FA login completed successfully');
-			console.log('JWT Token stored:', realToken);
-			console.log('User data:', user);
 
 			return {
 				success: true,
@@ -946,7 +932,6 @@ public clearAuthState(): void {
 	}
 
 	private offlineDemoLogin(credentials: LoginCredentials): AuthResponse {
-		console.log('Backend not available, offline mode not supported');
 		return {
 			success: false,
 			message: 'Backend service is currently unavailable. Please try again later.'
@@ -1030,9 +1015,6 @@ public clearAuthState(): void {
 		const endpoint = `${API_BASE_URL}/users/${user.id}`;
 
 		try {
-			console.log('Sending PATCH request to:', endpoint);
-			console.log('Update data:', updateData);
-			console.log('Token:', this.state.token.substring(0, 20) + '...');
 
 			const res = await fetch(endpoint, {
 				method: 'PATCH',
@@ -1078,11 +1060,6 @@ public clearAuthState(): void {
 			}
 
 			const data = await res.json();
-			console.log('Profile update response:', data);
-
-			console.log('DEBUG Complete backend response:', JSON.stringify(data, null, 2));
-			console.log('DEBUG data.user:', JSON.stringify(data.user, null, 2));
-			console.log('DEBUG data.twoFactorEnabled:', data.twoFactorEnabled);
 
 			const updatedUser = mapBackendUserToUser(data.user || data);
 
@@ -1144,7 +1121,12 @@ public clearAuthState(): void {
 
 		try {
 			const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-			console.log('Generated password reset code:', verificationCode);
+
+			console.log('🔑 ========================================');
+			console.log('🔑 PASSWORD RESET - VERIFICATION CODE GENERATED');
+			console.log('🔑 Email:', email);
+			console.log('🔑 CODE:', verificationCode);
+			console.log('🔑 ========================================');
 
 			localStorage.setItem('password_reset_code', verificationCode);
 			localStorage.setItem('password_reset_email', email);
@@ -1161,8 +1143,6 @@ public clearAuthState(): void {
 				})
 			});
 
-			console.log('Password reset verification response status:', response.status);
-
 			if (response.status === 404) {
 				return {
 					success: false,
@@ -1171,7 +1151,6 @@ public clearAuthState(): void {
 			}
 
 			if (response.status === 200 || response.status === 201) {
-				console.log('Password reset verification code sent successfully');
 				return {
 					success: true,
 					message: 'Verification code sent to your email'
@@ -1233,7 +1212,6 @@ public clearAuthState(): void {
 				localStorage.removeItem('password_reset_email');
 				localStorage.removeItem('password_reset_password');
 
-				console.log('Password reset completed successfully');
 				return {
 					success: true,
 					message: 'Password reset successful'
@@ -1258,7 +1236,6 @@ public clearAuthState(): void {
 	}
 
 	async resendPasswordResetCode(email: string, newPassword: string): Promise<AuthResponse> {
-		console.log('Resending password reset verification code');
 
 		return this.initiatePasswordReset(email, newPassword);
 	}
@@ -1337,6 +1314,19 @@ public clearAuthState(): void {
 			});
 
 			if (response.ok) {
+				// Send WebSocket notification to the other user
+				const currentUser = this.getUser();
+				if (currentUser) {
+					// Determine which username is the target (the one who sent the request)
+					const targetUsername = usernameOne === currentUser.userName ? usernameTwo : usernameOne;
+
+					// Get socket service and send notification
+					const socketService = (window as any).socketService;
+					if (socketService && socketService.sendFriendAccepted) {
+						socketService.sendFriendAccepted(targetUsername);
+					}
+				}
+
 				return { success: true, message: 'Friend request accepted' };
 			} else {
 				const errorData = await response.json().catch(() => ({}));
@@ -1352,66 +1342,96 @@ public clearAuthState(): void {
 		}
 	}
 
-	async blockUserFromRequest(usernameOne: string, usernameTwo: string): Promise<AuthResponse> {
-		try {
-			const response = await fetch(`${API_BASE_URL}/relation`, {
-				method: 'PATCH',
-				headers: {
-					'Authorization': `Bearer ${this.state.token}`,
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify({
-					usernameOne,
-					usernameTwo,
-					type: 'BLOCKED'
-				}),
-			});
 
-			if (response.ok) {
-				return { success: true, message: 'User blocked successfully' };
-			} else {
-				const errorData = await response.json().catch(() => ({}));
-				return {
-					success: false,
-					message: errorData.message || 'Failed to block user',
-					statusCode: response.status
-				};
-			}
-		} catch (error) {
-			console.error('Error blocking user:', error);
-			return { success: false, message: ERROR_MESSAGES.NETWORK_ERROR };
-		}
-	}
+async blockUserFromRequest(usernameOne: string, usernameTwo: string): Promise<AuthResponse> {
+    try {
+        const response = await fetch(`${API_BASE_URL}/relation`, {
+            method: 'PATCH',
+            headers: {
+                'Authorization': `Bearer ${this.state.token}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                usernameOne,
+                usernameTwo,
+                type: 'BLOCKED'
+            }),
+        });
 
-	async removeFriend(usernameOne: string, usernameTwo: string): Promise<AuthResponse> {
-		try {
-			const response = await fetch(`${API_BASE_URL}/relation`, {
-				method: 'DELETE',
-				headers: {
-					'Authorization': `Bearer ${this.state.token}`,
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify({
-					usernameOne,
-					usernameTwo
-				}),
-			});
+        if (response.ok) {
+            // Send WebSocket notification to the blocked user
+            const currentUser = this.getUser();
+            if (currentUser) {
+                // Determine which username is the target (the one being blocked)
+                const targetUsername = usernameOne === currentUser.userName ? usernameTwo : usernameOne;
 
-			if (response.ok) {
-				return { success: true, message: 'Friend removed successfully' };
-			} else {
-				const errorData = await response.json().catch(() => ({}));
-				return {
-					success: false,
-					message: errorData.message || 'Failed to remove friend',
-					statusCode: response.status
-				};
-			}
-		} catch (error) {
-			console.error('Error removing friend:', error);
-			return { success: false, message: ERROR_MESSAGES.NETWORK_ERROR };
-		}
-	}
+                // Get socket service and send notification
+                const socketService = (window as any).socketService;
+                if (socketService && socketService.sendUserBlocked) {
+                    socketService.sendUserBlocked(targetUsername);
+                }
+            }
+
+            return { success: true, message: 'User blocked successfully' };
+        } else {
+            const errorData = await response.json().catch(() => ({}));
+            return {
+                success: false,
+                message: errorData.message || 'Failed to block user',
+                statusCode: response.status
+            };
+        }
+    } catch (error) {
+        console.error('Error blocking user:', error);
+        return { success: false, message: ERROR_MESSAGES.NETWORK_ERROR };
+    }
+}
+
+// Replace your removeFriend method with this:
+
+async removeFriend(usernameOne: string, usernameTwo: string): Promise<AuthResponse> {
+    try {
+        const response = await fetch(`${API_BASE_URL}/relation`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${this.state.token}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                usernameOne,
+                usernameTwo
+            }),
+        });
+
+        if (response.ok) {
+            // Send WebSocket notification to the removed friend (using user-blocked type)
+            const currentUser = this.getUser();
+            if (currentUser) {
+                // Determine which username is the target (the friend being removed)
+                const targetUsername = usernameOne === currentUser.userName ? usernameTwo : usernameOne;
+
+                // Get socket service and send notification
+                // Using sendUserBlocked since the UI behavior should be the same
+                const socketService = (window as any).socketService;
+                if (socketService && socketService.sendUserBlocked) {
+                    socketService.sendUserBlocked(targetUsername);
+                }
+            }
+
+            return { success: true, message: 'Friend removed successfully' };
+        } else {
+            const errorData = await response.json().catch(() => ({}));
+            return {
+                success: false,
+                message: errorData.message || 'Failed to remove friend',
+                statusCode: response.status
+            };
+        }
+    } catch (error) {
+        console.error('Error removing friend:', error);
+        return { success: false, message: ERROR_MESSAGES.NETWORK_ERROR };
+    }
+}
 
 	async getFriendsList(userId: string): Promise<AuthResponse> {
 		try {
@@ -1444,7 +1464,6 @@ public clearAuthState(): void {
 		this.setLoading(true);
 
 		try {
-			console.log('🌐 Starting Google OAuth login...');
 
 			// Open Google OAuth popup
 			const authWindow = window.open(
@@ -1558,7 +1577,6 @@ public clearAuthState(): void {
 		try {
 			const endpoint = `${API_BASE_URL}/users/oauth-upsert`;
 
-			console.log('Processing OAuth callback with backend...');
 
 			const response = await fetch(endpoint, {
 				method: 'POST',
@@ -1653,6 +1671,70 @@ public clearAuthState(): void {
     // Return from localStorage as fallback
     const cached = localStorage.getItem("ft_pong_statistics");
     return cached ? JSON.parse(cached) as UserStats : stats;
+}
+
+async getBlockedUsers(userId: string): Promise<AuthResponse> {
+    try {
+        const response = await fetch(`${API_BASE_URL}/relation/blocked/${userId}`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${this.state.token}`,
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            return { success: true, data };
+        } else {
+            const errorData = await response.json().catch(() => ({}));
+            return {
+                success: false,
+                message: errorData.message || 'Failed to load blocked users',
+                statusCode: response.status
+            };
+        }
+    } catch (error) {
+        console.error('Error loading blocked users:', error);
+        return { success: false, message: ERROR_MESSAGES.NETWORK_ERROR };
+    }
+}
+
+async getFriendStatistics(friendId: string): Promise<UserStats | null> {
+    if (!this.state.token) {
+        console.error('No auth token available');
+        return null;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/statistics/${friendId}`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${this.state.token}`,
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (!response.ok) {
+            console.error('Failed to fetch friend statistics:', response.status);
+            return null;
+        }
+
+        const data = await response.json();
+
+        const stats: UserStats = {
+            winCount: data.winCount ?? 0,
+            lossCount: data.lossCount ?? 0,
+            tournamentWinCount: data.tournamentWinCount ?? 0,
+            tournamentCount: data.tournamentCount ?? 0,
+            totalGames: data.totalGames ?? 0,
+        };
+
+        return stats;
+    } catch (error) {
+        console.error('Error fetching friend statistics:', error);
+        return null;
+    }
 }
 }
 

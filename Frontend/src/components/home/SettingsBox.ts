@@ -456,7 +456,6 @@ private async applyAuthenticatedSettings(): Promise<void> {
     public applyBackendSettings(settings: any): void {
         if (!settings) return;
 
-        console.log('Applying backend settings:', settings);
 
         // Apply theme
         if (settings.theme && settings.theme !== simpleThemeManager.getCurrentTheme()) {
@@ -678,7 +677,6 @@ private changeBackgroundTheme(themeName: string): void {
     }
 
     private resetToDefaults(): void {
-        console.log('Resetting settings to defaults...');
 
         // Clear local storage
         localStorage.removeItem('ft_pong_game_settings');

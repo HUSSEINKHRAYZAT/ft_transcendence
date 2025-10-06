@@ -265,9 +265,8 @@ export abstract class BaseModal {
 
       // Add notification
       notifyBox.addNotification(fullMessage, type);
-    } else {
-      console.warn('NotificationBox instance not found. Please initialize notifyBox globally.');
     }
+    
   }
 
   protected showError(errorId: string, message: string): void {
