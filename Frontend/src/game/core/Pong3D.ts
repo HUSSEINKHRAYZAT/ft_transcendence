@@ -2895,6 +2895,16 @@ this.rightWall = wall(
   private async showNextMatchScreen(overlay: HTMLElement, tournament: any, match: any) {
     this.tournamentOverlay = overlay;
     
+    // IMPORTANT: Refetch the latest tournament state to ensure bracket is up-to-date
+    try {
+      const { tournamentService } = await import('../../tournament/TournamentService');
+      const latestTournament = await tournamentService.getTournament(tournament.tournamentId || tournament.id);
+      tournament = latestTournament; // Use the fresh data
+      console.log('🔄 Refetched tournament data for bracket display');
+    } catch (error) {
+      console.warn('⚠️ Failed to refetch tournament, using provided data:', error);
+    }
+    
     // Clear overlay and show bracket with ready button
     overlay.innerHTML = '';
     overlay.style.background = 'rgba(0, 0, 0, 0.95)';
@@ -3201,7 +3211,7 @@ this.rightWall = wall(
         tournamentService.off('tournamentUpdated', handleTournamentUpdate);
         tournamentService.off('matchCompleted', handleMatchCompleted);
         if (pollingInterval) clearInterval(pollingInterval);
-        this.showTournamentCompleteScreen(overlay);
+        // this.showTournamentCompleteScreen(overlay);
         return;
       }
       
@@ -3267,7 +3277,7 @@ this.rightWall = wall(
             if (pollingInterval) clearInterval(pollingInterval);
             tournamentService.off('tournamentUpdated', handleTournamentUpdate);
             tournamentService.off('matchCompleted', handleMatchCompleted);
-            this.showTournamentCompleteScreen(overlay);
+            // this.showTournamentCompleteScreen(overlay);
             return;
           }
           

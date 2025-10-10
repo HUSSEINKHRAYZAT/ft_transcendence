@@ -485,7 +485,7 @@ export class TournamentBracket {
           margin-top: 12px;
           text-align: center;
         }
-        
+        /*
         .btn-start-match {
           background: linear-gradient(135deg, #84cc16, #65a30d);
           color: white;
@@ -502,7 +502,7 @@ export class TournamentBracket {
           background: linear-gradient(135deg, #65a30d, #4d7c0f);
           transform: translateY(-1px);
         }
-
+        */
         .winner-info {
           margin-bottom: 8px;
           text-align: center;
@@ -760,7 +760,7 @@ export class TournamentBracket {
         </div>
       `;
     }
-
+/*
     if (isActive && isUserInMatch) {
       const matchData = JSON.stringify(match).replace(/"/g, '&quot;');
       return `
@@ -799,6 +799,7 @@ export class TournamentBracket {
         </div>
       `;
     }
+      */
 
     return '';
   }

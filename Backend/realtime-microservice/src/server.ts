@@ -341,21 +341,52 @@ function handleRoundCompletion(tournament: any): void {
     (m: any) => m.round === nextRound
   );
 
-  // Fill next round matches with winners
-  for (let i = 0; i < currentRoundMatches.length; i++) {
-    const completedMatch = currentRoundMatches[i];
+  // Fill next round matches with winners - FIXED: Only assign once per winner
+  // Sort current round matches by matchIndex to ensure consistent ordering
+  const sortedMatches = currentRoundMatches.sort((a: any, b: any) => a.matchIndex - b.matchIndex);
+  
+  console.log(`🔄 Advancing winners from ${sortedMatches.length} matches to ${nextRoundMatches.length} next round matches`);
+  
+  for (let i = 0; i < sortedMatches.length; i++) {
+    const completedMatch = sortedMatches[i];
     const winner = tournament.players.find(
       (p: any) => p.id === completedMatch.winnerId
     );
 
+    if (!winner) {
+      console.warn(`⚠️ No winner found for match ${completedMatch.id} (winnerId: ${completedMatch.winnerId})`);
+      continue;
+    }
+
     const nextMatchIndex = Math.floor(i / 2);
     const nextMatch = nextRoundMatches[nextMatchIndex];
 
-    if (winner && nextMatch) {
-      if (i % 2 === 0) {
+    if (!nextMatch) {
+      console.warn(`⚠️ No next round match found at index ${nextMatchIndex}`);
+      continue;
+    }
+
+    // Assign winner to next match based on their position
+    // i=0,1 -> match 0; i=2,3 -> match 1; etc.
+    if (i % 2 === 0) {
+      // First match of pair -> player1 of next match
+      if (!nextMatch.player1) {
         nextMatch.player1 = winner;
+        console.log(`✅ Match ${i} winner ${winner.name} -> Round ${nextRound} Match ${nextMatchIndex} slot 1`);
+      } else if (nextMatch.player1.id !== winner.id) {
+        console.warn(`⚠️ Slot 1 already occupied by ${nextMatch.player1.name}, cannot assign ${winner.name}`);
       } else {
+        console.log(`ℹ️ ${winner.name} already assigned to Round ${nextRound} Match ${nextMatchIndex} slot 1`);
+      }
+    } else {
+      // Second match of pair -> player2 of next match
+      if (!nextMatch.player2) {
         nextMatch.player2 = winner;
+        console.log(`✅ Match ${i} winner ${winner.name} -> Round ${nextRound} Match ${nextMatchIndex} slot 2`);
+      } else if (nextMatch.player2.id !== winner.id) {
+        console.warn(`⚠️ Slot 2 already occupied by ${nextMatch.player2.name}, cannot assign ${winner.name}`);
+      } else {
+        console.log(`ℹ️ ${winner.name} already assigned to Round ${nextRound} Match ${nextMatchIndex} slot 2`);
       }
     }
   }
@@ -376,7 +407,12 @@ function handleRoundCompletion(tournament: any): void {
   }
 
   // Check if tournament is complete
-  if (nextRoundMatches.length === 0 || nextRoundMatches.every((m: any) => m.status === 'completed')) {
+  // Tournament is complete only when:
+  // 1. There are no next round matches (shouldn't happen with proper bracket)
+  // 2. OR we just completed the final round (only 1 match in current round)
+  const isFinalRound = currentRoundMatches.length === 1;
+  
+  if (nextRoundMatches.length === 0 || isFinalRound) {
     // Tournament complete!
     const finalMatch = currentRoundMatches[0];
     tournament.status = 'completed';
@@ -1314,7 +1350,18 @@ function handleMessage(playerId: string, ws: WSClient, msg: WSMessage): void {
       }
 
       if (foundMatch.status === 'completed') {
+        console.log(`ℹ️ Match ${matchId} already completed, ignoring duplicate completion`);
         break; // Already completed
+      }
+
+      // Validate winnerId is one of the players
+      const isPlayer1Winner = foundMatch.player1?.id === winnerId;
+      const isPlayer2Winner = foundMatch.player2?.id === winnerId;
+      
+      if (!isPlayer1Winner && !isPlayer2Winner) {
+        console.error(`❌ Invalid winnerId ${winnerId} for match ${matchId}. Players: ${foundMatch.player1?.id}, ${foundMatch.player2?.id}`);
+        sendToSocket(ws, { type: 'tournament_error', reason: 'invalid_winner' });
+        break;
       }
 
       // Mark match as completed
@@ -1323,7 +1370,8 @@ function handleMessage(playerId: string, ws: WSClient, msg: WSMessage): void {
       foundMatch.score = finalScore;
       foundMatch.completedAt = Date.now();
 
-      console.log(`🏆 Match completed: ${matchId}, winner: ${winnerId}`);
+      const winnerName = isPlayer1Winner ? foundMatch.player1?.name : foundMatch.player2?.name;
+      console.log(`🏆 Match ${matchId} completed in Round ${foundTournament.currentRound}: Winner = ${winnerName} (${winnerId})`);
 
       // Broadcast match completion
       broadcastToAll({
@@ -1336,11 +1384,17 @@ function handleMessage(playerId: string, ws: WSClient, msg: WSMessage): void {
       const currentRoundMatches = foundTournament.matches.filter(
         (m: any) => m.round === foundTournament.currentRound
       );
+      const completedCount = currentRoundMatches.filter((m: any) => m.status === 'completed').length;
+      const totalCount = currentRoundMatches.length;
+      
+      console.log(`📊 Round ${foundTournament.currentRound} progress: ${completedCount}/${totalCount} matches completed`);
+      
       const allRoundMatchesComplete = currentRoundMatches.every(
         (m: any) => m.status === 'completed'
       );
 
       if (allRoundMatchesComplete) {
+        console.log(`✅ All matches in Round ${foundTournament.currentRound} completed - advancing to next round`);
         handleRoundCompletion(foundTournament);
       }
 
