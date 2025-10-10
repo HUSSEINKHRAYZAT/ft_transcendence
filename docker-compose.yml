@@ -1,0 +1,143 @@
+services:
+  user_management:
+    image: maxplushchreif/user_management:1.0.0
+    container_name: user_management
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DB_FILE=/app/data/user_management.db
+    volumes:
+      - usermgmt_data:/app/data
+    ports:
+      - "3001:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
+  realtime_microservice:
+    build:
+      context: ./Backend/realtime-microservice
+      dockerfile: Dockerfile
+    container_name: realtime_microservice
+    environment:
+      - NODE_ENV=production
+      - PORT=3020
+    ports:
+      - "3020:3020"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:3020/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
+  game_microservice:
+    image: maxplushchreif/game_microservice:1.0.0
+    container_name: game_microservice
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DB_FILE=/app/data/game_management.db
+    volumes:
+      - usermgmt_data:/app/data
+    ports:
+      - "3004:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
+  mailer:
+    image: maxplushchreif/mailer:1.0.0
+    container_name: mailer
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - SMTP_HOST=smtp.gmail.com
+      - SMTP_PORT=465
+      - SMTP_SECURE=true
+      - SMTP_USER=42transcender@gmail.com
+      - SMTP_PASS=jrlrgyfofocmliou
+      - FROM_EMAIL=42transcender@gmail.com
+      - FROM_NAME=Transcender
+    ports:
+      - "3002:3000"
+
+  session_microservice:
+    image: maxplushchreif/session_microservice:1.0.0
+    container_name: session_microservice
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DB_FILE=/app/data/session.db
+    volumes:
+      - usermgmt_data:/app/data
+    ports:
+      - "3003:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
+  google_oauth2:
+    image: maxplushchreif/google_oauth2:1.0.0
+    container_name: google_oauth2
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - GOOGLE_CLIENT_ID=710484980381-ruekfrc3otecdgpq44tms9ifgfff7fij.apps.googleusercontent.com
+      - GOOGLE_CLIENT_SECRET=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
+      - GOOGLE_REDIRECT_URI=http://localhost:8080/authWithGoogle/callback
+      - USER_SERVICE_URL=http://user_management:3000
+      - AUTH_JWT_SECRET=dev-gateway-secret
+      - AUTH_JWT_TTL=5h
+      - STATE_SECRET=dev-state-secret
+      - ALLOWED_REDIRECTS=http://localhost:5173,http://127.0.0.1:5173
+    restart: unless-stopped
+
+  api_gateway:
+    image: maxplushchreif/api_gateway:1.0.0
+    container_name: api_gateway
+    environment:
+      - NODE_ENV=production
+      - PORT=8080
+      - USER_SERVICE_URL=http://user_management:3000
+      - SESSION_SERVICE_URL=http://session_microservice:3000
+      - GAME_SERVICE_URL=http://game_microservice:3000
+      - GOOGLE_OAUTH_URL=http://google_oauth2:3000
+      - SOCKET_URL=ws://realtime_microservice:3020
+      - MAILER_URL=http://mailer:3000
+      - CORS_ORIGIN=*
+      - UPSTREAM_TIMEOUT_MS=15000
+      - AUTH_JWT_SECRET=dev-gateway-secret
+      - AUTH_JWT_TTL=5h
+    ports:
+      - "8080:8080"
+    depends_on:
+      - user_management
+      - mailer
+      - session_microservice
+      - game_microservice
+      - google_oauth2
+      - realtime_microservice
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:8080/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
+volumes:
+  usermgmt_data: {}
