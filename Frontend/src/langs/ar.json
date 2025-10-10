@@ -1,518 +1,0 @@
-{
-  "Login": "تسجيل الدخول",
-  "Sign Up": "إنشاء حساب",
-  "Signup": "إنشاء حساب",
-  "Welcome": "مرحباً",
-  "Create Account": "إنشاء حساب",
-  "Email": "البريد الإلكتروني",
-  "Username": "اسم المستخدم",
-  "Password": "كلمة المرور",
-  "First Name": "الاسم الأول",
-  "Last Name": "الاسم الأخير",
-  "Confirm Password": "تأكيد كلمة المرور",
-  "Remember me": "تذكرني",
-  "Forgot password?": "نسيت كلمة المرور؟",
-  "Already have an account?": "هل لديك حساب بالفعل؟",
-  "Don't have an account?": "ليس لديك حساب؟",
-  "Sign up here": "اشترك من هنا",
-  "Login here": "سجل الدخول من هنا",
-  "Verify Email": "تحقق من البريد الإلكتروني",
-  "Email Verification": "التحقق من البريد الإلكتروني",
-  "Please enter the verification code sent to your email": "يرجى إدخال رمز التحقق المرسل إلى بريدك الإلكتروني",
-  "Resend Code": "إعادة إرسال الرمز",
-  "Code Sent": "تم إرسال الرمز",
-  "Email verified successfully!": "تم التحقق من البريد الإلكتروني بنجاح!",
-  "You can request another code in {seconds} seconds": "يمكنك طلب رمز آخر خلال {seconds} ثانية",
-  "Email is required": "البريد الإلكتروني مطلوب",
-  "Password is required": "كلمة المرور مطلوبة",
-  "Username is required": "اسم المستخدم مطلوب",
-  "First name is required": "الاسم الأول مطلوب",
-  "Last name is required": "الاسم الأخير مطلوب",
-  "Please enter a valid email address": "يرجى إدخال بريد إلكتروني صحيح",
-  "Password must be at least 6 characters": "كلمة المرور يجب أن تحتوي على الأقل 6 أحرف",
-  "Password must be at least 6 characters long": "كلمة المرور يجب أن تكون على الأقل 6 أحرف",
-  "Password must contain at least one number": "كلمة المرور يجب أن تحتوي على الأقل رقم واحد",
-  "Password must contain at least one uppercase letter": "كلمة المرور يجب أن تحتوي على الأقل حرف كبير واحد",
-  "Password must contain at least one special character": "كلمة المرور يجب أن تحتوي على الأقل رمز خاص واحد",
-  "Invalid email or password": "بريد إلكتروني أو كلمة مرور غير صحيحة",
-  "Failed to create account": "فشل في إنشاء الحساب",
-  "Login failed": "فشل تسجيل الدخول",
-  "Network error. Please check your connection": "خطأ في الشبكة. يرجى التحقق من اتصالك",
-  "Verification failed. Please try again": "فشل التحقق. يرجى المحاولة مرة أخرى",
-  "This field is required": "هذا الحقل مطلوب",
-  "Username can only contain letters, digits, and underscores": "اسم المستخدم يمكن أن يحتوي فقط على أحرف وأرقام وشرطات سفلية",
-  "Username must contain at least one letter": "اسم المستخدم يجب أن يحتوي على الأقل حرف واحد",
-  "Username must contain at least one digit": "اسم المستخدم يجب أن يحتوي على الأقل رقم واحد",
-  "Login successful": "تم تسجيل الدخول بنجاح",
-  "Account created successfully": "تم إنشاء الحساب بنجاح",
-  "Profile updated successfully": "تم تحديث الملف الشخصي بنجاح",
-  "Close": "إغلاق",
-  "Cancel": "إلغاء",
-  "Confirm": "تأكيد",
-  "Submit": "إرسال",
-  "Save": "حفظ",
-  "Delete": "حذف",
-  "Edit": "تعديل",
-  "Add": "إضافة",
-  "Yes": "نعم",
-  "No": "لا",
-  "OK": "موافق",
-  "Start Game": "بدء اللعبة",
-  "Exit Game": "خروج من اللعبة",
-  "Refresh Page": "تحديث الصفحة",
-  "Home": "الرئيسية",
-  "Game": "اللعبة",
-  "Profile": "الملف الشخصي",
-  "About": "حول",
-  "Project": "المشروع",
-  "Logout": "تسجيل الخروج",
-  "Settings": "الإعدادات",
-  "🎮 Single Player": "🎮 لاعب واحد",
-  "🏠 Local Play": "🏠 لعب محلي",
-  "Local Multiplayer": "لاعبين محلي",
-  "🌐 Online Play": "🌐 لعب عبر الإنترنت",
-  "🏆 Tournament": "🏆 بطولة",
-  "Play Game": "العب اللعبة",
-  "Play against AI opponents": "العب ضد خصوم الذكاء الاصطناعي",
-  "Play with friends on the same device": "العب مع الأصدقاء على نفس الجهاز",
-  "Challenge players worldwide": "تحدى اللاعبين حول العالم",
-  "Compete in tournaments": "تنافس في البطولات",
-  "AI Players:": "لاعبو الذكاء الاصطناعي:",
-  "Local Players:": "لاعبون محليون:",
-  "Difficulty:": "الصعوبة:",
-  "Easy": "سهل",
-  "Medium": "متوسط",
-  "Hard": "صعب",
-  "Expert": "خبير",
-  "Create Room": "إنشاء غرفة",
-  "Join Room": "انضم إلى غرفة",
-  "Room Code": "رمز الغرفة",
-  "Player Name": "اسم اللاعب",
-  "Waiting for players...": "في انتظار اللاعبين...",
-  "Game starting...": "اللعبة تبدأ...",
-  "Game Configuration Saved!": "تم حفظ إعدادات اللعبة!",
-  "AI difficulty will be controlled from game settings": "سيتم التحكم في صعوبة الذكاء الاصطناعي من إعدادات اللعبة",
-  "Game Over": "انتهت اللعبة",
-  "You Win!": "لقد فزت!",
-  "You Lose!": "لقد خسرت!",
-  "Draw!": "تعادل!",
-  "Score": "النقاط",
-  "Wins": "الفوز",
-  "Losses": "الخسارة",
-  "Games Played": "عدد الألعاب",
-  "About Us": "معلومات عنا",
-  "We are a team of five passionate 42-Beirut developers collaborating on the FT_TRANSCENDENCE project": "نحن فريق من خمسة مطورين متحمسين من 42-بيروت نتعاون في مشروع FT_TRANSCENDENCE",
-  "Our Team:": "فريقنا:",
-  "Ali Fayad [ Frontend ]": "علي فياض [ واجهة أمامية ]",
-  "Fouad Dahouk [ Socket ]": "فؤاد دحوك [ سوكيت ]",
-  "Hussein Khrayzat [ Game ]": "حسين خريزات [ لعبة ]",
-  "Hussein Chrief [ DevOps ]": "حسين شريف [ ديفأوبس ]",
-  "Mostafa Younes [ Backend ]": "مصطفى يونس [ خلفية ]",
-  "Project Information": "معلومات المشروع",
-  "FT_TRANSCENDENCE is a Milestone 6 project at 42 Beirut, designed as a full-stack web application centered around a modern remake of the classic Pong game": "FT_TRANSCENDENCE هو مشروع Milestone 6 في 42 بيروت، مصمم كتطبيق ويب كامل متمركز حول إعادة صنع حديثة للعبة Pong الكلاسيكية",
-  "Full project carousel available with TypeScript components": "عرض مشروع كامل متاح بمكونات TypeScript",
-  "🌐 Web Module [ 2 / 3 ]": "🌐 وحدة الويب [ 2 / 3 ]",
-  "👤 User Management [ 2 / 2 ]": "👤 إدارة المستخدمين [ 2 / 2 ]",
-  "🎮 Game Module [ 2 / 3 ]": "🎮 وحدة اللعبة [ 2 / 3 ]",
-  "🤖 AI-Algo Module [ 0 / 1 ]": "🤖 وحدة الذكاء الاصطناعي [ 0 / 1 ]",
-  "⛓️ Blockchain Module [ 0 / 1 ]": "⛓️ وحدة البلوكشين [ 0 / 1 ]",
-  "🔒 Cyber-Security Module [ 0 / 1 ]": "🔒 وحدة الأمن السيبراني [ 0 / 1 ]",
-  "⚙️ DevOps Module [ 1 / 3 ]": "⚙️ وحدة ديفأوبس [ 1 / 3 ]",
-  "♿ Accessibility Module [ 0 / 1 ]": "♿ وحدة الوصول [ 0 / 1 ]",
-  "📦 Object Module [ 0 / 1 ]": "📦 وحدة الكائنات [ 0 / 1 ]",
-  "Major:": "رئيسي:",
-  "Minor:": "ثانوي:",
-  "Use a framework to build the backend": "استخدم إطار عمل لبناء الخلفية",
-  "Use a framework or a toolkit to build the frontend": "استخدم إطار عمل أو أدوات لبناء الواجهة الأمامية",
-  "Use a database for the backend": "استخدم قاعدة بيانات للخلفية",
-  "Standard user management, authentication, users across tournaments": "إدارة مستخدمين قياسية، مصادقة، مستخدمين عبر البطولات",
-  "Remote authentication": "مصادقة عن بعد",
-  "Multiplayer (more than 2 in the same game)": "لاعبين متعددين (أكثر من 2 في نفس اللعبة)",
-  "Add another game with the same set of rules": "إضافة لعبة أخرى بنفس مجموعة القواعد",
-  "Live chat": "دردشة مباشرة",
-  "Success": "نجاح",
-  "Error": "خطأ",
-  "Warning": "تحذير",
-  "Info": "معلومات",
-  "Welcome": "مرحباً",
-  "Logged out successfully": "تم تسجيل الخروج بنجاح",
-  "Profile updated": "تم تحديث الملف الشخصي",
-  "Game started": "بدأت اللعبة",
-  "Connection error": "خطأ في الاتصال",
-  "Please try again": "يرجى المحاولة مرة أخرى",
-  "Application Failed to Load": "فشل تحميل التطبيق",
-  "Sorry, FT_PONG couldn't start properly. Please try refreshing the page": "عذراً، لم يتمكن FT_PONG من البدء بشكل صحيح. يرجى محاولة تحديث الصفحة",
-  "User Profile": "الملف الشخصي للمستخدم",
-  "Personal Information": "المعلومات الشخصية",
-  "Game Statistics": "إحصائيات اللعبة",
-  "📢 Notifications": "📢 الإشعارات",
-  "👥 Friends": "👥 الأصدقاء",
-  "⚙️ Settings": "⚙️ الإعدادات",
-  "TypeScript components not loaded. Using fallback content": "مكونات TypeScript غير محملة. استخدام محتوى احتياطي",
-  "Component failed to load. Using fallback content": "فشل تحميل المكون. استخدام محتوى احتياطي",
-  "No new notifications": "لا توجد إشعارات جديدة",
-  "Just now": "الآن",
-  "Welcome to FT_PONG": "مرحباً بك في FT_PONG",
-  "Get ready for some retro gaming fun!": "استعد لمتعة الألعاب الكلاسيكية!",
-  "Experience the classic Pong game with modern features, multiplayer support, and exciting tournaments": "جرب لعبة Pong الكلاسيكية بميزات حديثة ودعم للاعبين المتعددين وبطولات مثيرة",
-  "Are you sure you want to logout? You will need to login again to access your account": "هل أنت متأكد أنك تريد تسجيل الخروج؟ ستحتاج إلى تسجيل الدخول مرة أخرى للوصول إلى حسابك",
-  "Yes, Logout": "نعم، تسجيل خروج",
-  "Are you sure you want to delete this item?": "هل أنت متأكد أنك تريد حذف هذا العنصر؟",
-  "Yes, Delete": "نعم، حذف",
-  "Add Item": "إضافة عنصر",
-  "Enter value": "أدخل القيمة",
-  "Confirm Action": "تأكيد الإجراء",
-  "Loading...": "جاري التحميل...",
-  "Loading FT_PONG...": "جاري تحميل FT_PONG...",
-  "FT_PONG - Lime Themed Pong Game": "FT_PONG - لعبة Pong ذات سمة الليمون",
-  "Content will be dynamically loaded here": "سيتم تحميل المحتوى هنا ديناميكياً",
-  "Dots will be dynamically created": "سيتم إنشاء النقاط ديناميكياً",
-  "Game Modal Error": "خطأ في نافذة اللعبة",
-  "Game modal service not available. Please refresh the page": "خدمة نافذة اللعبة غير متاحة. يرجى تحديث الصفحة",
-  "FT_PONG - A lime-themed Pong game built with TypeScript and Tailwind CSS": "FT_PONG - لعبة Pong ذات سمة الليمون مبنية بـ TypeScript و Tailwind CSS",
-  "pong, game, typescript, lime theme, arcade": "pong, لعبة, typescript, سمة الليمون, أركيد",
-  "FT_PONG Team": "فريق FT_PONG",
-  "Experience the classic Pong game with a fresh lime twist": "جرب لعبة Pong الكلاسيكية بلمسة ليمون منعشة",
-  "&copy; 2024 FT_PONG": "&copy; 2024 FT_PONG",
-  "Enter the verification code sent to your email": "أدخل رمز التحقق المرسل إلى بريدك الإلكتروني",
-  "Component failed to load": "فشل تحميل المكون",
-  "Modal service not loaded": "خدمة النافذة غير محملة",
-  "Unknown error occurred": "حدث خطأ غير معروف",
-  "Experience the classic Pong game with a fresh lime twist!": "جرب لعبة Pong الكلاسيكية بلمسة ليمون منعشة!",
-  "Login - Modal service not loaded": "تسجيل الدخول - خدمة النافذة غير محملة",
-  "Friends": "الأصدقاء",
-  "No friends yet.": "لا أصدقاء بعد.",
-  "Add Friend": "إضافة صديق",
-  "Requests": "الطلبات",
-  "Remove Friend": "إزالة صديق",
-  "Block User": "حظر مستخدم",
-  "Please log in to view friends": "يرجى تسجيل الدخول لعرض الأصدقاء",
-  "Sign In": "تسجيل الدخول",
-  "Please sign in first.": "يرجى تسجيل الدخول أولاً.",
-  "No user found with this email.": "لم يتم العثور على مستخدم بهذا البريد الإلكتروني.",
-  "You can't add yourself 🙂": "لا يمكنك إضافة نفسك 🙂",
-  "✅ Friend request sent!": "✅ تم إرسال طلب الصداقة!",
-  "❌ Could not send request:": "❌ تعذر إرسال الطلب:",
-  "Failed to load requests:": "فشل تحميل الطلبات:",
-  "unknown error": "خطأ غير معروف",
-  "Friend Requests": "طلبات الصداقة",
-  "No pending requests.": "لا توجد طلبات معلقة.",
-  "✅ Request accepted!": "✅ تم قبول الطلب!",
-  "❌ Could not accept:": "❌ تعذر القبول:",
-  "Online": "متصل",
-  "Offline": "غير متصل",
-  "Invite to play": "دعوة للعب",
-  "User is offline": "المستخدم غير متصل",
-  "Invite": "دعوة",
-  "Could not load friends.": "تعذر تحميل الأصدقاء.",
-  "No user found with that email.": "لم يتم العثور على مستخدم بهذا البريد الإلكتروني.",
-  "Notifications": "الإشعارات",
-  "Welcome to FT_PONG! Ready to play?": "مرحباً بك في FT_PONG! مستعد للعب؟",
-  "New game features available!": "ميزات لعبة جديدة متاحة!",
-  "2 hours ago": "منذ ساعتين",
-  "Clear all notifications": "مسح جميع الإشعارات",
-  "Please log in to view notifications": "يرجى تسجيل الدخول لعرض الإشعارات",
-  "Invitation Accepted!": "تم قبول الدعوة!",
-  "joined the game": "انضم إلى اللعبة",
-  "Authentication Required": "مطلوب مصادقة",
-  "Please login to play the game": "يرجى تسجيل الدخول للعب اللعبة",
-  "Game Configuration Ready!": "إعدادات اللعبة جاهزة!",
-  "Single Player": "لاعب واحد",
-  "Local Play": "لعب محلي",
-  "Online Play": "لعب عبر الإنترنت",
-  "Tournament": "بطولة",
-  "1 AI": "1 ذكاء اصطناعي",
-  "2 AI": "2 ذكاء اصطناعي",
-  "3 AI": "3 ذكاء اصطناعي",
-  "Number of Players:": "عدد اللاعبين:",
-  "2 Players": "2 لاعبين",
-  "4 Players": "4 لاعبين",
-  "Classic 1v1": "كلاسيكي 1 ضد 1",
-  "Tournament style": "نمط البطولة",
-  "Invite friends to play online": "ادعُ الأصدقاء للعب عبر الإنترنت",
-  "Online Friends:": "الأصدقاء المتصلون:",
-  "Invited Players:": "اللاعبون المدعوون:",
-  "Tournament bracket play": "لعب بطولة",
-  "Tournament Size:": "حجم البطولة:",
-  "Semi + Final": "نصف نهائي + نهائي",
-  "Quarter + Semi + Final": "ربع نهائي + نصف نهائي + نهائي",
-  "Tournament settings will be configured later": "سيتم تكوين إعدادات البطولة لاحقاً",
-  "Welcome to FT_PONG! Get ready for some retro gaming fun!": "مرحباً بك في FT_PONG! استعد لمتعة الألعاب الكلاسيكية!",
-  "We are a team of five passionate 42-Beirut developers collaborating on the FT_TRANSCENDENCE project.": "نحن فريق من خمسة مطورين متحمسين من 42-بيروت نتعاون في مشروع FT_TRANSCENDENCE.",
-  "FT_TRANSCENDENCE is a Milestone 6 project at 42 Beirut, designed as a full-stack web application centered around a modern remake of the classic Pong game.": "FT_TRANSCENDENCE هو مشروع Milestone 6 في 42 بيروت، مصمم كتطبيق ويب كامل متمركز حول إعادة صنع حديثة للعبة Pong الكلاسيكية.",
-  "Use a framework to build the backend.": "استخدم إطار عمل لبناء الخلفية.",
-  "Use a framework or a toolkit to build the frontend.": "استخدم إطار عمل أو أدوات لبناء الواجهة الأمامية.",
-  "Use a database for the backend.": "استخدم قاعدة بيانات للخلفية.",
-  "Store the score of a tournament in the Blockchain.": "تخزين نتيجة البطولة في البلوكشين.",
-  "Standard user management, authentication, users across tournaments.": "إدارة مستخدمين قياسية، مصادقة، مستخدمين عبر البطولات.",
-  "Implementing a remote authentication.": "تنفيذ مصادقة عن بعد.",
-  "🎮 Gameplay [ 3.5 / 4.5 ]": "🎮 اللعب [ 3.5 / 4.5 ]",
-  "Remote players can play Pong together.": "يمكن للاعبين عن بعد لعب Pong معاً.",
-  "Multiple players can play Pong at the same time.": "يمكن لعدة لاعبين لعب Pong في نفس الوقت.",
-  "Add another game with the same user management.": "إضافة لعبة أخرى بنفس إدارة المستخدمين.",
-  "Game customization options (half done).": "خيارات تخصيص اللعبة (نصف مكتمل).",
-  "Live chat during the game.": "دردشة مباشرة أثناء اللعبة.",
-  "🧠 AI-Algorithm [ 1 / 1.5 ]": "🧠 خوارزمية الذكاء الاصطناعي [ 1 / 1.5 ]",
-  "Introduce an AI opponent.": "إدخال خصم ذكاء اصطناعي.",
-  "User and AI statistics dashboard.": "لوحة إحصائيات المستخدم والذكاء الاصطناعي.",
-  "🔒 Cybersecurity [ 1 / 2.5 ]": "🔒 الأمن السيبراني [ 1 / 2.5 ]",
-  "Implement WAF/ModSecurity with Hardened Configuration.": "تنفيذ WAF/ModSecurity بتكوين معزز.",
-  "GDPR Compliance Options with User Anonymization.": "خيارات الامتثال لـ GDPR مع إخفاء هوية المستخدم.",
-  "Implement Two-Factor Authentication (2FA).": "تنفيذ المصادقة الثنائية (2FA).",
-  "⚙️ DevOps [ 1 / 2.5 ]": "⚙️ ديفأوبس [ 1 / 2.5 ]",
-  "Infrastructure Setup for Log Management.": "إعداد البنية التحتية لإدارة السجلات.",
-  "Designing the Backend as Microservices.": "تصميم الخلفية كخدمات مصغرة.",
-  "Set up ELK (Elasticsearch, Logstash, Kibana) for log management.": "إعداد ELK (Elasticsearch, Logstash, Kibana) لإدارة السجلات.",
-  "🎨 Graphics [ 1 / 1 ]": "🎨 الرسومات [ 1 / 1 ]",
-  "Use of advanced 3D techniques.": "استخدام تقنيات 3D متقدمة.",
-  "♿ Accessibility [ 1 / 2.5 ]": "♿ الوصول [ 1 / 2.5 ]",
-  "Support on all devices.": "الدعم على جميع الأجهزة.",
-  "Expanding Browser Compatibility.": "توسيع توافق المتصفح.",
-  "Multiple language supports.": "دعم متعدد اللغات.",
-  "🏓 Server-Side Pong [ 0 / 2 ]": "🏓 Pong من جانب الخادم [ 0 / 2 ]",
-  "Replace basic Pong with server-side Pong and implement an API.": "استبدال Pong الأساسي بـ Pong من جانب الخادم وتنفيذ API.",
-  "Enabling Pong gameplay via CLI against web users with API integration.": "تمكين لعب Pong عبر CLI ضد مستخدمي الويب مع تكامل API.",
-  "loginTitle": "تسجيل الدخول",
-  "emailPlaceholder": "البريد الإلكتروني",
-  "passwordPlaceholder": "كلمة المرور",
-  "loginButton": "تسجيل الدخول",
-  "loginWithGoogle": "تسجيل الدخول باستخدام Google",
-  "noAccount": "ليس لديك حساب؟",
-  "signUp": "اشتراك",
-  "invalidCredentials": "بريد إلكتروني أو كلمة مرور غير صحيحة",
-  "confirm": "تأكيد",
-  "confirmLogout": "تأكيد تسجيل الخروج",
-  "addItem": "إضافة عنصر",
-  "confirmAction": "تأكيد الإجراء",
-  "confirmDelete": "تأكيد الحذف",
-  "enterValue": "أدخل القيمة...",
-  "cancel": "إلغاء",
-  "add": "إضافة",
-  "yesLogout": "نعم، تسجيل خروج",
-  "yesDelete": "نعم، حذف",
-  "thisFieldIsRequired": "هذا الحقل مطلوب",
-  "Enter your first name": "أدخل اسمك الأول",
-  "Enter your last name": "أدخل اسمك الأخير",
-  "Choose a unique username": "اختر اسم مستخدم فريد",
-  "Username taken! Try these alternatives:": "اسم المستخدم مستخدم! جرب هذه البدائل:",
-  "Enter your email": "أدخل بريدك الإلكتروني",
-  "Enter your password (min 6 characters with numbers)": "أدخل كلمة المرور (6 أحرف على الأقل مع أرقام)",
-  "Enter your password": "أدخل كلمة المرور",
-  "✗ At least 6 characters": "✗ 6 أحرف على الأقل",
-  "✓ At least 6 characters": "✓ 6 أحرف على الأقل",
-  "✗ Contains numbers": "✗ تحتوي على أرقام",
-  "✓ Contains numbers": "✓ تحتوي على أرقام",
-  "✗ Contains uppercase letter": "✗ تحتوي على حرف كبير",
-  "✓ Contains uppercase letter": "✓ تحتوي على حرف كبير",
-  "✗ Contains special character": "✗ تحتوي على رمز خاص",
-  "✓ Contains special character": "✓ تحتوي على رمز خاص",
-  "Continue with Google": "المتابعة باستخدام Google",
-  "Connecting to Google...": "جاري الاتصال بـ Google...",
-  "First name can only contain letters and spaces": "الاسم الأول يمكن أن يحتوي فقط على أحرف ومسافات",
-  "First name must be at least 2 characters long": "الاسم الأول يجب أن يكون على الأقل حرفين",
-  "Last name can only contain letters and spaces": "الاسم الأخير يمكن أن يحتوي فقط على أحرف ومسافات",
-  "Last name must be at least 2 characters long": "الاسم الأخير يجب أن يكون على الأقل حرفين",
-  "Please fix the validation errors above": "يرجى إصلاح أخطاء التحقق أعلاه",
-  "Creating Account...": "جاري إنشاء الحساب...",
-  "Account Created!": "تم إنشاء الحساب!",
-  "Welcome to FT Pong, ": "مرحباً بك في FT Pong, ",
-  "An unexpected error occurred": "حدث خطأ غير متوقع",
-  "signup.title": "إنشاء حساب",
-  "signup.firstNameLabel": "الاسم الأول",
-  "signup.firstNamePlaceholder": "أدخل اسمك الأول",
-  "signup.lastNameLabel": "الاسم الأخير",
-  "signup.lastNamePlaceholder": "أدخل اسمك الأخير",
-  "signup.usernameLabel": "اسم المستخدم",
-  "signup.usernamePlaceholder": "اختر اسم مستخدم فريد",
-  "signup.usernameTaken": "اسم المستخدم مستخدم بالفعل! جرب هذه البدائل:",
-  "signup.emailLabel": "البريد الإلكتروني",
-  "signup.emailPlaceholder": "أدخل بريدك الإلكتروني",
-  "signup.passwordLabel": "كلمة المرور",
-  "signup.passwordPlaceholder": "أدخل كلمة المرور",
-  "signup.passwordReqLength": "8 أحرف على الأقل",
-  "signup.passwordReqNumber": "تحتوي على أرقام",
-  "signup.submitButton": "إنشاء حساب",
-  "signup.haveAccount": "هل لديك حساب بالفعل؟",
-  "signup.loginLink": "تسجيل الدخول",
-  "signup.googleButton": "المتابعة باستخدام Google",
-  "signup.googleConnecting": "جاري الاتصال بـ Google...",
-  "signup.creatingAccount": "جاري إنشاء الحساب...",
-  "signup.failed": "فشل إنشاء الحساب",
-  "Sign in with Google": "تسجيل الدخول باستخدام Google",
-  "validation.fixErrors": "يرجى إصلاح الأخطاء أعلاه",
-  "validation.name.lettersOnly": "{{fieldName}} يجب أن يحتوي فقط على أحرف",
-  "validation.name.minLength": "{{fieldName}} يجب أن يكون على الأقل حرفين",
-  "validation.password.length": "كلمة المرور يجب أن تكون على الأقل 6 أحرف",
-  "validation.password.lengthValid": "طول كلمة المرور صالح",
-  "validation.password.number": "كلمة المرور يجب أن تحتوي على الأقل رقم واحد",
-  "validation.password.numberValid": "كلمة المرور تحتوي على رقم",
-  "validation.password.uppercase": "كلمة المرور يجب أن تحتوي على حرف كبير",
-  "validation.password.uppercaseValid": "كلمة المرور تحتوي على حرف كبير",
-  "validation.password.specialChar": "كلمة المرور يجب أن تحتوي على رمز خاص",
-  "validation.password.specialCharValid": "كلمة المرور تحتوي على رمز خاص",
-  "validation.username.allowedChars": "اسم المستخدم يمكن أن يحتوي فقط على أحرف وأرقام وشرطات سفلية",
-  "validation.username.letterRequired": "اسم المستخدم يجب أن يحتوي على الأقل حرف واحد",
-  "validation.username.numberRequired": "اسم المستخدم يجب أن يحتوي على الأقل رقم واحد",
-  "validation.email.invalid": "يرجى إدخال بريد إلكتروني صحيح",
-  "toast.googleAuthTitle": "مصادقة Google",
-  "toast.welcomeMessage": "مرحباً, {{name}}!",
-  "toast.accountCreated": "تم إنشاء الحساب!",
-  "toast.welcomeUser": "مرحباً بك في FT Pong, {{name}}!",
-  "errors.unexpected": "حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى لاحقاً.",
-  "fields.firstName": "الاسم الأول",
-  "fields.lastName": "الاسم الأخير",
-  "verify.title": "تحقق من بريدك الإلكتروني",
-  "verify.sentCode": "لقد أرسلنا رمز تحقق مكون من 6 أرقام إلى:",
-  "verify.enterCode": "يرجى إدخال الرمز أدناه للمتابعة",
-  "verify.codeLabel": "رمز التحقق",
-  "verify.submitButton": "تحقق من البريد الإلكتروني",
-  "verify.noCodeReceived": "لم تستلم الرمز؟",
-  "verify.resendButton": "إعادة إرسال الرمز",
-  "verify.havingTrouble": "تواجه مشكلة؟",
-  "verify.changeEmailButton": "استخدام بريد إلكتروني مختلف",
-  "verify.verifying": "جاري التحقق...",
-  "verify.codeSent": "تم إرسال الرمز",
-  "verify.successMessage": "✓ تم التحقق من البريد الإلكتروني بنجاح!",
-  "verify.errors.incompleteCode": "يرجى إدخال جميع الأرقام الأربعة",
-  "verify.errors.numbersOnly": "يرجى إدخال أرقام فقط",
-  "verify.errors.invalidCode": "رمز تحقق غير صحيح. يرجى المحاولة مرة أخرى.",
-  "verify.resendToast.title": "تم إعادة إرسال الرمز",
-  "verify.resendToast.message": "تم إرسال رمز تحقق جديد إلى بريدك الإلكتروني",
-  "verify.resendTimer": "يمكنك طلب رمز آخر خلال {seconds} ثانية",
-  "Enter your email or username": "أدخل بريدك الإلكتروني أو اسم المستخدم",
-  "Accent Colors": "ألوان التمييز",
-  "Choose your preferred accent color scheme": "اختر نظام ألوان التمييز المفضل لديك",
-  "Background Theme": "سمة الخلفية",
-  "Choose your preferred background color scheme": "اختر نظام ألوان الخلفية المفضل لديك",
-  "Sound Effects": "المؤثرات الصوتية",
-  "Background Music": "موسيقى الخلفية",
-  "Game Difficulty": "صعوبة اللعبة",
-  "Language": "اللغة",
-  "Animations": "الرسوم المتحركة",
-  "Save Settings": "حفظ الإعدادات",
-  "Reset": "إعادة تعيين",
-  "Language changed to": "تم تغيير اللغة إلى",
-  "Please log in to access other settings": "يرجى تسجيل الدخول للوصول إلى الإعدادات الأخرى",
-  "Email / Username": "البريد الإلكتروني / اسم المستخدم",
-  "Sign up": "اشتراك",
-  "Logging in...": "جاري تسجيل الدخول...",
-  "Hello {name}!": "مرحباً {name}!",
-  "Background theme changed to": "تم تغيير سمة الخلفية إلى",
-  "Theme changed to": "تم تغيير السمة إلى",
-  "Music Player": "مشغل الموسيقى",
-  "Volume": "الصوت",
-  "Failed to play music": "فشل تشغيل الموسيقى",
-  "Music paused": "تم إيقاف الموسيقى مؤقتاً",
-  "Music stopped": "تم إيقاف الموسيقى",
-  "Playing music": "جاري تشغيل الموسيقى",
-  "Statistics": "الإحصائيات",
-  "Win Rate": "معدل الفوز",
-  "Record": "السجل",
-  "Performance": "الأداء",
-  "Member Since": "عضو منذ",
-  "Status": "الحالة",
-  "Active": "نشط",
-  "Ready to start your Pong journey?": "مستعد لبدء رحلتك في Pong؟",
-  "Play your first game to see statistics here!": "العب أول لعبة لك لرؤية الإحصائيات هنا!",
-  "Start Playing": "ابدأ اللعب",
-  "Edit Profile": "تعديل الملف الشخصي",
-  "Choose Avatar": "اختر الصورة الرمزية",
-  "Enter first name": "أدخل الاسم الأول",
-  "Enter last name": "أدخل الاسم الأخير",
-  "Enter username": "أدخل اسم المستخدم",
-  "Enter email": "أدخل البريد الإلكتروني",
-  "Two-Factor Authentication": "المصادقة الثنائية",
-  "Add an extra layer of security to your account": "أضف طبقة أمان إضافية لحسابك",
-  "2FA Disabled": "المصادقة الثنائية معطلة",
-  "Save Changes": "حفظ التغييرات",
-  "Are you sure you want to reset all settings to default?": "هل أنت متأكد أنك تريد إعادة تعيين جميع الإعدادات إلى الافتراضية؟",
-  "All settings have been reset to default values.": "تم إعادة تعيين جميع الإعدادات إلى القيم الافتراضية.",
-  "Forgot your password?": "نسيت كلمة المرور؟",
-  "Demo Accounts Available": "حسابات تجريبية متاحة",
-  "Welcome back": "مرحباً بعودتك",
-  "Saving...": "جاري الحفظ...",
-  "Two-Factor Authentication Required": "مطلوب مصادقة ثنائية",
-    "Please check your email and enter the 2FA verification code to continue.": "يرجى التحقق من بريدك الإلكتروني وإدخال رمز التحقق بخطوتين للمتابعة.",
-  "Two-factor authentication is enabled for your account. Please enter the verification code sent to your email.": "المصادقة الثنائية مفعلة لحسابك. يرجى إدخال رمز التحقق المرسل إلى بريدك الإلكتروني.",
-  "Enter 2FA Code": "أدخل رمز التحقق",
-  "Enter the 6-digit code from your email": "أدخل الرمز المكون من 6 أرقام من بريدك الإلكتروني",
-  "Verify & Login": "تحقق وتسجيل الدخول",
-  "Search friends...": "ابحث عن الأصدقاء...",
-  "Loading friends...": "جاري تحميل الأصدقاء...",
-  "Email cannot be changed": "لا يمكن تغيير البريد الإلكتروني",
-  "Apply Changes": "تطبيق التغييرات",
-  "Type your message...": "اكتب رسالتك...",
-  "Send": "إرسال",
-  "View Statistics": "عرض الإحصائيات",
-  "Chat": "الدردشة",
-  "All changes have been applied successfully!": "تم تطبيق جميع التغييرات بنجاح!",
-  "Are you sure you want to remove": "هل أنت متأكد أنك تريد إزالة",
-  "Refresh": "تحديث",
-  "🔒 Cybersecurity [ 2 / 2.5 ]": "🔒 الأمن السيبراني [ 2 / 2.5 ]",
-  "⚙️ DevOps [ 2 / 2.5 ]": "⚙️ ديف أوبس [ 2 / 2.5 ]",
-  "Add accessibility features for visually impaired users": "إضافة ميزات تسهيلية للمستخدمين ضعاف البصر",
-  "Server-Side Rendering (SSR) integration.": "دمج العرض من جانب الخادم (SSR).",
-  "signup.passwordReqCharsDigits": "أحرف > 0 / أرقام > 0",
-    "Blocked Users": "المستخدمون المحظورون",
-  "Add friend by username...": "أضف صديقًا باستخدام اسم المستخدم...",
-  "theme.lime": "ليموني (افتراضي)",
-  "theme.orange": "موضوع برتقالي",
-  "theme.dark": "موضوع داكن",
-  "theme.blue": "موضوع أزرق",
-  "theme.purple": "موضوع بنفسجي",
-  "theme.green": "موضوع أخضر",
-
-  "background_theme.dark": "الوضع الداكن",
-  "background_theme.light": "الوضع الفاتح",
-  "background_theme.midnight": "أزرق منتصف الليل",
-  "background_theme.carbon": "أسود كربوني",
-  "background_theme.ocean": "أزرق المحيط",
-  "background_theme.forest": "أخضر الغابة",
-  "background_theme.crimson": "أحمر قرمزي",
-  "background_theme.cosmic": "بنفسجي كوني",
-   "Please log in to access settings": "يرجى تسجيل الدخول للوصول إلى الإعدادات",
-  "Reset Password": "إعادة تعيين كلمة المرور",
-  "Enter your email and new password": "أدخل بريدك الإلكتروني وكلمة المرور الجديدة",
-  "We will send you a verification code": "سنرسل لك رمز التحقق",
-  "Email Address": "عنوان البريد الإلكتروني",
-  "Enter your email address": "أدخل عنوان بريدك الإلكتروني",
-  "New Password": "كلمة المرور الجديدة",
-  "Enter your new password": "أدخل كلمة المرور الجديدة",
-  "Confirm your new password": "أكد كلمة المرور الجديدة",
-  "Send Verification Code": "إرسال رمز التحقق",
-  "validation.password.charsDigits": "يجب أن تحتوي كلمة المرور على أحرف وأرقام",
-  "validation.password.charsDigitsValid": "يجب أن تكون كلمة المرور صالحة مع أحرف وأرقام",
-  "Passwords do not match": "كلمتا المرور غير متطابقتين",
-  "Sending...": "جاري الإرسال...",
-  "Verify Password Reset": "تحقق من إعادة تعيين كلمة المرور",
-  "We sent a verification code to your email": "أرسلنا رمز التحقق إلى بريدك الإلكتروني",
-  "Enter the 6-digit code to reset your password": "أدخل الرمز المكون من 6 أرقام لإعادة تعيين كلمة المرور",
-  "Verification Code": "رمز التحقق",
-  "Didn't receive the code?": "لم تتلقَ الرمز؟",
-  "Verification Code Sent": "تم إرسال رمز التحقق",
-  "Please check your email and enter the verification code": "يرجى التحقق من بريدك الإلكتروني وإدخال رمز التحقق",
-  "Resetting Password...": "جاري إعادة تعيين كلمة المرور...",
-  "Password reset successful!": "تم إعادة تعيين كلمة المرور بنجاح!",
-  "Password Reset Successful": "تمت إعادة تعيين كلمة المرور بنجاح",
-  "Your password has been updated successfully. You can now login": "تم تحديث كلمة المرور بنجاح. يمكنك الآن تسجيل الدخول",
-   "← Back to Frontend": "← العودة إلى الواجهة",
-  "3D Pong Game Setup": "إعداد لعبة البونج ثلاثية الأبعاد",
-  "🔒 Not signed in": "🔒 غير مسجل الدخول",
-  "2P Local Match": "مباراة محلية لشخصين",
-  "🤖 AI Difficulty": "🤖 صعوبة الذكاء الاصطناعي",
-  "VS AI": "ضد الذكاء الاصطناعي",
-  "3 AI (4P)": "3 ذكاء اصطناعي (4 لاعبين)",
-  "1 player vs 3 bots (uses difficulty above)": "لاعب واحد ضد 3 روبوتات (يستخدم مستوى الصعوبة أعلاه)",
-  "Host 2P": "استضافة 2 لاعب",
-  "Join 2P": "الانضمام إلى 2 لاعب",
-  "Host 4P": "استضافة 4 لاعبين",
-  "Join 4P": "الانضمام إلى 4 لاعبين",
-  "Real-time Web socket multiplayer": "متعدد اللاعبين عبر Web socket في الوقت الفعلي",
-  "Size:": "الحجم:",
-  "8 Players": "8 لاعبين",
-  "16 Players": "16 لاعبًا",
-  "Create Tournament": "إنشاء بطولة",
-  "Join Tournament": "الانضمام إلى بطولة",
-  "Results saved to database": "النتائج محفوظة في قاعدة البيانات"
-
-}
