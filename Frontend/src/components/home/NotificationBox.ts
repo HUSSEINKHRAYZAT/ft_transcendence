@@ -55,7 +55,10 @@ export class NotificationBox {
 
   private getAuthenticatedContent(): string {
     return `
-      <h3 class="text-xl font-bold mb-4 text-lime-500">📢 ${t('Notifications')}</h3>
+      <h3 class="text-xl font-bold mb-4 text-lime-500">
+        <img src="/boxes/notifications.png" alt="Notifications" class="inline w-6 h-6 align-middle mr-2" />
+        ${t('Notifications')}
+      </h3>
       <div class="space-y-3">
         <div class="bg-gray-700 p-3 rounded border-l-4 border-lime-500">
           <p class="text-sm text-gray-300">${t('Welcome to FT_PONG! Ready to play?')}</p>
@@ -74,7 +77,10 @@ export class NotificationBox {
 
   private getUnauthenticatedContent(): string {
     return `
-      <h3 class="text-xl font-bold mb-4 text-lime-500">📢 ${t('Notifications')}</h3>
+      <h3 class="text-xl font-bold mb-4 text-lime-500">
+        <img src="/boxes/notifications.png" alt="Notifications" class="inline w-6 h-6 align-middle mr-2" />
+        ${t('Notifications')}
+      </h3>
       <p class="text-gray-400">${t('Please log in to view notifications')}</p>
       <button id="notify-signin" class="mt-4 bg-lime-500 hover:bg-lime-600 text-white font-bold py-2 px-4 rounded transition-all duration-300">
         ${t('Sign In')}
@@ -108,7 +114,10 @@ export class NotificationBox {
   private clearNotifications(): void {
     if (this.container) {
       this.container.innerHTML = `
-        <h3 class="text-xl font-bold mb-4 text-lime-500">📢 ${t('Notifications')}</h3>
+        <h3 class="text-xl font-bold mb-4 text-lime-500">
+          <img src="/boxes/notifications.png" alt="Notifications" class="inline w-6 h-6 align-middle mr-2" />
+          ${t('Notifications')}
+        </h3>
         <p class="text-gray-400">${t('No new notifications')}</p>
       `;
     }

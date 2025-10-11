@@ -18,7 +18,7 @@ export class BlockedUsersModal extends BaseModal {
     if (this.blockedUsers.length === 0) {
       return `
         <div class="text-center py-8">
-          <p class="text-gray-400">${t('No blocked users.')}</p>
+          <p class="text-gray-400">${t('No blocked users')}</p>
         </div>
         <div class="flex justify-end mt-6">
           <button id="close-blocked-users" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded transition-colors">
@@ -43,10 +43,10 @@ export class BlockedUsersModal extends BaseModal {
           <div class="flex gap-3">
             <button
               data-username="${this.escapeHtml(user.username)}"
-              class="unblock-user text-gray-400 hover:text-green-400 text-2xl font-bold transition-colors"
+              class="unblock-user p-1 hover:opacity-70 transition-opacity"
               title="${t('Unblock')}"
             >
-              🔓
+              <img src="/info/True.png" alt="${t('Unblock')}" class="w-6 h-6 pointer-events-none" />
             </button>
           </div>
         </div>
@@ -75,7 +75,10 @@ export class BlockedUsersModal extends BaseModal {
 
     document.querySelectorAll('.unblock-user').forEach(btn => {
       btn.addEventListener('click', async (e) => {
-        const username = (e.target as HTMLElement).getAttribute('data-username');
+        e.preventDefault();
+        e.stopPropagation();
+        const target = e.currentTarget as HTMLElement;
+        const username = target.getAttribute('data-username');
         if (username) {
           await this.unblockUser(username);
         }

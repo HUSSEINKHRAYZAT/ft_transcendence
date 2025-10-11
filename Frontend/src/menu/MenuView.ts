@@ -29,7 +29,7 @@ export function createMenuRoot(ctx: MenuRenderContext) {
           <div class="menu-icon w-12 h-12 rounded-xl flex items-center justify-center text-xl shadow-lg" style="background: linear-gradient(135deg, ${primaryHex} 0%, ${primaryHex}dd 100%); box-shadow: 0 8px 25px ${primaryHex}40;">🎮</div>
           <h1 class="menu-title text-4xl font-bold tracking-wide" style="
             color: ${primaryHex};
-            text-shadow: 
+            text-shadow:
               1px 1px 0 rgba(0,0,0,0.3),
               2px 2px 0 rgba(0,0,0,0.25),
               3px 3px 0 rgba(0,0,0,0.2),

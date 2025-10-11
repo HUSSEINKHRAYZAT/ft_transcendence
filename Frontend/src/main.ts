@@ -313,7 +313,7 @@ function showBasicPlayGameModal(): void
         <button onclick="selectGameMode('create-tournament')" class="w-full btn-glass btn-shimmer" style="background: linear-gradient(135deg, #84cc16, #65a30d); border: 2px solid #84cc16;">
           🏆 Create Tournament
         </button>
-        
+
         <button onclick="selectGameMode('join-tournament')" class="w-full btn-glass btn-shimmer" style="background: linear-gradient(135deg, #22c55e, #16a34a); border: 2px solid #22c55e;">
           🎯 Join Tournament
         </button>
@@ -346,7 +346,7 @@ function showBasicPlayGameModal(): void
   if (mode === 'create-tournament') {
     console.log('🏆 Creating Tournament...');
     showBasicToast('info', 'Opening Tournament Creation...');
-    
+
     try {
       await showTournamentCreationModal();
     } catch (error) {
@@ -355,11 +355,11 @@ function showBasicPlayGameModal(): void
     }
     return;
   }
-  
+
   if (mode === 'join-tournament') {
     console.log('� Joining Tournament...');
     showBasicToast('info', 'Opening Tournament Join...');
-    
+
     try {
       await showTournamentJoinModal();
     } catch (error) {
@@ -1050,7 +1050,7 @@ export function addBasicJumbotron(): void {
 				<!-- Content -->
 				<div class="text-center max-w-600 p-8 z-10 relative">
 					<h1 class="text-6xl font-bold mb-6 text-lime-500" style="
-						text-shadow: 
+						text-shadow:
 							2px 2px 0 rgba(0,0,0,0.3),
 							4px 4px 0 rgba(0,0,0,0.25),
 							6px 6px 0 rgba(0,0,0,0.2),
@@ -1310,7 +1310,7 @@ function setupAuthListeners(components: Component[]): void {
 	}) as EventListener);
 
 	// ==================== NEW TOURNAMENT SYSTEM EVENT LISTENERS ====================
-	
+
 	window.addEventListener('tournament-created', ((e: CustomEvent) => {
 		console.log('🏆 Tournament created:', e.detail);
 		const { tournament } = e.detail;
@@ -1386,42 +1386,42 @@ function setupAuthListeners(components: Component[]): void {
 
 async function setupNewTournamentListeners() {
 	const { newTournamentService } = await import('./tournament/NewTournamentService');
-	
+
 	// Listen for match ready events
 	newTournamentService.on('match_ready', (data: any) => {
 		console.log('🎮 Match ready event received:', data);
-		
+
 		const user = authService.getUser();
 		const userId = user?.id || user?.email;
-		
+
 		if (!data.match || !userId) {
 			console.log('⚠️ No match data or user ID');
 			return;
 		}
-		
+
 		// Check if current user is in this match
 		const isPlayer1 = data.match.player1?.id === userId || data.match.player1?.externalId === userId;
 		const isPlayer2 = data.match.player2?.id === userId || data.match.player2?.externalId === userId;
-		
+
     if (isPlayer1 || isPlayer2) {
 			console.log('🎮 Current user is in this match! Starting game...');
-			
+
 			// IMMEDIATELY hide ALL tournament UI and overlays
 			console.log('🧹 Force removing all tournament overlays...');
       document.querySelectorAll('.tournament-lobby, .tournament-lobby-overlay, .tournament-modal, .modal-overlay, .modal').forEach(el => {
 				console.log('🧹 Removing:', el.className);
 				el.remove();
 			});
-			
+
 			// Clear jumbotron
 			const jumbotron = document.getElementById('jumbotron');
 			if (jumbotron) {
 				jumbotron.innerHTML = '';
 				console.log('🧹 Cleared jumbotron');
 			}
-			
+
 			showBasicToast('success', 'Your match is starting!');
-			
+
 			// Start the game after a very short delay (just enough for DOM to settle)
 			setTimeout(() => {
 				launchNewTournamentMatch(data.tournament, data.match);
@@ -1431,13 +1431,13 @@ async function setupNewTournamentListeners() {
 			showBasicToast('info', 'A match has started');
 		}
 	});
-	
+
 	// Listen for round started events
 	newTournamentService.on('round_started', (data: any) => {
 		console.log('🏆 Round started:', data.round);
 		showBasicToast('info', `Round ${data.round} has started!`);
 	});
-	
+
 	// Listen for tournament completed
 	newTournamentService.on('tournament_completed', (data: any) => {
 		console.log('🏆 Tournament completed:', data);
@@ -1603,7 +1603,7 @@ let currentTournamentData: any = null;
 // Show NEW tournament creation modal
 async function showTournamentCreationModal() {
   closeBasicModal();
-  
+
   try {
     const { tournamentCreationModal } = await import('./components/tournament/TournamentCreationModal');
     tournamentCreationModal.show();
@@ -1616,49 +1616,49 @@ async function showTournamentCreationModal() {
 // Show NEW tournament join modal (simplified - code entry only)
 async function showTournamentJoinModal() {
   closeBasicModal();
-  
+
   const modal = document.createElement('div');
   modal.id = 'basic-modal';
   modal.className = 'fixed inset-0 z-50 flex items-center justify-center modal-backdrop backdrop-blur-sm bg-black/75';
-  
+
   modal.innerHTML = `
     <div class="bg-gray-800 rounded-lg shadow-2xl max-w-md w-full mx-4 p-6">
       <div class="flex justify-between items-center mb-6">
-        <h2 class="text-2xl font-bold text-lime-500">🎯 Join Tournament</h2>
+        <h2 class="text-2xl font-bold text-lime-500">🎯 ${t('Join Tournament')}</h2>
         <button onclick="closeBasicModal()" class="text-gray-400 hover:text-white text-2xl">&times;</button>
       </div>
-      
+
       <div class="mb-4">
-        <label class="block text-sm font-medium text-gray-300 mb-2">Tournament Code</label>
-        <input 
-          type="text" 
-          id="tourn-code" 
-          maxlength="6" 
-          class="input-modern text-center text-2xl font-mono uppercase tracking-widest" 
+        <label class="block text-sm font-medium text-gray-300 mb-2">${t('Tournament Code')}</label>
+        <input
+          type="text"
+          id="tourn-code"
+          maxlength="6"
+          class="input-modern text-center text-2xl font-mono uppercase tracking-widest"
           placeholder="ABCD12"
           style="letter-spacing: 0.5em;"
         >
-        <p class="text-sm text-gray-400 mt-2">Enter the 6-character tournament code</p>
+        <p class="text-sm text-gray-400 mt-2">${t('Enter the 6-character tournament code')}</p>
       </div>
-      
+
       <button type="button" onclick="handleTournamentJoin()" class="w-full btn-lime mb-3">
-        Join Tournament
+        ${t('Join Tournament')}
       </button>
       <button type="button" onclick="closeBasicModal()" class="w-full btn-outline">
-        Cancel
+        ${t('Cancel')}
       </button>
     </div>
   `;
-  
+
   document.body.appendChild(modal);
-  
+
   const input = modal.querySelector('#tourn-code') as HTMLInputElement;
   input?.addEventListener('keyup', (e) => {
     if (e.key === 'Enter') {
       (window as any).handleTournamentJoin();
     }
   });
-  
+
   input?.focus();
 }
 
@@ -1666,7 +1666,7 @@ async function showTournamentJoinModal() {
 (window as any).handleTournamentJoin = async function() {
   const input = document.querySelector('#tourn-code') as HTMLInputElement;
   if (!input) return;
-  
+
   const code = input.value.trim().toUpperCase();
   if (!code) {
     showBasicToast('error', 'Please enter a tournament code');
@@ -1686,7 +1686,7 @@ async function showTournamentJoinModal() {
     input.focus();
     return;
   }
-  
+
   try {
     closeBasicModal();
     showBasicToast('info', 'Joining tournament...');
@@ -1747,7 +1747,7 @@ async function showTournamentJoinModal() {
 async function showTournamentLobby(tournament: any) {
   const jumbotron = document.getElementById('jumbotron');
   if (!jumbotron) return;
-  
+
   const user = authService.getUser();
   const createdBy = tournament?.createdBy || {};
   const userId = user?.id || user?.email || null;
@@ -1764,7 +1764,7 @@ async function showTournamentLobby(tournament: any) {
       ))
     )
   );
-  
+
   // Create lobby structure (without dynamic content)
   jumbotron.innerHTML = `
     <div class="min-h-screen bg-gray-900 p-6">
@@ -1780,12 +1780,12 @@ async function showTournamentLobby(tournament: any) {
               ❌ Leave
             </button>
           </div>
-          
+
           <div id="tournament-stats" class="grid grid-cols-3 gap-4 mt-4">
             <!-- Stats will be updated here -->
           </div>
         </div>
-        
+
         <!-- Players Grid -->
         <div class="bg-gray-800 rounded-lg p-6 mb-6">
           <h2 class="text-xl font-bold text-white mb-4">Players in Lobby:</h2>
@@ -1793,7 +1793,7 @@ async function showTournamentLobby(tournament: any) {
             <!-- Players will be added here -->
           </div>
         </div>
-        
+
         <!-- Controls -->
         <div id="tournament-controls" class="bg-gray-800 rounded-lg p-6">
           <!-- Controls will be updated here -->
@@ -1801,11 +1801,11 @@ async function showTournamentLobby(tournament: any) {
       </div>
     </div>
   `;
-  
+
   // Function to update lobby UI
   const updateLobbyUI = (tournamentData: any) => {
     const spotsRemaining = tournamentData.size - tournamentData.players.length;
-    
+
     // Update stats
     const statsContainer = document.getElementById('tournament-stats');
     if (statsContainer) {
@@ -1824,7 +1824,7 @@ async function showTournamentLobby(tournament: any) {
         </div>
       `;
     }
-    
+
     // Update controls
     const controlsContainer = document.getElementById('tournament-controls');
     if (controlsContainer) {
@@ -1867,30 +1867,30 @@ async function showTournamentLobby(tournament: any) {
         }
       }
     }
-    
+
     // Update players grid
     updatePlayersGrid(tournamentData);
   };
-  
+
   // Initial render
   updateLobbyUI(tournament);
-  
+
   // Listen for tournament updates
   const { tournamentService } = await import('./tournament/TournamentService');
-  
+
   const updateHandler = async (updatedTournament: any) => {
     if (updatedTournament.tournamentId === tournament.tournamentId) {
       console.log('🔄 Tournament updated:', updatedTournament.players.length, '/', updatedTournament.size);
-      
+
       // Check if tournament just became full
       const wasFull = currentTournamentData && currentTournamentData.players.length === currentTournamentData.size;
       const isFull = updatedTournament.players.length === updatedTournament.size;
-      
+
       currentTournamentData = updatedTournament;
 
       // Update entire lobby UI
       updateLobbyUI(updatedTournament);
-      
+
       // Notify host when tournament becomes full
       if (!wasFull && isFull && updatedTournament.status === 'waiting' && isCreator) {
         console.log('🏆 Tournament is full!');
@@ -1904,7 +1904,7 @@ async function showTournamentLobby(tournament: any) {
       }
     }
   };
-  
+
   const matchStartHandler = (data: any) => {
     console.log('🏆 matchStartHandler called with data:', data);
     if (data.tournament.tournamentId === tournament.tournamentId) {
@@ -1914,7 +1914,7 @@ async function showTournamentLobby(tournament: any) {
       const userId = currentUser?.id || currentUser?.email;
       console.log('🏆 Current user ID:', userId);
       console.log('🏆 Match players:', data.match.player1?.id, data.match.player2?.id);
-      
+
       if (data.match.player1?.id === userId || data.match.player2?.id === userId) {
         console.log('🏆 Current user is in this match! Starting game...');
         showBasicToast('success', 'Your match is starting!');
@@ -1930,10 +1930,10 @@ async function showTournamentLobby(tournament: any) {
       console.log('🏆 Match start event for different tournament:', data.tournament.tournamentId);
     }
   };
-  
+
   tournamentService.on('tournamentUpdated', updateHandler);
   tournamentService.on('matchStarted', matchStartHandler);
-  
+
   // Cleanup on exit
   (window as any)._tournamentCleanup = () => {
     tournamentService.off('tournamentUpdated', updateHandler);
@@ -1945,9 +1945,9 @@ async function showTournamentLobby(tournament: any) {
 function updatePlayersGrid(tournament: any) {
   const grid = document.getElementById('players-grid');
   if (!grid) return;
-  
+
   const spotsRemaining = tournament.size - tournament.players.length;
-  
+
   grid.innerHTML = tournament.players.map((player: any) => `
     <div class="bg-lime-900/30 border-2 border-lime-500 rounded-lg p-4 text-center">
       <div class="text-3xl mb-2">👤</div>
@@ -1955,7 +1955,7 @@ function updatePlayersGrid(tournament: any) {
       <div class="text-xs text-gray-400 mt-1">Player</div>
     </div>
   `).join('') +
-  
+
   Array(spotsRemaining).fill(0).map(() => `
     <div class="bg-gray-700 border-2 border-dashed border-gray-600 rounded-lg p-4 text-center opacity-50">
       <div class="text-3xl mb-2">➕</div>
@@ -1973,21 +1973,21 @@ function updatePlayersGrid(tournament: any) {
     showBasicToast('error', 'No tournament data available');
     return;
   }
-  
+
   if (currentTournamentData.status !== 'waiting') {
     console.log('🏆 Tournament already started:', currentTournamentData.status);
     showBasicToast('info', 'Tournament already in progress');
     return;
   }
-  
+
   try {
     console.log('🏆 Manually starting tournament:', currentTournamentData.tournamentId);
     showBasicToast('info', 'Starting tournament...');
-    
+
     const { tournamentService } = await import('./tournament/TournamentService');
     const result = await tournamentService.startTournament(currentTournamentData.tournamentId);
     console.log('🏆 Tournament started successfully:', result);
-    
+
     showBasicToast('success', '🚀 Tournament started!');
   } catch (error) {
     console.error('Failed to start tournament:', error);
@@ -2024,7 +2024,7 @@ async function showTournamentBracket(tournament: any) {
       </div>
     </div>
   `;
-  
+
   // Import and render bracket
   try {
     const { TournamentBracket } = await import('./tournament/TournamentBracket');
@@ -2042,7 +2042,7 @@ async function showTournamentBracket(tournament: any) {
     if (!match) return;
 
     console.log('🏆 Start Match button clicked for match:', match.id);
-    
+
     const currentUser = authService.getUser();
     if (!currentUser) {
       showBasicToast('error', 'Not logged in');
@@ -2051,7 +2051,7 @@ async function showTournamentBracket(tournament: any) {
 
     const userId = currentUser.id || currentUser.email;
     const isInMatch = match.player1?.id === userId || match.player2?.id === userId;
-    
+
     if (!isInMatch) {
       showBasicToast('error', 'You are not in this match');
       return;
@@ -2060,7 +2060,7 @@ async function showTournamentBracket(tournament: any) {
     try {
       // Send ready signal to backend
       const { socketManager } = await import('./services/SocketManager');
-      
+
       console.log('🏆 Sending player_ready to backend:', {
         tournamentId: tournament.tournamentId,
         matchId: match.id,
@@ -2074,7 +2074,7 @@ async function showTournamentBracket(tournament: any) {
       });
 
       showBasicToast('success', 'Ready! Waiting for opponent...');
-      
+
       // Listen for both players ready
       const readyHandler = (data: any) => {
         console.log('🏆 Both players ready event:', data);
@@ -2086,9 +2086,9 @@ async function showTournamentBracket(tournament: any) {
           }, 500);
         }
       };
-      
+
       socketManager.on('both_players_ready', readyHandler);
-      
+
     } catch (error) {
       console.error('Failed to signal ready:', error);
       showBasicToast('error', 'Failed to start match');
@@ -2101,7 +2101,7 @@ async function launchTournamentMatch(tournament: any, match: any) {
   console.log('🏆 launchTournamentMatch - SIMPLIFIED DIRECT START');
   console.log('🏆 Tournament:', tournament.tournamentId, 'Match:', match.id);
   console.log('🏆 Match players:', match.player1, match.player2);
-  
+
   try {
     const currentUser = authService.getUser();
     if (!currentUser) {
@@ -2112,7 +2112,7 @@ async function launchTournamentMatch(tournament: any, match: any) {
     const userId = currentUser.id || currentUser.email;
     const isHost = match.player1?.id === userId;
     const opponent = isHost ? match.player2 : match.player1;
-    
+
     console.log('🏆 Role:', isHost ? 'HOST' : 'GUEST');
     console.log('🏆 Opponent:', opponent?.name);
 
@@ -2165,7 +2165,7 @@ async function launchTournamentMatch(tournament: any, match: any) {
     console.log('🏆 Starting Pong3D with tournament config...');
     currentGameInstance = new Pong3D(gameConfig);
     console.log('🏆 Tournament match started successfully!');
-    
+
   } catch (error) {
     console.error('Failed to start tournament match:', error);
     showBasicToast('error', 'Failed to start match');
@@ -2175,21 +2175,21 @@ async function launchTournamentMatch(tournament: any, match: any) {
 // Launch match for NEW tournament system (simplified like Host 2P)
 async function launchNewTournamentMatch(tournament: any, match: any) {
   console.log('🎮 launchNewTournamentMatch - Simple approach like Host 2P');
-  
+
   try {
     const currentUser = authService.getUser();
     if (!currentUser) {
       console.error('❌ No current user found!');
       return;
     }
-    
+
     // Determine which player is current user
     const userId = currentUser.id || currentUser.email;
     const isPlayer1 = match.player1?.id === userId || match.player1?.externalId === userId;
     const opponent = isPlayer1 ? match.player2 : match.player1;
-    
+
     console.log('🎮 Starting game - Current user vs', opponent?.name);
-    
+
   // Simple config like Host 2P - NO aggressive UI cleanup, NO canvas manipulation
     const { clearPongUI } = await import('./ui');
     clearPongUI();
@@ -2251,12 +2251,12 @@ async function launchNewTournamentMatch(tournament: any, match: any) {
     const { Pong3D } = await import('./game/core/Pong3D');
     console.log('🎮 Creating Pong3D instance (tournament)...');
     currentGameInstance = new Pong3D(gameConfig);
-    
+
     console.log('✅ Tournament match started!');
-    
+
     // Listen for game end to report results
     // TODO: Implement game end callback to report winner to backend
-    
+
   } catch (error) {
     console.error('❌ Failed to start tournament match:', error);
     showBasicToast('error', 'Failed to start match');
@@ -2295,7 +2295,7 @@ async function launchTournamentHub() {
 					// Start the game with the tournament config
 					const { Pong3D } = await import('./game/core/Pong3D');
 					currentGameInstance = new Pong3D(gameConfig);
-					
+
 					console.log('✅ Tournament game started successfully');
 				} catch (error) {
 					console.error('❌ Failed to start tournament game:', error);

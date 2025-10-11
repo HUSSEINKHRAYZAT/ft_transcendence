@@ -44,24 +44,24 @@ export class RequestModal extends BaseModal {
           <div class="flex gap-3">
             <button
               data-username="${this.escapeHtml(request.username)}"
-              class="accept-request text-green-500 hover:text-green-400 text-2xl font-bold transition-colors"
+              class="accept-request p-1 hover:opacity-70 transition-opacity"
               title="${t('Accept')}"
             >
-              ✓
+              <img src="/info/True.png" alt="${t('Accept')}" class="w-6 h-6 pointer-events-none" />
             </button>
             <button
               data-username="${this.escapeHtml(request.username)}"
-              class="reject-request text-red-500 hover:text-red-400 text-2xl font-bold transition-colors"
+              class="reject-request p-1 hover:opacity-70 transition-opacity"
               title="${t('Reject')}"
             >
-              ✕
+              <img src="/info/False.png" alt="${t('Reject')}" class="w-6 h-6 pointer-events-none" />
             </button>
             <button
               data-username="${this.escapeHtml(request.username)}"
-              class="block-request text-yellow-500 hover:text-yellow-400 text-2xl font-bold transition-colors"
+              class="block-request p-1 hover:opacity-70 transition-opacity"
               title="${t('Block')}"
             >
-              🚫
+              <img src="/boxes/block.png" alt="${t('Block')}" class="w-6 h-6 pointer-events-none" />
             </button>
           </div>
         </div>
@@ -90,7 +90,10 @@ export class RequestModal extends BaseModal {
 
     document.querySelectorAll('.accept-request').forEach(btn => {
       btn.addEventListener('click', async (e) => {
-        const username = (e.target as HTMLElement).getAttribute('data-username');
+        e.preventDefault();
+        e.stopPropagation();
+        const target = e.currentTarget as HTMLElement;
+        const username = target.getAttribute('data-username');
         if (username) {
           await this.acceptRequest(username);
         }
@@ -99,7 +102,10 @@ export class RequestModal extends BaseModal {
 
     document.querySelectorAll('.reject-request').forEach(btn => {
       btn.addEventListener('click', async (e) => {
-        const username = (e.target as HTMLElement).getAttribute('data-username');
+        e.preventDefault();
+        e.stopPropagation();
+        const target = e.currentTarget as HTMLElement;
+        const username = target.getAttribute('data-username');
         if (username) {
           await this.rejectRequest(username);
         }
@@ -108,7 +114,10 @@ export class RequestModal extends BaseModal {
 
     document.querySelectorAll('.block-request').forEach(btn => {
       btn.addEventListener('click', async (e) => {
-        const username = (e.target as HTMLElement).getAttribute('data-username');
+        e.preventDefault();
+        e.stopPropagation();
+        const target = e.currentTarget as HTMLElement;
+        const username = target.getAttribute('data-username');
         if (username) {
           await this.blockRequest(username);
         }

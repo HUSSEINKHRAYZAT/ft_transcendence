@@ -73,7 +73,7 @@ export class FriendsBox {
         window.addEventListener('direct-message-received', this.boundHandleDirectMessageReceived);
         window.addEventListener('direct-message-sent', this.boundHandleDirectMessageSent);
         window.addEventListener('socket-reconnected', this.boundHandleSocketReconnected);
-        window.addEventListener('close-chat-if-active', this.boundHandleCloseChatIfActive); // NEW
+        window.addEventListener('close-chat-if-active', this.boundHandleCloseChatIfActive);
         this.loadMessagesFromStorage();
     }
 
@@ -207,7 +207,7 @@ export class FriendsBox {
         const isDuplicate = messages.some(msg =>
             msg.text === message.text &&
             msg.isOwn === message.isOwn &&
-            Math.abs(msg.timestamp.getTime() - message.timestamp.getTime()) < 5000 // Within 5 seconds
+            Math.abs(msg.timestamp.getTime() - message.timestamp.getTime()) < 5000
         );
 
         if (isDuplicate) {
@@ -339,22 +339,20 @@ export class FriendsBox {
     private getAuthenticatedContent(): string {
         return `
             <div class="flex items-center justify-between mb-4">
-                <h3 class="text-xl font-bold text-lime-500">👥 ${t('Friends')}</h3>
+                <h3 class="text-xl font-bold text-lime-500">
+                    <img src="/boxes/friends.png" alt="Friends" class="inline w-6 h-6 align-middle mr-2" />
+                    ${t('Friends')}
+                </h3>
                 <div class="flex items-center gap-2">
                     <button id="blocked-users" class="p-2 bg-gray-700 hover:bg-gray-600 rounded-full transition-all duration-300" title="${t('Blocked Users')}">
-                        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m0 0v2m0-2h2m-2 0H10m2-7a2 2 0 100-4 2 2 0 000 4zM7 19H5a2 2 0 01-2-2V7a2 2 0 012-2h2m10 0h2a2 2 0 012 2v10a2 2 0 01-2 2h-2"></path>
-                        </svg>
+                        <img src="/boxes/block.png" alt="Blocked Users" class="w-5 h-5" />
                     </button>
                     <button id="friend-requests" class="p-2 bg-gray-700 hover:bg-gray-600 rounded-full transition-all duration-300" title="${t('Requests')}">
-                        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2M4 13h2m13-8l-4 4-2-2-4 4"></path>
-                        </svg>
+                        <img src="/boxes/requests.png" alt="Requests" class="w-5 h-5" />
                     </button>
                 </div>
             </div>
 
-            <!-- Rest of the content remains the same -->
             <!-- Notification Container -->
             <div id="notification-container" class="mb-4"></div>
 
@@ -438,7 +436,10 @@ export class FriendsBox {
 
     private getUnauthenticatedContent(): string {
         return `
-            <h3 class="text-xl font-bold mb-4 text-lime-500">👥 ${t('Friends')}</h3>
+            <h3 class="text-xl font-bold mb-4 text-lime-500">
+                <img src="/boxes/friends.png" alt="Friends" class="inline w-6 h-6 align-middle mr-2" />
+                ${t('Friends')}
+            </h3>
             <p class="text-gray-400">${t('Please log in to view friends')}</p>
             <button id="friends-signin" class="mt-4 bg-lime-500 hover:bg-lime-600 text-white font-bold py-2 px-4 rounded transition-all duration-300">
                 ${t('Sign In')}
@@ -486,7 +487,7 @@ export class FriendsBox {
             addFriendForm.addEventListener("submit", (e) => this.handleAddFriendSubmit(e));
         }
 
-        
+
     }
 
     private async showBlockedUsersModal(): Promise<void> {
@@ -750,7 +751,6 @@ export class FriendsBox {
 
         console.log(`🟢 FriendsBox: Sending message to ${this.activeChatUser}: ${messageText}`);
 
-        // Get current user info
         const userData = localStorage.getItem('ft_pong_user_data');
         const user = userData ? JSON.parse(userData) : null;
 
@@ -759,10 +759,8 @@ export class FriendsBox {
             return;
         }
 
-        // Clear input immediately
         chatInput.value = '';
 
-        // Dispatch event for socket service to handle
         console.log('🟢 FriendsBox: Dispatching send-message-request event');
         window.dispatchEvent(new CustomEvent('send-message-request', {
             detail: {
@@ -777,7 +775,6 @@ export class FriendsBox {
         try {
             const messagesObj: {[key: string]: any[]} = {};
             this.chatMessages.forEach((messages, username) => {
-                // Convert timestamps to strings for storage
                 messagesObj[username] = messages.map(msg => ({
                     ...msg,
                     timestamp: msg.timestamp.toISOString()
@@ -795,7 +792,6 @@ export class FriendsBox {
             if (stored) {
                 const messagesObj = JSON.parse(stored);
                 Object.entries(messagesObj).forEach(([username, messages]) => {
-                    // Convert timestamp strings back to Date objects
                     const parsedMessages = (messages as any[]).map(msg => ({
                         ...msg,
                         timestamp: new Date(msg.timestamp)
@@ -881,7 +877,6 @@ export class FriendsBox {
         const emptyEl = this.container.querySelector("#friends-empty") as HTMLElement | null;
         if (!listEl) return;
 
-        // Clear existing friend cards
         listEl.querySelectorAll(".friend-card").forEach((n) => n.remove());
 
         try {
@@ -890,7 +885,6 @@ export class FriendsBox {
             if (response.success && response.data) {
                 const friends = Array.isArray(response.data) ? response.data : [];
 
-                // Remove duplicates based on username before storing
                 const uniqueFriends = friends.filter((friend, index, self) =>
                     index === self.findIndex(f => f.username === friend.username)
                 );
@@ -914,7 +908,6 @@ export class FriendsBox {
 
                 this.setupFriendCardListeners();
 
-                // Update message indicators
                 this.pendingMessages.forEach((count, username) => {
                     if (count > 0) {
                         this.updateFriendMessageIndicator(username);
@@ -936,7 +929,6 @@ export class FriendsBox {
     }
 
 private setupFriendCardListeners(): void {
-    // Setup remove friend listeners
     const removeButtons = this.container?.querySelectorAll('.remove-friend-btn') || [];
     removeButtons.forEach((btn) => {
         btn.addEventListener('click', (e) => {
@@ -948,13 +940,11 @@ private setupFriendCardListeners(): void {
         });
     });
 
-    // Setup chat listeners
     const chatButtons = this.container?.querySelectorAll('.chat-friend-btn') || [];
     chatButtons.forEach((btn) => {
         btn.addEventListener('click', (e) => {
             e.preventDefault();
 
-            // Check if button is disabled (offline user)
             if ((btn as HTMLButtonElement).disabled) {
                 return;
             }
@@ -966,7 +956,6 @@ private setupFriendCardListeners(): void {
         });
     });
 
-    // Setup statistics listeners
     const statsButtons = this.container?.querySelectorAll('.stats-friend-btn') || [];
     statsButtons.forEach((btn) => {
         btn.addEventListener('click', (e) => {
@@ -979,7 +968,6 @@ private setupFriendCardListeners(): void {
         });
     });
 
-    // NEW: Setup block user listeners
     const blockButtons = this.container?.querySelectorAll('.block-friend-btn') || [];
     blockButtons.forEach((btn) => {
         btn.addEventListener('click', (e) => {
@@ -1008,7 +996,6 @@ private renderFriendCard(friend: any): string {
 
     const color = this.colorFor(username);
 
-    // Create avatar display (keep existing avatar code)
     let avatarHtml = '';
     if (profilePath) {
         const fullAvatarPath = profilePath.startsWith('avatars/') ? profilePath : `avatars/${profilePath}`;
@@ -1069,7 +1056,6 @@ private renderFriendCard(friend: any): string {
                     </svg>
                 </button>
 
-                <!-- NEW BLOCK BUTTON -->
                 <button
                     class="block-friend-btn p-1 hover:opacity-70 transition-opacity duration-300 text-orange-400"
                     data-username="${this.escape(username)}"
@@ -1180,15 +1166,12 @@ private renderFriendCard(friend: any): string {
         if (response.success) {
             this.showNotification(t('User blocked successfully'), 'success');
 
-            // Close chat if blocking the active chat user
             if (this.activeChatUser === friendUsername) {
                 this.closeChatInterface();
             }
 
-            // Refresh friends list
             await this.loadAndRenderFriends();
 
-            // Dispatch event to notify other components
             window.dispatchEvent(new CustomEvent('friends-list-changed'));
         } else {
             if (response.message?.includes('404')) {
@@ -1207,11 +1190,9 @@ private handleCloseChatIfActive(event: Event): void {
     const customEvent = event as CustomEvent;
     const { username } = customEvent.detail;
 
-    // Check if the chat is currently active with this user
     if (this.activeChatUser === username) {
         this.closeChatInterface();
 
-        // Show a notification to inform the user
         this.showNotification(`Chat closed: ${username} is now offline`, 'info');
     }
 }

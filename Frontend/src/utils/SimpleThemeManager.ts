@@ -47,21 +47,6 @@ class SimpleThemeManager {
         '--dark-green-700': '#c2410c'
       }
     },
-    dark: {
-      name: 'dark',
-      displayNameKey: 'theme.dark',
-      colors: {
-        primary: '#1f2937',
-        secondary: '#111827',
-        accent: '#374151'
-      },
-      cssVariables: {
-        '--lime-500': '#1f2937',
-        '--lime-600': '#111827',
-        '--dark-green-600': '#111827',
-        '--dark-green-700': '#374151'
-      }
-    },
     blue: {
       name: 'blue',
       displayNameKey: 'theme.blue',

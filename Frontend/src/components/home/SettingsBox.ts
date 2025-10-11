@@ -22,6 +22,35 @@ export class SettingsBox {
   private pendingBackgroundTheme: string | null = null;
   private pendingLanguage: string | null = null;
 
+  // Map theme names to image files
+  private themeImages: Record<string, string> = {
+    'lime': '/boxes/colors/lime.png',
+    'purple': '/boxes/colors/purple.png',
+    'orange': '/boxes/colors/orange.png',
+    'green': '/boxes/colors/green.png',
+    'blue': '/boxes/colors/blue.png'
+  };
+
+  // Map background theme names to image files
+  private backgroundThemeImages: Record<string, string> = {
+    'dark': '/boxes/background/Dark.svg',
+    'light': '/boxes/background/Light.svg',
+    'midnight': '/boxes/background/MidnightBlue.svg',
+    'carbon': '/boxes/background/CarbonBlack.svg',
+    'ocean': '/boxes/background/Blue.svg',
+    'forest': '/boxes/background/Green.svg',
+    'crimson': '/boxes/background/Red.svg',
+    'cosmic': '/boxes/background/Purple.svg'
+  };
+
+  // Map language codes to image files
+  private languageImages: Record<string, string> = {
+    'en': '/boxes/langs/united-states-of-america.png',
+    'fr': '/boxes/langs/france.png',
+    'de': '/boxes/langs/germany.png',
+    'ar': '/boxes/langs/palestine.png'
+  };
+
   constructor() {
     this.container = document.getElementById('settings-box');
     this.applySavedLanguage();
@@ -64,26 +93,14 @@ export class SettingsBox {
     }
   }
 
-  private getLanguageSettingsHTML(settings: any): string {
-    return `
-      <div class="bg-gray-700 p-3 rounded">
-        <label class="text-sm font-medium text-gray-300 block mb-2">${t('Language')}</label>
-        <select id="language-select" class="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded text-white focus:ring-2 focus:ring-lime-500 focus:border-lime-500">
-          ${SUPPORTED_LANGUAGES.map(lang => `
-            <option value="${lang.code}" ${settings.language === lang.code ? 'selected' : ''}>
-              ${lang.flag} ${lang.nativeName}
-            </option>
-          `).join('')}
-        </select>
-      </div>
-    `;
-  }
-
   private getMusicPlayerHTML(): string {
     const currentTrack = this.playlist[this.currentTrackIndex];
     return `
       <div class="bg-gray-700 p-4 rounded shadow-md">
-        <label class="text-sm font-medium text-gray-300 block mb-2">🎵 ${t('Music Player')}</label>
+        <label class="text-sm font-medium text-gray-300 block mb-2">
+          <img src="/boxes/music.png" alt="Music Player" class="inline w-5 h-5 align-middle mr-2" />
+          ${t('Music Player')}
+        </label>
 
         <div class="flex items-center justify-between mb-3">
           <!-- Song name -->
@@ -129,84 +146,208 @@ export class SettingsBox {
     }
   }
 
-private getAuthenticatedContent(): string {
-  const settings = this.loadSettings();
-  const availableThemes = simpleThemeManager.getAvailableThemesTranslated(); // Use translated method
-  const currentTheme = simpleThemeManager.getCurrentTheme();
-  const availableBackgroundThemes = backgroundThemeManager.getAvailableThemesTranslated(); // Use translated method
-  const currentBackgroundTheme = backgroundThemeManager.getCurrentTheme();
+  private getCustomDropdownHTML(
+    id: string,
+    options: Array<{ value: string; label: string; image: string }>,
+    selectedValue: string
+  ): string {
+    const selectedOption = options.find(opt => opt.value === selectedValue) || options[0];
 
-  // Use pending values if they exist, otherwise use current values
-  const displayTheme = this.pendingTheme || currentTheme;
-  const displayBackgroundTheme = this.pendingBackgroundTheme || currentBackgroundTheme;
-  const displayLanguage = this.pendingLanguage || settings.language;
+    return `
+      <div class="custom-dropdown relative" id="${id}-dropdown">
+        <!-- Selected Display -->
+        <button type="button" class="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded text-white focus:ring-2 focus:ring-lime-500 focus:border-lime-500 flex items-center justify-between cursor-pointer hover:bg-gray-500 transition">
+          <div class="flex items-center gap-2">
+            <img src="${selectedOption.image}" alt="${selectedOption.label}" class="w-5 h-5 object-contain" />
+            <span>${selectedOption.label}</span>
+          </div>
+          <svg class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+          </svg>
+        </button>
 
-  return `
-    <h3 class="text-xl font-bold mb-4 text-lime-500">⚙️ ${t('Settings')}</h3>
-    <div class="space-y-4">
-      <!-- Accent Color Theme Selector -->
-      <div class="bg-gray-700 p-3 rounded">
-        <label class="text-sm font-medium text-gray-300 block mb-2">🎨 ${t('Accent Colors')}</label>
-        <select id="theme-select" class="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded text-white focus:ring-2 focus:ring-lime-500 focus:border-lime-500">
-          ${availableThemes.map(theme => `
-            <option value="${theme.name}" ${displayTheme === theme.name ? 'selected' : ''}>
-              ${theme.displayName}
-            </option>
+        <!-- Dropdown Options -->
+        <div class="dropdown-options absolute z-50 w-full mt-1 bg-gray-600 border border-gray-500 rounded shadow-lg max-h-60 overflow-y-auto hidden">
+          ${options.map(option => `
+            <div class="dropdown-option px-3 py-2 cursor-pointer hover:bg-gray-500 transition flex items-center gap-2 ${option.value === selectedValue ? 'bg-gray-700' : ''}" data-value="${option.value}">
+              <img src="${option.image}" alt="${option.label}" class="w-5 h-5 object-contain" />
+              <span class="text-white">${option.label}</span>
+            </div>
           `).join('')}
-        </select>
-        <p class="text-xs text-gray-400 mt-1">${t('Choose your preferred accent color scheme')}</p>
+        </div>
+      </div>
+    `;
+  }
+
+  private getAuthenticatedContent(): string {
+    const settings = this.loadSettings();
+    const availableThemes = simpleThemeManager.getAvailableThemesTranslated();
+    const currentTheme = simpleThemeManager.getCurrentTheme();
+    const availableBackgroundThemes = backgroundThemeManager.getAvailableThemesTranslated();
+    const currentBackgroundTheme = backgroundThemeManager.getCurrentTheme();
+
+    // Use pending values if they exist, otherwise use current values
+    const displayTheme = this.pendingTheme || currentTheme;
+    const displayBackgroundTheme = this.pendingBackgroundTheme || currentBackgroundTheme;
+    const displayLanguage = this.pendingLanguage || settings.language;
+
+    // Prepare options for custom dropdowns
+    const themeOptions = availableThemes.map(theme => ({
+      value: theme.name,
+      label: theme.displayName,
+      image: this.themeImages[theme.name] || '/boxes/colors/lime.png'
+    }));
+
+    const backgroundThemeOptions = availableBackgroundThemes.map(theme => ({
+      value: theme.name,
+      label: theme.displayName,
+      image: this.backgroundThemeImages[theme.name] || '/boxes/background/Dark.svg'
+    }));
+
+    const languageOptions = SUPPORTED_LANGUAGES.map(lang => ({
+      value: lang.code,
+      label: lang.nativeName,
+      image: this.languageImages[lang.code] || '/boxes/langs/united-states-of-america.png'
+    }));
+
+    return `
+      <h3 class="text-xl font-bold mb-4 text-lime-500">
+        <img src="/boxes/settings.png" alt="Settings" class="inline w-6 h-6 align-middle mr-2" />
+        ${t('Settings')}
+      </h3>
+      <div class="space-y-4">
+        <!-- Accent Color Theme Selector -->
+        <div class="bg-gray-700 p-3 rounded">
+          <label class="text-sm font-medium text-gray-300 block mb-2">
+            <img src="/boxes/accentColors.png" alt="Accent Colors" class="inline w-5 h-5 align-middle mr-2" />
+            ${t('Accent Colors')}
+          </label>
+          ${this.getCustomDropdownHTML('theme-select', themeOptions, displayTheme)}
+          <p class="text-xs text-gray-400 mt-1">${t('Choose your preferred accent color scheme')}</p>
+        </div>
+
+        <!-- Background Theme Selector -->
+        <div class="bg-gray-700 p-3 rounded">
+          <label class="text-sm font-medium text-gray-300 block mb-2">
+            <img src="/boxes/background.png" alt="Background Theme" class="inline w-5 h-5 align-middle mr-2" />
+            ${t('Background Theme')}
+          </label>
+          ${this.getCustomDropdownHTML('background-theme-select', backgroundThemeOptions, displayBackgroundTheme)}
+          <p class="text-xs text-gray-400 mt-1">${t('Choose your preferred background color scheme')}</p>
+        </div>
+
+        <!-- Music Player -->
+        ${this.getMusicPlayerHTML()}
+
+        <!-- Language Settings -->
+        <div class="bg-gray-700 p-3 rounded">
+          <label class="text-sm font-medium text-gray-300 block mb-2">
+            <img src="/boxes/languages.png" alt="Language" class="inline w-5 h-5 align-middle mr-2" />
+            ${t('Language')}
+          </label>
+          ${this.getCustomDropdownHTML('language-select', languageOptions, displayLanguage)}
+        </div>
       </div>
 
-      <!-- Background Theme Selector -->
-      <div class="bg-gray-700 p-3 rounded">
-        <label class="text-sm font-medium text-gray-300 block mb-2">🌙 ${t('Background Theme')}</label>
-        <select id="background-theme-select" class="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded text-white focus:ring-2 focus:ring-lime-500 focus:border-lime-500">
-          ${availableBackgroundThemes.map(theme => `
-            <option value="${theme.name}" ${displayBackgroundTheme === theme.name ? 'selected' : ''}>
-              ${theme.displayName}
-            </option>
-          `).join('')}
-        </select>
-        <p class="text-xs text-gray-400 mt-1">${t('Choose your preferred background color scheme')}</p>
+      <!-- Action Buttons -->
+      <div class="mt-4 flex gap-2">
+        <button id="apply-settings" class="flex-1 bg-lime-500 hover:bg-lime-600 text-white font-bold py-2 px-4 rounded transition-all duration-300" ${this.hasPendingChanges() ? '' : 'disabled'}>
+          ${t('Apply Changes')}
+        </button>
+        <button id="cancel-changes" class="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded transition-all duration-300" ${this.hasPendingChanges() ? '' : 'disabled'}>
+          ${t('Cancel')}
+        </button>
       </div>
-
-      <!-- Music Player -->
-      ${this.getMusicPlayerHTML()}
-
-      <!-- Language Settings -->
-      <div class="bg-gray-700 p-3 rounded">
-        <label class="text-sm font-medium text-gray-300 block mb-2">${t('Language')}</label>
-        <select id="language-select" class="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded text-white focus:ring-2 focus:ring-lime-500 focus:border-lime-500">
-          ${SUPPORTED_LANGUAGES.map(lang => `
-            <option value="${lang.code}" ${displayLanguage === lang.code ? 'selected' : ''}>
-              ${lang.flag} ${lang.nativeName}
-            </option>
-          `).join('')}
-        </select>
-      </div>
-    </div>
-
-    <!-- Action Buttons -->
-    <div class="mt-4 flex gap-2">
-      <button id="apply-settings" class="flex-1 bg-lime-500 hover:bg-lime-600 text-white font-bold py-2 px-4 rounded transition-all duration-300" ${this.hasPendingChanges() ? '' : 'disabled'}>
-        ${t('Apply Changes')}
-      </button>
-      <button id="cancel-changes" class="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded transition-all duration-300" ${this.hasPendingChanges() ? '' : 'disabled'}>
-        ${t('Cancel')}
-      </button>
-    </div>
-  `;
-}
+    `;
+  }
 
   private getUnauthenticatedContent(): string {
-    const settings = this.loadSettings();
     return `
-      <h3 class="text-xl font-bold mb-4 text-lime-500">⚙️ ${t('Settings')}</h3>
+      <h3 class="text-xl font-bold mb-4 text-lime-500">
+        <img src="/boxes/settings.png" alt="Settings" class="inline w-6 h-6 align-middle mr-2" />
+        ${t('Settings')}
+      </h3>
       <p class="text-gray-400 mt-4">${t('Please log in to access settings')}</p>
       <button id="settings-signin" class="mt-4 bg-lime-500 hover:bg-lime-600 text-white font-bold py-2 px-4 rounded transition-all duration-300">
         ${t('Sign In')}
       </button>
     `;
+  }
+
+  private setupCustomDropdown(dropdownId: string, onChange: (value: string) => void): void {
+    const dropdown = document.getElementById(`${dropdownId}-dropdown`);
+    if (!dropdown) return;
+
+    const button = dropdown.querySelector('button');
+    const optionsContainer = dropdown.querySelector('.dropdown-options');
+    const options = dropdown.querySelectorAll('.dropdown-option');
+
+    if (!button || !optionsContainer) return;
+
+    // Toggle dropdown
+    button.addEventListener('click', (e) => {
+      e.stopPropagation();
+      optionsContainer.classList.toggle('hidden');
+
+      // Rotate arrow
+      const arrow = button.querySelector('svg');
+      if (arrow) {
+        arrow.classList.toggle('rotate-180');
+      }
+
+      // Close other dropdowns
+      document.querySelectorAll('.custom-dropdown').forEach(otherDropdown => {
+        if (otherDropdown !== dropdown) {
+          const otherOptions = otherDropdown.querySelector('.dropdown-options');
+          const otherArrow = otherDropdown.querySelector('svg');
+          otherOptions?.classList.add('hidden');
+          otherArrow?.classList.remove('rotate-180');
+        }
+      });
+    });
+
+    // Select option
+    options.forEach(option => {
+      option.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const value = option.getAttribute('data-value');
+        if (!value) return;
+
+        // Update selected display
+        const img = option.querySelector('img')?.cloneNode(true) as HTMLImageElement;
+        const text = option.querySelector('span')?.textContent || '';
+
+        const buttonContent = button.querySelector('div');
+        if (buttonContent && img) {
+          buttonContent.innerHTML = '';
+          buttonContent.appendChild(img);
+          const span = document.createElement('span');
+          span.textContent = text;
+          buttonContent.appendChild(span);
+        }
+
+        // Update active state
+        options.forEach(opt => opt.classList.remove('bg-gray-700'));
+        option.classList.add('bg-gray-700');
+
+        // Close dropdown
+        optionsContainer.classList.add('hidden');
+        const arrow = button.querySelector('svg');
+        arrow?.classList.remove('rotate-180');
+
+        // Trigger change
+        onChange(value);
+      });
+    });
+
+    // Close on outside click
+    document.addEventListener('click', (e) => {
+      if (!dropdown.contains(e.target as Node)) {
+        optionsContainer.classList.add('hidden');
+        const arrow = button.querySelector('svg');
+        arrow?.classList.remove('rotate-180');
+      }
+    });
   }
 
   private setupEventListeners(): void {
@@ -215,34 +356,26 @@ private getAuthenticatedContent(): string {
       signinBtn.addEventListener('click', () => this.showLoginModal());
     }
 
-    const themeSelect = document.getElementById('theme-select') as HTMLSelectElement;
-    if (themeSelect) {
-      themeSelect.addEventListener('change', (e) => {
-        this.pendingTheme = (e.target as HTMLSelectElement).value;
-        this.updateApplyButtonState();
-      });
-    }
+    // Setup custom dropdowns
+    this.setupCustomDropdown('theme-select', (value) => {
+      this.pendingTheme = value;
+      this.updateApplyButtonState();
+    });
 
-    const backgroundThemeSelect = document.getElementById('background-theme-select') as HTMLSelectElement;
-    if (backgroundThemeSelect) {
-      backgroundThemeSelect.addEventListener('change', (e) => {
-        this.pendingBackgroundTheme = (e.target as HTMLSelectElement).value;
-        this.updateApplyButtonState();
-      });
-    }
+    this.setupCustomDropdown('background-theme-select', (value) => {
+      this.pendingBackgroundTheme = value;
+      this.updateApplyButtonState();
+    });
+
+    this.setupCustomDropdown('language-select', (value) => {
+      this.pendingLanguage = value;
+      this.updateApplyButtonState();
+    });
 
     this.setupMusicEventListeners();
 
-    const languageSelect = document.getElementById('language-select') as HTMLSelectElement;
     const applyBtn = document.getElementById('apply-settings');
     const cancelBtn = document.getElementById('cancel-changes');
-
-    if (languageSelect) {
-      languageSelect.addEventListener('change', (e) => {
-        this.pendingLanguage = (e.target as HTMLSelectElement).value;
-        this.updateApplyButtonState();
-      });
-    }
 
     if (applyBtn) {
       applyBtn.addEventListener('click', () => this.applySettings());
@@ -312,180 +445,144 @@ private getAuthenticatedContent(): string {
     }
   }
 
-private async applySettings(): Promise<void> {
+  private async applySettings(): Promise<void> {
     const authToken = localStorage.getItem('ft_pong_auth_token');
     const userData = localStorage.getItem('ft_pong_user_data');
 
     if (authToken && userData) {
-        // Authenticated user - sync with backend
-        await this.applyAuthenticatedSettings();
+      await this.applyAuthenticatedSettings();
     } else {
-        // Unauthenticated user - only local settings
-        this.applyLocalSettings();
+      this.applyLocalSettings();
     }
-}
+  }
 
-private async applyAuthenticatedSettings(): Promise<void> {
+  private async applyAuthenticatedSettings(): Promise<void> {
     const user = authService.getUser();
     if (!user) {
-        console.error('No user found for authenticated settings update');
-        return;
+      console.error('No user found for authenticated settings update');
+      return;
     }
 
     const settings = this.loadSettings();
-    let changesApplied = false;
 
-    // Prepare backend settings object
     const backendSettings = {
-        username: user.userName,
-        languageCode: this.pendingLanguage || settings.language,
-        accentColor: this.pendingTheme || settings.theme,
-        backgroundTheme: this.pendingBackgroundTheme || settings.backgroundTheme
+      username: user.userName,
+      languageCode: this.pendingLanguage || settings.language,
+      accentColor: this.pendingTheme || settings.theme,
+      backgroundTheme: this.pendingBackgroundTheme || settings.backgroundTheme
     };
 
     try {
-        // Update settings on backend
-        const success = await authService.updateUserSettings(backendSettings);
+      const success = await authService.updateUserSettings(backendSettings);
 
-        if (success) {
-            // Apply theme changes locally after successful backend update
-            if (this.pendingTheme && this.pendingTheme !== simpleThemeManager.getCurrentTheme()) {
-                this.changeTheme(this.pendingTheme);
-                changesApplied = true;
-            }
-
-            if (this.pendingBackgroundTheme && this.pendingBackgroundTheme !== backgroundThemeManager.getCurrentTheme()) {
-                this.changeBackgroundTheme(this.pendingBackgroundTheme);
-                changesApplied = true;
-            }
-
-            if (this.pendingLanguage && this.pendingLanguage !== settings.language) {
-                this.changeLanguage(this.pendingLanguage);
-                changesApplied = true;
-            }
-
-            // Clear pending changes
-            this.pendingTheme = null;
-            this.pendingBackgroundTheme = null;
-            this.pendingLanguage = null;
-
-            // Update UI
-            this.updateContent();
-            this.setupEventListeners();
-
-            // No toast notification - changes are applied silently
-        }
-        // No else block needed - if success is false, we just don't apply changes
-    } catch (error) {
-        console.error('Error updating authenticated settings:', error);
-        // No error toast - fail silently
-    }
-}
-
-    private applyLocalSettings(): void {
-        const settings = this.loadSettings();
-        let changesApplied = false;
-
-        // Apply theme if changed
+      if (success) {
         if (this.pendingTheme && this.pendingTheme !== simpleThemeManager.getCurrentTheme()) {
-            this.changeTheme(this.pendingTheme);
-            this.saveSettingValue('theme', this.pendingTheme);
-            changesApplied = true;
+          this.changeTheme(this.pendingTheme);
         }
 
-        // Apply background theme if changed
         if (this.pendingBackgroundTheme && this.pendingBackgroundTheme !== backgroundThemeManager.getCurrentTheme()) {
-            this.changeBackgroundTheme(this.pendingBackgroundTheme);
-            this.saveSettingValue('backgroundTheme', this.pendingBackgroundTheme);
-            changesApplied = true;
+          this.changeBackgroundTheme(this.pendingBackgroundTheme);
         }
 
-        // Apply language if changed
         if (this.pendingLanguage && this.pendingLanguage !== settings.language) {
-            this.changeLanguage(this.pendingLanguage);
-            changesApplied = true;
+          this.changeLanguage(this.pendingLanguage);
         }
 
-        // Clear pending changes
         this.pendingTheme = null;
         this.pendingBackgroundTheme = null;
         this.pendingLanguage = null;
 
-        // Update UI
         this.updateContent();
         this.setupEventListeners();
+      }
+    } catch (error) {
+      console.error('Error updating authenticated settings:', error);
+    }
+  }
 
-        if (changesApplied) {
-            const message = t('Local settings applied successfully!');
-            this.showBasicToast('success', message);
-        }
+  private applyLocalSettings(): void {
+    const settings = this.loadSettings();
+
+    if (this.pendingTheme && this.pendingTheme !== simpleThemeManager.getCurrentTheme()) {
+      this.changeTheme(this.pendingTheme);
+      this.saveSettingValue('theme', this.pendingTheme);
     }
 
-    private loadSettings(): any {
-        const authState = authService.getState();
-
-        // If authenticated, prioritize backend settings
-        if (authState.isAuthenticated && authState.settings) {
-            return {
-                language: authState.settings.language,
-                theme: authState.settings.theme,
-                backgroundTheme: authState.settings.backgroundTheme
-            };
-        }
-
-        // Fallback to local settings for unauthenticated users
-        const defaultSettings = {
-            language: languageManager.getCurrentLanguage(),
-            theme: simpleThemeManager.getCurrentTheme(),
-            backgroundTheme: backgroundThemeManager.getCurrentTheme()
-        };
-
-        try {
-            const savedSettings = localStorage.getItem('ft_pong_game_settings');
-            if (savedSettings) {
-                return { ...defaultSettings, ...JSON.parse(savedSettings) };
-            }
-        } catch (error) {
-            console.error('Error loading local settings:', error);
-        }
-
-        return defaultSettings;
+    if (this.pendingBackgroundTheme && this.pendingBackgroundTheme !== backgroundThemeManager.getCurrentTheme()) {
+      this.changeBackgroundTheme(this.pendingBackgroundTheme);
+      this.saveSettingValue('backgroundTheme', this.pendingBackgroundTheme);
     }
 
-    // Add method to apply settings from backend on auth
-    public applyBackendSettings(settings: any): void {
-        if (!settings) return;
-
-
-        // Apply theme
-        if (settings.theme && settings.theme !== simpleThemeManager.getCurrentTheme()) {
-            simpleThemeManager.applyTheme(settings.theme);
-        }
-
-        // Apply background theme
-        if (settings.backgroundTheme && settings.backgroundTheme !== backgroundThemeManager.getCurrentTheme()) {
-            backgroundThemeManager.applyBackgroundTheme(settings.backgroundTheme);
-        }
-
-        // Apply language
-        if (settings.language && settings.language !== languageManager.getCurrentLanguage()) {
-            languageManager.setLanguage(settings.language);
-        }
-
-        // Update UI if rendered
-        if (this.isRendered) {
-            this.updateContent();
-            this.setupEventListeners();
-        }
+    if (this.pendingLanguage && this.pendingLanguage !== settings.language) {
+      this.changeLanguage(this.pendingLanguage);
     }
 
-  private cancelChanges(): void {
-    // Clear pending changes
     this.pendingTheme = null;
     this.pendingBackgroundTheme = null;
     this.pendingLanguage = null;
 
-    // Update UI to reflect current settings
+    this.updateContent();
+    this.setupEventListeners();
+
+    const message = t('Local settings applied successfully!');
+    this.showBasicToast('success', message);
+  }
+
+  private loadSettings(): any {
+    const authState = authService.getState();
+
+    if (authState.isAuthenticated && authState.settings) {
+      return {
+        language: authState.settings.language,
+        theme: authState.settings.theme,
+        backgroundTheme: authState.settings.backgroundTheme
+      };
+    }
+
+    const defaultSettings = {
+      language: languageManager.getCurrentLanguage(),
+      theme: simpleThemeManager.getCurrentTheme(),
+      backgroundTheme: backgroundThemeManager.getCurrentTheme()
+    };
+
+    try {
+      const savedSettings = localStorage.getItem('ft_pong_game_settings');
+      if (savedSettings) {
+        return { ...defaultSettings, ...JSON.parse(savedSettings) };
+      }
+    } catch (error) {
+      console.error('Error loading local settings:', error);
+    }
+
+    return defaultSettings;
+  }
+
+  public applyBackendSettings(settings: any): void {
+    if (!settings) return;
+
+    if (settings.theme && settings.theme !== simpleThemeManager.getCurrentTheme()) {
+      simpleThemeManager.applyTheme(settings.theme);
+    }
+
+    if (settings.backgroundTheme && settings.backgroundTheme !== backgroundThemeManager.getCurrentTheme()) {
+      backgroundThemeManager.applyBackgroundTheme(settings.backgroundTheme);
+    }
+
+    if (settings.language && settings.language !== languageManager.getCurrentLanguage()) {
+      languageManager.setLanguage(settings.language);
+    }
+
+    if (this.isRendered) {
+      this.updateContent();
+      this.setupEventListeners();
+    }
+  }
+
+  private cancelChanges(): void {
+    this.pendingTheme = null;
+    this.pendingBackgroundTheme = null;
+    this.pendingLanguage = null;
+
     this.updateContent();
     this.setupEventListeners();
 
@@ -497,7 +594,7 @@ private async applyAuthenticatedSettings(): Promise<void> {
     if (!this.audioPlayer) {
       this.audioPlayer = new Audio();
       this.audioPlayer.loop = true;
-      this.audioPlayer.volume = 0.5; // Default volume 50%
+      this.audioPlayer.volume = 0.5;
       this.audioPlayer.addEventListener('ended', () => {
         this.nextTrack();
       });
@@ -600,99 +697,93 @@ private async applyAuthenticatedSettings(): Promise<void> {
     }
   }
 
-private changeTheme(themeName: string): void {
-  const success = simpleThemeManager.applyTheme(themeName);
+  private changeTheme(themeName: string): void {
+    const success = simpleThemeManager.applyTheme(themeName);
 
-  if (success) {
-    const theme = simpleThemeManager.getCurrentThemeConfigTranslated(); // Use translated method
-    const message = `${t('Theme changed to')} ${theme?.displayName}`;
+    if (success) {
+      const theme = simpleThemeManager.getCurrentThemeConfigTranslated();
+      const message = `${t('Theme changed to')} ${theme?.displayName}`;
 
-    if ((window as any).modalService?.showToast) {
-      (window as any).modalService.showToast('success', t('Theme Changed'), message);
+      if ((window as any).modalService?.showToast) {
+        (window as any).modalService.showToast('success', t('Theme Changed'), message);
+      } else {
+        this.addNotification(message, 'success');
+      }
     } else {
-      this.addNotification(message, 'success');
-    }
-  } else {
-    const errorMessage = t('Failed to change theme');
-    if ((window as any).modalService?.showToast) {
-      (window as any).modalService.showToast('error', t('Error'), errorMessage);
-    } else {
-      this.addNotification(errorMessage, 'error');
-    }
-  }
-}
-
-private changeBackgroundTheme(themeName: string): void {
-  const success = backgroundThemeManager.applyBackgroundTheme(themeName);
-
-  if (success) {
-    const theme = backgroundThemeManager.getCurrentThemeConfigTranslated(); // Use translated method
-    const message = `${t('Background theme changed to')} ${theme?.displayName}`;
-
-    if ((window as any).modalService?.showToast) {
-      (window as any).modalService.showToast('success', t('Background Theme Changed'), message);
-    } else {
-      this.addNotification(message, 'success');
-    }
-  } else {
-    const errorMessage = t('Failed to change background theme');
-    if ((window as any).modalService?.showToast) {
-      (window as any).modalService.showToast('error', t('Error'), errorMessage);
-    } else {
-      this.addNotification(errorMessage, 'error');
+      const errorMessage = t('Failed to change theme');
+      if ((window as any).modalService?.showToast) {
+        (window as any).modalService.showToast('error', t('Error'), errorMessage);
+      } else {
+        this.addNotification(errorMessage, 'error');
+      }
     }
   }
-}
+
+  private changeBackgroundTheme(themeName: string): void {
+    const success = backgroundThemeManager.applyBackgroundTheme(themeName);
+
+    if (success) {
+      const theme = backgroundThemeManager.getCurrentThemeConfigTranslated();
+      const message = `${t('Background theme changed to')} ${theme?.displayName}`;
+
+      if ((window as any).modalService?.showToast) {
+        (window as any).modalService.showToast('success', t('Background Theme Changed'), message);
+      } else {
+        this.addNotification(message, 'success');
+      }
+    } else {
+      const errorMessage = t('Failed to change background theme');
+      if ((window as any).modalService?.showToast) {
+        (window as any).modalService.showToast('error', t('Error'), errorMessage);
+      } else {
+        this.addNotification(errorMessage, 'error');
+      }
+    }
+  }
 
   private updateThemeSelector(): void {
-    const themeSelect = document.getElementById('theme-select') as HTMLSelectElement;
-    if (themeSelect) {
-      themeSelect.value = simpleThemeManager.getCurrentTheme();
+    // Re-render to update custom dropdown
+    if (this.isRendered) {
+      this.updateContent();
+      this.setupEventListeners();
     }
   }
 
   private updateBackgroundThemeSelector(): void {
-    const backgroundThemeSelect = document.getElementById('background-theme-select') as HTMLSelectElement;
-    if (backgroundThemeSelect) {
-      backgroundThemeSelect.value = backgroundThemeManager.getCurrentTheme();
+    // Re-render to update custom dropdown
+    if (this.isRendered) {
+      this.updateContent();
+      this.setupEventListeners();
     }
   }
 
-    updateAuthState(isAuthenticated: boolean, user?: any): void {
-        if (!this.isRendered) return;
+  updateAuthState(isAuthenticated: boolean, user?: any): void {
+    if (!this.isRendered) return;
 
-        if (isAuthenticated && user) {
-            // Apply backend settings when user logs in
-            const authState = authService.getState();
-            if (authState.settings) {
-                this.applyBackendSettings(authState.settings);
-            }
-        } else {
-            // Reset to defaults when user logs out
-            this.resetToDefaults();
-        }
-
-        this.updateContent();
-        this.setupEventListeners();
+    if (isAuthenticated && user) {
+      const authState = authService.getState();
+      if (authState.settings) {
+        this.applyBackendSettings(authState.settings);
+      }
+    } else {
+      this.resetToDefaults();
     }
 
-    private resetToDefaults(): void {
+    this.updateContent();
+    this.setupEventListeners();
+  }
 
-        // Clear local storage
-        localStorage.removeItem('ft_pong_game_settings');
+  private resetToDefaults(): void {
+    localStorage.removeItem('ft_pong_game_settings');
 
-        // Reset managers to defaults
-        simpleThemeManager.resetTheme();
-        backgroundThemeManager.resetTheme();
-        languageManager.setLanguage('en');
+    simpleThemeManager.resetTheme();
+    backgroundThemeManager.resetTheme();
+    languageManager.setLanguage('en');
 
-        // Clear pending changes
-        this.pendingTheme = null;
-        this.pendingBackgroundTheme = null;
-        this.pendingLanguage = null;
-    }
-
-
+    this.pendingTheme = null;
+    this.pendingBackgroundTheme = null;
+    this.pendingLanguage = null;
+  }
 
   private saveSettingValue(key: string, value: any): void {
     const settings = this.loadSettings();
@@ -780,8 +871,6 @@ private changeBackgroundTheme(themeName: string): void {
       alert('Login - Modal service not loaded');
     }
   }
-
-
 
   getSettings(): any {
     return this.loadSettings();
