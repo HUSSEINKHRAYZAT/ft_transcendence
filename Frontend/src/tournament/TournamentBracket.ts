@@ -246,404 +246,149 @@ export class TournamentBracket {
 
   private generateBracketHTML(): string {
     const rounds = this.getRounds();
-    
+    const totalRounds = rounds.length || 1;
+
     return `
-      <div class="bracket-container">
-        <div class="bracket-header">
-          <h2 class="tournament-title">🏆 Tournament Bracket (${this.data.size} Players)</h2>
-          <div class="tournament-status">
-            ${this.data.isComplete
-              ? `<span class="status-complete">✅ Tournament Complete - Winner: ${this.data.winner?.name || 'TBD'}</span>`
-              : `<span class="status-active">⚡ Round ${this.data.currentRound} in progress - Live for all players</span>`
-            }
-          </div>
-          <div class="bracket-info">
-            <p style="margin: 8px 0 0 0; color: #94a3b8; font-size: 14px;">
-              📺 All players can view the tournament brackets in real-time
-            </p>
-          </div>
+      <section class="tournament-bracket-ui" style="--round-count:${totalRounds}">
+        ${this.generateBracketHeader(totalRounds)}
+        <div class="bracket-grid">
+          ${rounds.map((roundMatches, index) => this.generateRoundHTML(roundMatches, index, totalRounds)).join('')}
         </div>
-        
-        <div class="bracket-rounds">
-          ${rounds.map((round, index) => this.generateRoundHTML(round, index)).join('')}
-        </div>
-      </div>
-      
-      <style>
-        .tournament-bracket {
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-          background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
-          border-radius: 16px;
-          padding: 24px;
-          color: white;
-          max-width: 1200px;
-          margin: 0 auto;
-          box-shadow: 0 20px 40px rgba(0,0,0,0.3);
-        }
-        
-        .bracket-header {
-          text-align: center;
-          margin-bottom: 32px;
-        }
-        
-        .tournament-title {
-          font-size: 28px;
-          font-weight: 800;
-          margin: 0 0 12px 0;
-          background: linear-gradient(135deg, #84cc16, #65a30d);
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          background-clip: text;
-        }
-        
-        .tournament-status {
-          font-size: 16px;
-          font-weight: 600;
-        }
-        
-        .status-complete {
-          color: #10b981;
-        }
-        
-        .status-active {
-          color: #f59e0b;
-        }
-        
-        .bracket-rounds {
-          display: flex;
-          justify-content: space-between;
-          gap: 32px;
-          overflow-x: auto;
-          padding: 16px 0;
-        }
-        
-        .bracket-round {
-          flex: 1;
-          min-width: 220px;
-        }
-        
-        .round-header {
-          text-align: center;
-          margin-bottom: 20px;
-          padding: 12px;
-          background: rgba(255,255,255,0.1);
-          border-radius: 8px;
-          font-weight: 700;
-          font-size: 16px;
-        }
-        
-        .round-matches {
-          display: flex;
-          flex-direction: column;
-          gap: 16px;
-        }
-        
-        .match-card {
-          background: rgba(255,255,255,0.05);
-          border: 2px solid rgba(255,255,255,0.1);
-          border-radius: 12px;
-          padding: 16px;
-          transition: all 0.3s ease;
-          position: relative;
-        }
-        
-        .match-card:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 8px 25px rgba(0,0,0,0.2);
-          border-color: rgba(132, 204, 22, 0.5);
-        }
-        
-        .match-card.completed {
-          border-color: #10b981;
-          background: rgba(16, 185, 129, 0.1);
-        }
-        
-        .match-card.active {
-          border-color: #f59e0b;
-          background: rgba(245, 158, 11, 0.1);
-          animation: pulse 2s infinite;
-        }
-
-        .match-card.waiting {
-          border-color: rgba(148, 163, 184, 0.4);
-          background: rgba(148, 163, 184, 0.12);
-        }
-        
-        @keyframes pulse {
-          0%, 100% { border-color: #f59e0b; }
-          50% { border-color: #fbbf24; }
-        }
-        
-        .match-header {
-          font-size: 12px;
-          color: #94a3b8;
-          margin-bottom: 12px;
-          text-align: center;
-          font-weight: 600;
-        }
-        
-        .match-players {
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-        }
-        
-        .player {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 8px 12px;
-          border-radius: 8px;
-          background: rgba(0,0,0,0.2);
-          font-weight: 600;
-        }
-        
-        .player.winner {
-          background: rgba(16, 185, 129, 0.2);
-          color: #10b981;
-        }
-        
-        .player.loser {
-          opacity: 0.6;
-          text-decoration: line-through;
-        }
-        
-        .player.current-user {
-          border: 2px solid #84cc16;
-          background: rgba(132, 204, 22, 0.15);
-          box-shadow: 0 0 12px rgba(132, 204, 22, 0.3);
-          font-weight: 700;
-        }
-        
-        .player.current-user.winner {
-          border-color: #10b981;
-          background: rgba(16, 185, 129, 0.25);
-          box-shadow: 0 0 12px rgba(16, 185, 129, 0.4);
-        }
-        
-        .player-name {
-          flex: 1;
-        }
-        
-        .player-score {
-          font-weight: 800;
-          font-size: 18px;
-        }
-        
-        .player-status {
-          font-size: 10px;
-          color: #64748b;
-        }
-        
-        .tbd-player {
-          color: #64748b;
-          font-style: italic;
-        }
-        
-        .match-vs {
-          text-align: center;
-          font-size: 12px;
-          color: #64748b;
-          margin: 4px 0;
-          font-weight: 600;
-        }
-        
-        .connection-lines {
-          position: absolute;
-          top: 50%;
-          right: -16px;
-          width: 32px;
-          height: 2px;
-          background: rgba(255,255,255,0.2);
-          transform: translateY(-50%);
-        }
-        
-        .connection-lines::after {
-          content: '';
-          position: absolute;
-          right: 0;
-          top: 50%;
-          width: 8px;
-          height: 8px;
-          background: rgba(255,255,255,0.3);
-          border-radius: 50%;
-          transform: translate(50%, -50%);
-        }
-        .connection-lines::after {
-          content: '';
-          position: absolute;
-          right: 0;
-          top: 50%;
-          width: 8px;
-          height: 8px;
-          background: rgba(255,255,255,0.3);
-          border-radius: 50%;
-          transform: translate(50%, -50%);
-        }
-        
-        .match-actions {
-          margin-top: 12px;
-          text-align: center;
-        }
-        /*
-        .btn-start-match {
-          background: linear-gradient(135deg, #84cc16, #65a30d);
-          color: white;
-          border: none;
-          padding: 8px 16px;
-          border-radius: 6px;
-          font-weight: 600;
-          font-size: 12px;
-          cursor: pointer;
-          transition: all 0.2s ease;
-        }
-        
-        .btn-start-match:hover {
-          background: linear-gradient(135deg, #65a30d, #4d7c0f);
-          transform: translateY(-1px);
-        }
-        */
-        .winner-info {
-          margin-bottom: 8px;
-          text-align: center;
-        }
-
-        .winner-text {
-          font-size: 12px;
-          color: #10b981;
-          font-weight: 700;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 4px;
-          animation: celebrate 2s ease-in-out infinite;
-        }
-
-        @keyframes celebrate {
-          0%, 100% { transform: scale(1); }
-          50% { transform: scale(1.05); }
-        }
-
-        /* Match Status Badges */
-        .match-status {
-          font-size: 10px;
-          padding: 2px 6px;
-          border-radius: 4px;
-          font-weight: 600;
-          margin-left: 8px;
-        }
-
-        .match-status.completed {
-          background: rgba(16, 185, 129, 0.2);
-          color: #10b981;
-        }
-
-        .match-status.active {
-          background: rgba(245, 158, 11, 0.2);
-          color: #f59e0b;
-          animation: pulse 2s infinite;
-        }
-
-        .match-status.user-ready {
-          background: rgba(132, 204, 22, 0.2);
-          color: #84cc16;
-          animation: pulse 2s infinite;
-        }
-
-        .match-status.ready {
-          background: rgba(59, 130, 246, 0.2);
-          color: #3b82f6;
-        }
-
-        .match-status.waiting {
-          background: rgba(107, 114, 128, 0.2);
-          color: #6b7280;
-        }
-
-        /* User Match Highlighting */
-        .match-card.user-match {
-          border: 2px solid #84cc16;
-          box-shadow: 0 0 20px rgba(132, 204, 22, 0.3);
-        }
-
-        .match-card.user-match.pending {
-          animation: glow 3s ease-in-out infinite;
-        }
-
-        /* Auto-start Info */
-        .auto-start-info {
-          text-align: center;
-          margin-bottom: 8px;
-        }
-
-        .auto-start-text {
-          font-size: 11px;
-          color: #84cc16;
-          font-weight: 600;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 4px;
-        }
-
-        /* Animations */
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.6; }
-        }
-
-        @keyframes glow {
-          0%, 100% { box-shadow: 0 0 20px rgba(132, 204, 22, 0.3); }
-          50% { box-shadow: 0 0 30px rgba(132, 204, 22, 0.6); }
-        }
-      </style>
+      </section>
+      ${this.generateBracketStyles()}
     `;
+  }
+
+  private generateBracketHeader(totalRounds: number): string {
+    const tournamentName = this.escapeHtml(this.data.name);
+    const roundsText = this.data.isComplete
+      ? 'All rounds completed'
+      : `Round ${Math.max(1, this.data.currentRound)} of ${totalRounds}`;
+    const playerCount = `${Math.min(this.data.players.length, this.data.size)}/${this.data.size} players`;
+    const spectatorsChip = this.data.allowSpectators
+      ? '<span class="info-chip">👀 Spectators allowed</span>'
+      : '<span class="info-chip info-chip--muted">🔒 Private lobby</span>';
+    const winnerChip = this.data.winner
+      ? `<span class="info-chip info-chip--winner">🏆 Winner: ${this.escapeHtml(this.data.winner.name)}</span>`
+      : '';
+
+    return `
+      <header class="bracket-header">
+        <div class="header-titles">
+          <h2 class="bracket-title">${tournamentName}</h2>
+          <p class="bracket-subtitle">${this.data.size}-player elimination · ${roundsText}</p>
+        </div>
+        <div class="bracket-meta">
+          ${this.renderStatusChip()}
+          <span class="info-chip">👥 ${playerCount}</span>
+          ${spectatorsChip}
+          ${winnerChip}
+        </div>
+      </header>
+    `;
+  }
+
+  private renderStatusChip(): string {
+    const status = this.data.status;
+
+    if (status === 'completed' || this.data.isComplete) {
+      return '<span class="status-chip status-chip--completed">🏆 Tournament completed</span>';
+    }
+    if (status === 'active') {
+      return `<span class="status-chip status-chip--active">🎮 Round ${Math.max(1, this.data.currentRound)}</span>`;
+    }
+    return '<span class="status-chip status-chip--waiting">⏳ Waiting for players</span>';
   }
 
   private getRounds(): TournamentMatch[][] {
-    const rounds: TournamentMatch[][] = [];
-    const maxRound = this.data.size === 16 ? 4 : this.data.size === 8 ? 3 : 2; // 16 players = 4 rounds, 8 players = 3 rounds, 4 players = 2 rounds
-    
-    for (let round = 1; round <= maxRound; round++) {
-      const roundMatches = this.data.matches.filter(match => match.round === round);
-      rounds.push(roundMatches);
+    const roundsMap = new Map<number, TournamentMatch[]>();
+
+    for (const match of this.data.matches) {
+      if (!roundsMap.has(match.round)) {
+        roundsMap.set(match.round, []);
+      }
+      roundsMap.get(match.round)!.push(match);
     }
-    
-    return rounds;
+
+    return Array.from(roundsMap.entries())
+      .sort((a, b) => a[0] - b[0])
+      .map(([, matches]) => matches.sort((a, b) => (a.matchIndex ?? 0) - (b.matchIndex ?? 0)));
   }
 
-  private generateRoundHTML(matches: TournamentMatch[], roundIndex: number): string {
-    const roundNames = this.data.size === 16 
-      ? ['Round of 16', 'Quarterfinals', 'Semifinals', 'Final']
-      : this.data.size === 8
-      ? ['Quarterfinals', 'Semifinals', 'Final']
-      : ['Semifinals', 'Final']; // For 4 players
-    
-    // Enhanced round visuals with emojis and colors
-    const roundEmojis = ['🎮', '⚔️', '🏅', '🏆'];
-    const roundColors = ['#3b82f6', '#f59e0b', '#8b5cf6', '#ef4444'];
-    const roundEmoji = roundEmojis[roundIndex] || '🎯';
-    const roundColor = roundColors[roundIndex] || '#84cc16';
-    
-    const roundName = roundNames[roundIndex] || `Round ${roundIndex + 1}`;
-    
+  private generateRoundHTML(matches: TournamentMatch[], roundIndex: number, totalRounds: number): string {
+    const roundLabel = this.getRoundLabel(roundIndex, totalRounds);
+    const roundIcon = this.getRoundIcon(roundIndex);
+    const matchesHtml = matches.length
+      ? matches.map(match => this.generateMatchHTML(match, roundIndex, totalRounds)).join('')
+      : this.generatePlaceholderMatch(roundIndex, totalRounds);
+
     return `
-      <div class="bracket-round">
-        <div class="round-header" style="background: linear-gradient(135deg, ${roundColor}22, ${roundColor}11); border: 2px solid ${roundColor}44; box-shadow: 0 0 20px ${roundColor}22;">
-          <div style="font-size: 24px; margin-bottom: 4px;">${roundEmoji}</div>
-          <div style="color: ${roundColor}; text-shadow: 0 0 10px ${roundColor}88;">${roundName}</div>
-          <div style="font-size: 11px; color: ${roundColor}99; margin-top: 2px;">
-            ${matches.length} ${matches.length === 1 ? 'match' : 'matches'}
-          </div>
+      <div class="bracket-column" data-round-index="${roundIndex}">
+        <div class="round-label">
+          <span class="round-icon">${roundIcon}</span>
+          <span>${roundLabel}</span>
         </div>
         <div class="round-matches">
-          ${matches.map(match => this.generateMatchHTML(match)).join('')}
+          ${matchesHtml}
         </div>
       </div>
     `;
   }
 
-  private generateMatchHTML(match: TournamentMatch): string {
+  private getRoundLabel(roundIndex: number, totalRounds: number): string {
+    const labelsByRounds: Record<number, string[]> = {
+      2: ['Semifinals', 'Final'],
+      3: ['Quarterfinals', 'Semifinals', 'Final'],
+      4: ['Round of 16', 'Quarterfinals', 'Semifinals', 'Final']
+    };
+
+    const labels = labelsByRounds[totalRounds] ?? Array.from({ length: totalRounds }, (_, i) => `Round ${i + 1}`);
+    return labels[roundIndex] || `Round ${roundIndex + 1}`;
+  }
+
+  private getRoundIcon(roundIndex: number): string {
+    const icons = ['🎮', '⚔️', '🏅', '🏆'];
+    return icons[Math.min(roundIndex, icons.length - 1)] || '🎯';
+  }
+
+  private generatePlaceholderMatch(roundIndex: number, totalRounds: number): string {
+    const hasConnector = roundIndex < totalRounds - 1;
+    const classes = ['match-card', 'is-placeholder'];
+
+    if (hasConnector) {
+      classes.push('has-connector', 'connector-top');
+    }
+
+    return `
+      <article class="${classes.join(' ')}" data-round="${roundIndex + 1}">
+        <div class="match-meta">
+          <span class="match-label">Match TBD</span>
+          <span class="match-status" data-state="waiting">⌛ Pending</span>
+        </div>
+        <div class="match-players">
+          ${this.generatePlaceholderPlayer('Awaiting player')}
+          ${this.generatePlaceholderPlayer('Awaiting player')}
+        </div>
+      </article>
+    `;
+  }
+
+  private generatePlaceholderPlayer(label: string): string {
+    return `
+      <div class="match-player is-placeholder">
+        <div class="player-info">
+          <div class="player-name">
+            <span class="player-avatar">?</span>
+            <span>${this.escapeHtml(label)}</span>
+          </div>
+          <span class="player-status">TBD</span>
+        </div>
+        <span class="player-score">-</span>
+      </div>
+    `;
+  }
+
+  private generateMatchHTML(match: TournamentMatch, roundIndex: number, totalRounds: number): string {
     const currentUser = this.getCurrentUser();
     const resolvedUserId = this.resolveUserIdFromRecord(currentUser) || this.currentUserId;
 
@@ -651,70 +396,70 @@ export class TournamentBracket {
       this.currentUserId = resolvedUserId;
     }
 
-    const isUserInMatch: boolean = this.doesPlayerMatchUser(match.player1, resolvedUserId) || this.doesPlayerMatchUser(match.player2, resolvedUserId);
+    const isUserInMatch = Boolean(
+      resolvedUserId &&
+      (this.doesPlayerMatchUser(match.player1, resolvedUserId) || this.doesPlayerMatchUser(match.player2, resolvedUserId))
+    );
 
-    const isActive: boolean = match.isActive && !match.isComplete;
-    const isPending: boolean = !match.isComplete && !!match.player1 && !!match.player2 && !isActive;
-    const hasPlayer1 = Boolean(match.player1);
-    const hasPlayer2 = Boolean(match.player2);
-    const waitingForOpponent = !match.isComplete && (Boolean(match.waitingForOpponent) || (hasPlayer1 !== hasPlayer2));
+    const isActive = match.isActive && !match.isComplete;
+    const playersPresent = Boolean(match.player1) && Boolean(match.player2);
+    const isPending = !match.isComplete && playersPresent && !isActive;
+    const waitingForOpponent = !match.isComplete && (!playersPresent || Boolean(match.waitingForOpponent));
+    const hasConnector = roundIndex < totalRounds - 1;
+    const matchIndex = match.matchIndex ?? 0;
 
-    const cardClassParts: string[] = [];
+    const cardClasses: string[] = ['match-card'];
+
     if (match.isComplete) {
-      cardClassParts.push('completed');
+      cardClasses.push('is-complete');
     } else if (isActive) {
-      cardClassParts.push('active');
+      cardClasses.push('is-active');
     } else if (isPending) {
-      cardClassParts.push('pending');
+      cardClasses.push('is-ready');
     }
 
     if (waitingForOpponent) {
-      cardClassParts.push('waiting');
+      cardClasses.push('is-waiting');
     }
 
     if (isUserInMatch) {
-      cardClassParts.push('user-match');
+      cardClasses.push('is-user-match');
     }
 
-    const cardClass = cardClassParts.join(' ');
+    if (hasConnector) {
+      cardClasses.push('has-connector');
+      cardClasses.push(matchIndex % 2 === 0 ? 'connector-top' : 'connector-bottom');
+    }
 
     return `
-      <div class="match-card ${cardClass}" data-match-id="${match.id}">
-        <div class="match-header">
-          Match ${match.matchIndex + 1}
+      <article class="${cardClasses.join(' ')}" data-match-id="${match.id}" data-round="${roundIndex + 1}" data-index="${matchIndex}">
+        <div class="match-meta">
+          <span class="match-label">Match ${matchIndex + 1}</span>
           ${this.getMatchStatusBadge(match, isUserInMatch, waitingForOpponent)}
         </div>
         <div class="match-players">
-          ${this.generatePlayerHTML(match.player1, match.score1, match.winner)}
-          <div class="match-vs">VS</div>
-          ${this.generatePlayerHTML(match.player2, match.score2, match.winner)}
+          ${this.generatePlayerHTML(match.player1, match.score1, match.winner, resolvedUserId)}
+          ${this.generatePlayerHTML(match.player2, match.score2, match.winner, resolvedUserId)}
         </div>
         ${this.getMatchActionsHTML(match, isActive, isPending, isUserInMatch)}
-        ${!match.isComplete && match.round < this.getRounds().length ? '<div class="connection-lines"></div>' : ''}
-      </div>
+      </article>
     `;
   }
 
   private getMatchStatusBadge(match: TournamentMatch, isUserInMatch: boolean, waitingForOpponent: boolean): string {
     if (match.isComplete) {
-      return '<span class="match-status completed">✅ Complete</span>';
+      return '<span class="match-status" data-state="completed">🏆 Complete</span>';
     }
     if (match.isActive) {
-      return '<span class="match-status active">🎮 Playing</span>';
+      return `<span class="match-status" data-state="active">${isUserInMatch ? '🎮 In progress' : '🎮 Live'}</span>`;
     }
     if (waitingForOpponent) {
-      if (isUserInMatch) {
-        return '<span class="match-status waiting">⌛ Waiting for opponent</span>';
-      }
-      return '<span class="match-status waiting">⌛ Opponent pending</span>';
+      return `<span class="match-status" data-state="waiting">${isUserInMatch ? '⌛ Waiting for opponent' : '⌛ Awaiting opponent'}</span>`;
     }
     if (match.player1 && match.player2) {
-      if (isUserInMatch) {
-        return '<span class="match-status user-ready">🚀 Your Turn</span>';
-      }
-      return '<span class="match-status ready">⏳ Ready</span>';
+      return `<span class="match-status" data-state="${isUserInMatch ? 'user-ready' : 'ready'}">${isUserInMatch ? '🚀 Your turn' : '✅ Ready'}</span>`;
     }
-    return '<span class="match-status waiting">⌛ Waiting</span>';
+    return '<span class="match-status" data-state="waiting">⌛ Pending</span>';
   }
 
   private getMatchActionsHTML(match: TournamentMatch, isActive: boolean, isPending: boolean, isUserInMatch: boolean): string {
@@ -725,16 +470,11 @@ export class TournamentBracket {
     const resolvedUserId = this.resolveUserIdFromRecord(currentUser) || this.currentUserId;
 
     if (match.isComplete) {
-      // No button for completed matches - auto-polling will handle advancement
       if (resolvedUserId && this.doesPlayerMatchUser(match.winner, resolvedUserId)) {
         return `
           <div class="match-actions">
-            <div class="winner-info">
-              <span class="winner-text">🏆 You won this match!</span>
-            </div>
-            <div style="color: #64748b; font-size: 12px; margin-top: 8px;">
-              Waiting for next round to begin...
-            </div>
+            <div class="action-message action-message--success">🏆 You won this match</div>
+            <span class="action-subtext">Waiting for the next round...</span>
           </div>
         `;
       }
@@ -742,64 +482,55 @@ export class TournamentBracket {
     }
 
     if (waitingForOpponent) {
-      if (isUserInMatch) {
-        return `
-          <div class="match-actions">
-            <div class="auto-start-info">
-              <span class="auto-start-text">⌛ Waiting for your opponent to finish their match...</span>
-            </div>
-          </div>
-        `;
-      }
-
       return `
         <div class="match-actions">
-          <div class="auto-start-info">
-            <span class="auto-start-text">⌛ Awaiting opponent assignment</span>
-          </div>
+          <div class="action-message">${isUserInMatch ? '⌛ Waiting for your opponent to be ready...' : '⌛ Awaiting opponent assignment'}</div>
         </div>
       `;
     }
-/*
-    if (isActive && isUserInMatch) {
-      const matchData = JSON.stringify(match).replace(/"/g, '&quot;');
+
+    if (!hasPlayer1 && !hasPlayer2) {
       return `
         <div class="match-actions">
-          <div class="auto-start-info">
-            <span class="auto-start-text">🎮 Your match is ready!</span>
+          <div class="action-message action-message--muted">Players will populate shortly</div>
+        </div>
+      `;
+    }
+
+    if (isActive) {
+      if (isUserInMatch) {
+        return `
+          <div class="match-actions">
+            <button type="button" class="btn-view-match" data-match-id="${match.id}">
+              👀 Rejoin match
+            </button>
           </div>
-          <button class="btn-start-match" onclick="this.dispatchEvent(new CustomEvent('tournamentMatchStartRequest', {bubbles: true, detail: {match: ${matchData}}}))">
-            Start Match
-          </button>
+        `;
+      }
+      return `
+        <div class="match-actions">
+          <div class="action-message action-message--muted">Match in progress</div>
         </div>
       `;
     }
 
     if (isPending && isUserInMatch) {
-      const matchData = JSON.stringify(match).replace(/"/g, '&quot;');
       return `
         <div class="match-actions">
-          <div class="auto-start-info">
-            <span class="auto-start-text">🚀 Your turn to play!</span>
-          </div>
-          <button class="btn-start-match" onclick="this.dispatchEvent(new CustomEvent('tournamentMatchStartRequest', {bubbles: true, detail: {match: ${matchData}}}))">
-            Start Match
+          <button type="button" class="btn-start-match" data-match-id="${match.id}">
+            🚀 Start match
           </button>
         </div>
       `;
     }
 
-    if (isPending) {
-      const matchData = JSON.stringify(match).replace(/"/g, '&quot;');
+    if (isPending && !isUserInMatch) {
       return `
         <div class="match-actions">
-          <button class="btn-start-match" onclick="this.dispatchEvent(new CustomEvent('tournamentMatchStartRequest', {bubbles: true, detail: {match: ${matchData}}}))">
-            Start Match
-          </button>
+          <div class="action-message action-message--muted">Players are preparing to start</div>
         </div>
       `;
     }
-      */
 
     return '';
   }
@@ -814,32 +545,606 @@ export class TournamentBracket {
     }
   }
 
-  private generatePlayerHTML(player: TournamentPlayer | undefined, score: number | undefined, winner: TournamentPlayer | undefined): string {
+  private generatePlayerHTML(
+    player: TournamentPlayer | undefined,
+    score: number | undefined,
+    winner: TournamentPlayer | undefined,
+    resolvedUserId: string | null | undefined
+  ): string {
     if (!player) {
       return `
-        <div class="player tbd-player">
-          <span class="player-name">TBD</span>
+        <div class="match-player is-placeholder">
+          <div class="player-info">
+            <div class="player-name">
+              <span class="player-avatar">?</span>
+              <span>${this.escapeHtml('TBD')}</span>
+            </div>
+            <span class="player-status">TBD</span>
+          </div>
           <span class="player-score">-</span>
         </div>
       `;
     }
-    
+
     const isWinner = Boolean(winner && this.areSamePlayer(winner, player));
     const isLoser = Boolean(winner && !this.areSamePlayer(winner, player));
-    const isCurrentUser = this.doesPlayerMatchUser(player, this.currentUserId);
-    const playerClass = isWinner ? 'winner' : (isLoser ? 'loser' : '');
-    const currentUserClass = isCurrentUser ? 'current-user' : '';
-    const aiIcon = player.isAI ? '🤖 ' : '';
-    const youBadge = isCurrentUser ? '<span style="margin-left: 6px; padding: 2px 8px; background: #84cc16; color: black; font-size: 10px; font-weight: bold; border-radius: 4px;">YOU</span>' : '';
-    const offlineText = !player.isOnline && !player.isAI ? ' (offline)' : '';
-    
+    const isCurrentUser = Boolean(resolvedUserId && this.doesPlayerMatchUser(player, resolvedUserId));
+    const statusTokens: string[] = [];
+
+    if (player.isAI) {
+      statusTokens.push(player.aiLevel ? `${player.aiLevel.charAt(0).toUpperCase()}${player.aiLevel.slice(1)} bot` : 'AI opponent');
+    }
+
+    if (!player.isOnline && !player.isAI) {
+      statusTokens.push('Offline');
+    }
+
+    const statusHtml = statusTokens.length ? `<span class="player-status">${statusTokens.join(' • ')}</span>` : '';
+    const scoreDisplay = typeof score === 'number' ? score : '-';
+    const initial = player.name ? player.name.trim().charAt(0).toUpperCase() : '?';
+    const avatarUrl = player.avatar ? encodeURI(player.avatar) : null;
+    const avatar = avatarUrl
+      ? `<span class="player-avatar player-avatar--image" style="background-image: url('${avatarUrl}');"></span>`
+      : `<span class="player-avatar">${initial}</span>`;
+
+    const badges: string[] = [];
+    if (isCurrentUser) {
+      badges.push('<span class="player-badge player-badge--you">YOU</span>');
+    }
+    if (player.isAI) {
+      badges.push('<span class="player-badge player-badge--ai">AI</span>');
+    }
+
+    const classes = ['match-player'];
+    if (isWinner) {
+      classes.push('is-winner');
+    } else if (isLoser) {
+      classes.push('is-loser');
+    }
+    if (isCurrentUser) {
+      classes.push('is-current');
+    }
+
     return `
-      <div class="player ${playerClass} ${currentUserClass}">
-        <span class="player-name">
-          ${aiIcon}${player.name}${offlineText}${youBadge}
-        </span>
-        <span class="player-score">${score !== undefined ? score : '-'}</span>
+      <div class="${classes.join(' ')}">
+        <div class="player-info">
+          <div class="player-name">
+            ${avatar}
+            <span>${this.escapeHtml(player.name)}</span>
+            ${badges.join('')}
+          </div>
+          ${statusHtml}
+        </div>
+        <span class="player-score">${scoreDisplay}</span>
       </div>
+    `;
+  }
+
+  private escapeHtml(value: string | null | undefined): string {
+    if (!value) {
+      return '';
+    }
+
+    return value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  private generateBracketStyles(): string {
+    return `
+      <style>
+        .tournament-bracket {
+          font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+          background: none;
+        }
+
+        .tournament-bracket-ui {
+          --round-count: 3;
+          --round-gap: clamp(24px, 3vw, 40px);
+          --connector-color: rgba(148, 163, 184, 0.32);
+          position: relative;
+          color: #e2e8f0;
+          background:
+            radial-gradient(circle at top left, rgba(132, 204, 22, 0.15), transparent 45%),
+            radial-gradient(circle at top right, rgba(56, 189, 248, 0.12), transparent 40%),
+            linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(15, 23, 42, 0.98));
+          border-radius: 28px;
+          padding: 32px clamp(24px, 4vw, 40px);
+          border: 1px solid rgba(148, 163, 184, 0.25);
+          box-shadow: 0 32px 56px rgba(15, 23, 42, 0.45);
+          overflow: hidden;
+        }
+
+        .tournament-bracket-ui::after {
+          content: '';
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          background: radial-gradient(circle at center, rgba(132, 204, 22, 0.08), transparent 60%);
+          opacity: 0.6;
+        }
+
+        .bracket-header {
+          position: relative;
+          z-index: 1;
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          gap: 24px;
+          flex-wrap: wrap;
+          margin-bottom: 28px;
+        }
+
+        .header-titles {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          min-width: 240px;
+        }
+
+        .bracket-title {
+          margin: 0;
+          font-size: clamp(26px, 3vw, 32px);
+          font-weight: 800;
+          letter-spacing: -0.02em;
+          color: #f8fafc;
+        }
+
+        .bracket-subtitle {
+          margin: 0;
+          font-size: 13px;
+          text-transform: uppercase;
+          letter-spacing: 0.14em;
+          color: rgba(148, 163, 184, 0.85);
+        }
+
+        .bracket-meta {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          flex-wrap: wrap;
+        }
+
+        .status-chip,
+        .info-chip {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 6px 12px;
+          border-radius: 999px;
+          font-size: 12px;
+          font-weight: 600;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          border: 1px solid rgba(148, 163, 184, 0.25);
+          background: rgba(15, 23, 42, 0.65);
+          color: rgba(226, 232, 240, 0.92);
+        }
+
+        .status-chip--waiting {
+          border-color: rgba(148, 163, 184, 0.35);
+        }
+
+        .status-chip--active {
+          border-color: rgba(251, 146, 60, 0.45);
+          background: rgba(251, 146, 60, 0.18);
+          color: #fb923c;
+        }
+
+        .status-chip--completed {
+          border-color: rgba(34, 197, 94, 0.45);
+          background: rgba(34, 197, 94, 0.2);
+          color: #22c55e;
+        }
+
+        .info-chip--winner {
+          border-color: rgba(132, 204, 22, 0.55);
+          background: rgba(132, 204, 22, 0.18);
+          color: #84cc16;
+        }
+
+        .info-chip--muted {
+          border-color: rgba(148, 163, 184, 0.25);
+          color: rgba(148, 163, 184, 0.7);
+        }
+
+        .bracket-grid {
+          position: relative;
+          z-index: 1;
+          display: grid;
+          grid-template-columns: repeat(var(--round-count), minmax(220px, 1fr));
+          gap: var(--round-gap);
+          overflow-x: auto;
+          padding-bottom: 12px;
+        }
+
+        .bracket-column {
+          position: relative;
+          min-width: min(260px, 100%);
+          display: flex;
+          flex-direction: column;
+          gap: clamp(20px, 2.4vw, 36px);
+        }
+
+        .round-label {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          align-self: flex-start;
+          padding: 8px 14px;
+          border-radius: 999px;
+          border: 1px solid rgba(148, 163, 184, 0.3);
+          background: rgba(15, 23, 42, 0.65);
+          font-size: 12px;
+          font-weight: 700;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+          color: rgba(226, 232, 240, 0.85);
+        }
+
+        .round-icon {
+          font-size: 16px;
+        }
+
+        .round-matches {
+          display: flex;
+          flex-direction: column;
+          gap: clamp(24px, 3.5vw, 56px);
+        }
+
+        .match-card {
+          position: relative;
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+          padding: clamp(16px, 2vw, 20px);
+          background: rgba(15, 23, 42, 0.78);
+          border: 1px solid rgba(148, 163, 184, 0.28);
+          border-radius: 18px;
+          box-shadow: 0 14px 28px rgba(15, 23, 42, 0.35);
+          transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+        }
+
+        .match-card:hover {
+          transform: translateY(-4px);
+          border-color: rgba(148, 163, 184, 0.42);
+          box-shadow: 0 18px 32px rgba(15, 23, 42, 0.45);
+        }
+
+        .match-card.is-user-match {
+          border-color: rgba(132, 204, 22, 0.75);
+          box-shadow: 0 18px 36px rgba(132, 204, 22, 0.2);
+        }
+
+        .match-card.is-active {
+          border-color: rgba(249, 115, 22, 0.75);
+          box-shadow: 0 18px 36px rgba(249, 115, 22, 0.22);
+        }
+
+        .match-card.is-ready {
+          border-color: rgba(56, 189, 248, 0.5);
+          background: rgba(56, 189, 248, 0.12);
+        }
+
+        .match-card.is-complete {
+          border-color: rgba(34, 197, 94, 0.65);
+          background: linear-gradient(145deg, rgba(34, 197, 94, 0.2), rgba(15, 23, 42, 0.78));
+        }
+
+        .match-card.is-waiting {
+          opacity: 0.88;
+        }
+
+        .match-card.is-placeholder {
+          border-style: dashed;
+          color: rgba(148, 163, 184, 0.7);
+          background: rgba(15, 23, 42, 0.45);
+        }
+
+        .match-card.has-connector::after {
+          content: '';
+          position: absolute;
+          top: 50%;
+          right: -28px;
+          width: 28px;
+          height: 2px;
+          background: var(--connector-color);
+        }
+
+        .match-card.connector-top::before,
+        .match-card.connector-bottom::before {
+          content: '';
+          position: absolute;
+          right: -28px;
+          width: 2px;
+          background: var(--connector-color);
+        }
+
+        .match-card.connector-top::before {
+          top: 50%;
+          height: calc(50% + clamp(10px, 3vw, 32px));
+          transform: translateY(-100%);
+        }
+
+        .match-card.connector-bottom::before {
+          bottom: 50%;
+          height: calc(50% + clamp(10px, 3vw, 32px));
+          transform: translateY(100%);
+        }
+
+        .match-meta {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          font-size: 11px;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+          color: rgba(148, 163, 184, 0.85);
+        }
+
+        .match-label {
+          font-weight: 700;
+        }
+
+        .match-status {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 4px 10px;
+          border-radius: 999px;
+          border: 1px solid rgba(148, 163, 184, 0.35);
+          background: rgba(15, 23, 42, 0.6);
+          font-weight: 700;
+        }
+
+        .match-status[data-state="active"] {
+          color: #fb923c;
+          border-color: rgba(251, 146, 60, 0.5);
+          background: rgba(251, 146, 60, 0.18);
+        }
+
+        .match-status[data-state="completed"] {
+          color: #22c55e;
+          border-color: rgba(34, 197, 94, 0.5);
+          background: rgba(34, 197, 94, 0.2);
+        }
+
+        .match-status[data-state="ready"],
+        .match-status[data-state="user-ready"] {
+          color: #38bdf8;
+          border-color: rgba(56, 189, 248, 0.48);
+          background: rgba(56, 189, 248, 0.18);
+        }
+
+        .match-status[data-state="user-ready"] {
+          color: #84cc16;
+          border-color: rgba(132, 204, 22, 0.5);
+          background: rgba(132, 204, 22, 0.2);
+        }
+
+        .match-status[data-state="waiting"] {
+          color: rgba(148, 163, 184, 0.85);
+        }
+
+        .match-players {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+
+        .match-player {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          padding: 12px 16px;
+          border-radius: 12px;
+          border: 1px solid rgba(148, 163, 184, 0.28);
+          background: rgba(15, 23, 42, 0.7);
+          transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+        }
+
+        .match-player.is-current {
+          border-color: rgba(132, 204, 22, 0.75);
+          box-shadow: 0 0 18px rgba(132, 204, 22, 0.25);
+        }
+
+        .match-player.is-winner {
+          border-color: rgba(34, 197, 94, 0.5);
+          background: rgba(34, 197, 94, 0.18);
+        }
+
+        .match-player.is-loser {
+          opacity: 0.6;
+        }
+
+        .match-player.is-placeholder {
+          border-style: dashed;
+          color: rgba(148, 163, 184, 0.7);
+          background: rgba(15, 23, 42, 0.45);
+        }
+
+        .player-info {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+        }
+
+        .player-name {
+          display: inline-flex;
+          align-items: center;
+          gap: 10px;
+          font-weight: 600;
+          color: #f8fafc;
+        }
+
+        .player-avatar {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 32px;
+          height: 32px;
+          border-radius: 50%;
+          background: rgba(148, 163, 184, 0.25);
+          font-size: 14px;
+          font-weight: 700;
+          letter-spacing: 0.04em;
+        }
+
+        .player-avatar--image {
+          background-size: cover;
+          background-position: center;
+          border: 2px solid rgba(148, 163, 184, 0.35);
+        }
+
+        .player-badge {
+          display: inline-flex;
+          align-items: center;
+          padding: 2px 8px;
+          border-radius: 999px;
+          font-size: 10px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.12em;
+        }
+
+        .player-badge--you {
+          background: rgba(132, 204, 22, 0.92);
+          color: #0f172a;
+        }
+
+        .player-badge--ai {
+          background: rgba(56, 189, 248, 0.88);
+          color: #0f172a;
+        }
+
+        .player-status {
+          font-size: 10px;
+          text-transform: uppercase;
+          letter-spacing: 0.14em;
+          color: rgba(148, 163, 184, 0.78);
+        }
+
+        .player-score {
+          font-size: 20px;
+          font-weight: 700;
+          min-width: 32px;
+          text-align: right;
+          color: #f8fafc;
+        }
+
+        .match-actions {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+          border-top: 1px solid rgba(148, 163, 184, 0.22);
+          padding-top: 12px;
+        }
+
+        .action-message {
+          font-size: 12px;
+          color: rgba(148, 163, 184, 0.85);
+        }
+
+        .action-message--success {
+          color: #84cc16;
+          font-weight: 600;
+        }
+
+        .action-message--muted {
+          color: rgba(148, 163, 184, 0.7);
+        }
+
+        .action-subtext {
+          font-size: 11px;
+          color: rgba(148, 163, 184, 0.75);
+        }
+
+        .btn-start-match,
+        .btn-view-match {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          padding: 10px 16px;
+          border-radius: 10px;
+          border: none;
+          font-weight: 700;
+          font-size: 14px;
+          cursor: pointer;
+          transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .btn-start-match {
+          background: linear-gradient(135deg, #84cc16, #65a30d);
+          color: #0f172a;
+        }
+
+        .btn-view-match {
+          background: linear-gradient(135deg, #38bdf8, #2563eb);
+          color: #f8fafc;
+        }
+
+        .btn-start-match:hover,
+        .btn-view-match:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 12px 22px rgba(15, 23, 42, 0.35);
+        }
+
+        @media (max-width: 1024px) {
+          .tournament-bracket-ui {
+            padding: 28px;
+          }
+
+          .bracket-grid {
+            grid-template-columns: repeat(var(--round-count), minmax(220px, 1fr));
+          }
+        }
+
+        @media (max-width: 720px) {
+          .tournament-bracket-ui {
+            padding: 24px;
+          }
+
+          .bracket-header {
+            flex-direction: column;
+            align-items: flex-start;
+          }
+
+          .bracket-grid {
+            grid-auto-flow: column;
+            overflow-x: auto;
+          }
+
+          .match-card.has-connector::after,
+          .match-card.connector-top::before,
+          .match-card.connector-bottom::before {
+            display: none;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .tournament-bracket-ui {
+            padding: 20px;
+            border-radius: 20px;
+          }
+
+          .player-name {
+            font-size: 13px;
+          }
+
+          .player-status {
+            font-size: 9px;
+          }
+
+          .player-score {
+            font-size: 18px;
+          }
+        }
+      </style>
     `;
   }
 
