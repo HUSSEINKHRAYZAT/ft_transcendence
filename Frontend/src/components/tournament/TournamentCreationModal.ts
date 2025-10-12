@@ -2,7 +2,7 @@
  * Tournament Creation Modal
  *
  * Allows users to create tournaments with:
- * - Size selection (4, 8, or 16 players)
+ * - Size selection (4 or 8 players)
  * - Auto-start timer (optional)
  * - Share via link or QR code
  */
@@ -111,10 +111,9 @@ export class TournamentCreationModal {
           <!-- Size Selection -->
           <div>
             <label class="block text-sm font-medium text-gray-300 mb-3">${t('Tournament Size')}</label>
-            <div class="grid grid-cols-3 gap-4">
+            <div class="grid grid-cols-2 gap-4">
               ${this.getSizeButtonHTML(4)}
               ${this.getSizeButtonHTML(8)}
-              ${this.getSizeButtonHTML(16)}
             </div>
             <p class="text-xs text-gray-400 mt-2">${t('Choose the number of players for your tournament')}</p>
           </div>
@@ -189,8 +188,8 @@ export class TournamentCreationModal {
     switch (size) {
       case 4: return 2;
       case 8: return 3;
-      case 16: return 4;
     }
+    return 2;
   }
 
   // ==================== EVENT LISTENERS ====================

@@ -96,7 +96,7 @@ export type TournamentPlayerTS = Static<typeof TournamentPlayer>;
 export type TournamentMatchTS = Static<typeof TournamentMatch>;
 export declare const CreateTournamentBody: import("@sinclair/typebox").TObject<{
     name: import("@sinclair/typebox").TString;
-    size: import("@sinclair/typebox").TUnion<[import("@sinclair/typebox").TLiteral<4>, import("@sinclair/typebox").TLiteral<8>, import("@sinclair/typebox").TLiteral<16>]>;
+    size: import("@sinclair/typebox").TUnion<[import("@sinclair/typebox").TLiteral<4>, import("@sinclair/typebox").TLiteral<8>]>;
     isPublic: import("@sinclair/typebox").TBoolean;
     allowSpectators: import("@sinclair/typebox").TBoolean;
     createdBy: import("@sinclair/typebox").TString;

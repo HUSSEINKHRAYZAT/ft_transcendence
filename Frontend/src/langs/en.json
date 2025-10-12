@@ -509,7 +509,6 @@
   "Real-time Web socket multiplayer": "Real-time Web socket multiplayer",
   "Size:": "Size:",
   "8 Players": "8 Players",
-  "16 Players": "16 Players",
   "Create Tournament": "Create Tournament",
   "Join Tournament": "Join Tournament",
   "Results saved to database": "Results saved to database",
@@ -540,5 +539,4 @@
   "Enter the 6-character tournament code": "Enter the 6-character tournament code",
   "No blocked users" : "No blocked users"
 }
-
 

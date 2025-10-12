@@ -38,7 +38,7 @@ export interface ServerTournamentMatch {
 export interface ServerTournamentState {
   id: string;
   name: string;
-  size: 4 | 8 | 16;
+  size: 4 | 8;
   status: 'waiting' | 'active' | 'completed';
   players: ServerTournamentPlayer[];
   matches: ServerTournamentMatch[];

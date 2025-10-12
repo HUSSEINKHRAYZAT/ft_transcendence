@@ -30,7 +30,7 @@ interface WSMessage {
 
 type WSClient = WebSocket & { _id?: string };
 
-type TournamentSize = 4 | 8 | 16;
+type TournamentSize = 4 | 8;
 type TournamentStatus = 'waiting' | 'active' | 'completed';
 type MatchStatus = 'pending' | 'active' | 'completed';
 
@@ -242,6 +242,11 @@ function handleTournamentStart(tournamentId: string): void {
     return;
   }
 
+  if (tournament.players.length < tournament.size) {
+    console.log(`⚠️ Cannot start tournament ${tournament.code} - waiting for ${tournament.size - tournament.players.length} more player(s) (current ${tournament.players.length}/${tournament.size})`);
+    return;
+  }
+
   // Build bracket
   tournament.matches = buildNewTournamentBracket(tournament);
   tournament.status = 'active';
@@ -371,7 +376,7 @@ function handleRoundCompletion(tournament: any): void {
     if (i % 2 === 0) {
       // First match of pair -> player1 of next match
       if (!nextMatch.player1) {
-        nextMatch.player1 = winner;
+        nextMatch.player1 = { ...winner };
         console.log(`✅ Match ${i} winner ${winner.name} -> Round ${nextRound} Match ${nextMatchIndex} slot 1`);
       } else if (nextMatch.player1.id !== winner.id) {
         console.warn(`⚠️ Slot 1 already occupied by ${nextMatch.player1.name}, cannot assign ${winner.name}`);
@@ -381,7 +386,7 @@ function handleRoundCompletion(tournament: any): void {
     } else {
       // Second match of pair -> player2 of next match
       if (!nextMatch.player2) {
-        nextMatch.player2 = winner;
+        nextMatch.player2 = { ...winner };
         console.log(`✅ Match ${i} winner ${winner.name} -> Round ${nextRound} Match ${nextMatchIndex} slot 2`);
       } else if (nextMatch.player2.id !== winner.id) {
         console.warn(`⚠️ Slot 2 already occupied by ${nextMatch.player2.name}, cannot assign ${winner.name}`);
@@ -389,6 +394,23 @@ function handleRoundCompletion(tournament: any): void {
         console.log(`ℹ️ ${winner.name} already assigned to Round ${nextRound} Match ${nextMatchIndex} slot 2`);
       }
     }
+
+    const hasPlayer1 = Boolean(nextMatch.player1);
+    const hasPlayer2 = Boolean(nextMatch.player2);
+    nextMatch.waitingForOpponent = !(hasPlayer1 && hasPlayer2);
+
+    if (nextMatch.status === 'completed') {
+      nextMatch.status = 'pending';
+      delete nextMatch.completedAt;
+    }
+
+    if (nextMatch.readyPlayers && nextMatch.readyPlayers instanceof Set) {
+      nextMatch.readyPlayers.clear();
+    }
+
+    delete nextMatch.startedAt;
+
+    console.log(`📡 Next match ${nextMatch.id} state: player1=${nextMatch.player1?.name || 'null'} (${nextMatch.player1?.id || 'none'}), player2=${nextMatch.player2?.name || 'null'} (${nextMatch.player2?.id || 'none'}), waitingForOpponent=${nextMatch.waitingForOpponent}`);
   }
 
   // Notify losers (eliminated)
@@ -405,6 +427,9 @@ function handleRoundCompletion(tournament: any): void {
       });
     }
   }
+
+  // Push updated bracket state so clients see newly assigned players immediately
+  broadcastTournamentState(tournament);
 
   // Check if tournament is complete
   // Tournament is complete only when:
@@ -537,8 +562,6 @@ function totalRoundsForSize(size: TournamentSize): number {
       return 2;
     case 8:
       return 3;
-    case 16:
-      return 4;
     default:
       return 2;
   }
@@ -1204,7 +1227,7 @@ function handleMessage(playerId: string, ws: WSClient, msg: WSMessage): void {
       }
 
       const sizeValue = Number(msg.size);
-      const size: TournamentSize = sizeValue === 16 ? 16 : sizeValue === 8 ? 8 : 4;
+      const size: TournamentSize = sizeValue === 8 ? 8 : 4;
       const maxGoals = 5; // Always 5 goals
       const autoStartMinutes = Number(msg.autoStartMinutes) || 5;
 
@@ -1323,6 +1346,28 @@ function handleMessage(playerId: string, ws: WSClient, msg: WSMessage): void {
 
     case 'start_new_tournament': {
       const tournamentId = String(msg.tournamentId || '').trim();
+      const tournament = tournaments.get(tournamentId);
+
+      if (!tournament) {
+        sendToSocket(ws, { type: 'tournament_error', reason: 'tournament_not_found' });
+        break;
+      }
+
+      if (tournament.status !== 'waiting') {
+        sendToSocket(ws, { type: 'tournament_error', reason: 'tournament_already_started' });
+        break;
+      }
+
+      if (tournament.players.length < tournament.size) {
+        sendToSocket(ws, {
+          type: 'tournament_error',
+          reason: 'tournament_not_full',
+          required: tournament.size,
+          current: tournament.players.length
+        });
+        break;
+      }
+
       handleTournamentStart(tournamentId);
       break;
     }
@@ -1440,7 +1485,7 @@ function handleMessage(playerId: string, ws: WSClient, msg: WSMessage): void {
 
       const name = (msg.name && String(msg.name).trim()) || 'New Tournament';
       const sizeValue = Number(msg.size);
-      const size: TournamentSize = sizeValue === 16 ? 16 : sizeValue === 8 ? 8 : 4;
+      const size: TournamentSize = sizeValue === 8 ? 8 : 4;
 
       let tournamentId = generateTournamentId();
       while (tournaments.has(tournamentId)) {

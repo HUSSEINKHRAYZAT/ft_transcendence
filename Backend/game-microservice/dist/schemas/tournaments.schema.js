@@ -42,7 +42,7 @@ exports.Tournament = typebox_1.Type.Object({
 });
 exports.CreateTournamentBody = typebox_1.Type.Object({
     name: typebox_1.Type.String({ minLength: 1, maxLength: 100 }),
-    size: typebox_1.Type.Union([typebox_1.Type.Literal(4), typebox_1.Type.Literal(8), typebox_1.Type.Literal(16)]),
+    size: typebox_1.Type.Union([typebox_1.Type.Literal(4), typebox_1.Type.Literal(8)]),
     isPublic: typebox_1.Type.Boolean(),
     allowSpectators: typebox_1.Type.Boolean(),
     createdBy: typebox_1.Type.String(),

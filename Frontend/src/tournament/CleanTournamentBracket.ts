@@ -2,7 +2,7 @@
  * Clean Tournament Bracket Display Component
  * 
  * Features:
- * - Displays bracket for 4, 8, 16 player tournaments
+ * - Displays bracket for 4 or 8 player tournaments
  * - Real-time updates as matches complete
  * - Winner auto-advancement visualization
  * - Eliminated player indicators
@@ -36,7 +36,7 @@ export interface TournamentBracket {
   id: number;
   code: string;
   name: string;
-  size: 4 | 8 | 16;
+  size: 4 | 8;
   status: 'waiting' | 'active' | 'completed';
   currentRound: number;
   winnerId: string | null;
@@ -118,7 +118,6 @@ export class CleanTournamentBracket {
     if (roundsFromEnd === 1) return 'Final';
     if (roundsFromEnd === 2) return 'Semifinals';
     if (roundsFromEnd === 3) return 'Quarterfinals';
-    if (roundsFromEnd === 4) return 'Round of 16';
     
     return `Round ${round}`;
   }

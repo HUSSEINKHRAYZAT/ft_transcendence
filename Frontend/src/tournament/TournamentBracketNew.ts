@@ -29,7 +29,7 @@ export interface TournamentMatch {
 export interface TournamentBracketData {
   tournamentId: string;
   name: string;
-  size: 4 | 8 | 16;
+  size: 4 | 8;
   players: TournamentPlayer[];
   matches: TournamentMatch[];
   currentRound: number;
@@ -120,13 +120,10 @@ export class TournamentBracketNew {
     if (totalRounds === 2) {
       // 4-player tournament
       return this.generate4PlayerBracket(semifinals, finals);
-    } else if (totalRounds === 3) {
-      // 8-player tournament
-      return this.generate8PlayerBracket(rounds);
-    } else {
-      // 16-player tournament
-      return this.generate16PlayerBracket(rounds);
     }
+
+    // 8-player tournament
+    return this.generate8PlayerBracket(rounds);
   }
 
   private generate4PlayerBracket(semifinals: TournamentMatch[], finals: TournamentMatch[]): string {
@@ -188,11 +185,6 @@ export class TournamentBracketNew {
   private generate8PlayerBracket(rounds: TournamentMatch[][]): string {
     // Quarterfinals → Semifinals → Final
     return `<div class="bracket-8player">8-player bracket (to be implemented)</div>`;
-  }
-
-  private generate16PlayerBracket(rounds: TournamentMatch[][]): string {
-    // Round 1 → Quarterfinals → Semifinals → Final
-    return `<div class="bracket-16player">16-player bracket (to be implemented)</div>`;
   }
 
   private generateMatchCard(match: TournamentMatch | undefined, position: 'top' | 'middle' | 'bottom'): string {

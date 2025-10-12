@@ -9,7 +9,7 @@ import { TournamentBracketData, TournamentPlayer, TournamentMatch } from './Tour
 
 export interface CreateTournamentRequest {
   name: string;
-  size: 4 | 8 | 16;
+  size: 4 | 8;
   isPublic: boolean;
   allowSpectators: boolean;
 }
@@ -23,7 +23,7 @@ export interface JoinTournamentRequest {
 export interface TournamentListItem {
   id: string;
   name: string;
-  size: 4 | 8 | 16;
+  size: 4 | 8;
   currentPlayers: number;
   status: 'waiting' | 'active' | 'completed';
   createdBy: string;
@@ -619,9 +619,9 @@ export class TournamentService {
   }
 
   public static canStartTournament(tournament: TournamentBracketData): boolean {
-    // Only allow starting with real users (no AI)
+    // Only allow starting when all slots are filled with real users
     const realPlayers = tournament.players.filter(p => !p.isAI);
-    return realPlayers.length >= 2 && tournament.status === 'waiting';
+    return realPlayers.length >= tournament.size && tournament.status === 'waiting';
   }
 
   public static getNextMatch(tournament: TournamentBracketData): TournamentMatch | null {

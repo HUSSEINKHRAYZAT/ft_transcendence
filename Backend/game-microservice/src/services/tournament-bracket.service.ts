@@ -2,7 +2,7 @@
  * Clean Tournament Bracket System
  * 
  * Features:
- * - Automatic bracket generation for 4, 8, 16 players
+ * - Automatic bracket generation for 4 or 8 players
  * - Winner auto-advancement to next round
  * - Loser elimination (cannot play again)
  * - Single elimination tournament
@@ -38,7 +38,7 @@ export interface TournamentBracket {
   id: number;
   code: string;
   name: string;
-  size: 4 | 8 | 16;
+  size: 4 | 8;
   status: 'waiting' | 'active' | 'completed';
   currentRound: number;
   winnerId: string | null;
@@ -83,7 +83,6 @@ export function tournamentBracketService(app: FastifyInstance) {
     if (roundsFromEnd === 1) return 'Final';
     if (roundsFromEnd === 2) return 'Semifinals';
     if (roundsFromEnd === 3) return 'Quarterfinals';
-    if (roundsFromEnd === 4) return 'Round of 16';
     
     return `Round ${round}`;
   }

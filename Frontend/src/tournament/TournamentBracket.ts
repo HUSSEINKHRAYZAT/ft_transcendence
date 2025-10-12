@@ -30,7 +30,7 @@ export interface TournamentMatch {
 export interface TournamentBracketData {
   tournamentId: string;
   name: string;
-  size: 4 | 8 | 16;
+  size: 4 | 8;
   players: TournamentPlayer[];
   matches: TournamentMatch[];
   currentRound: number;
@@ -338,8 +338,7 @@ export class TournamentBracket {
   private getRoundLabel(roundIndex: number, totalRounds: number): string {
     const labelsByRounds: Record<number, string[]> = {
       2: ['Semifinals', 'Final'],
-      3: ['Quarterfinals', 'Semifinals', 'Final'],
-      4: ['Round of 16', 'Quarterfinals', 'Semifinals', 'Final']
+      3: ['Quarterfinals', 'Semifinals', 'Final']
     };
 
     const labels = labelsByRounds[totalRounds] ?? Array.from({ length: totalRounds }, (_, i) => `Round ${i + 1}`);
@@ -501,9 +500,7 @@ export class TournamentBracket {
       if (isUserInMatch) {
         return `
           <div class="match-actions">
-            <button type="button" class="btn-view-match" data-match-id="${match.id}">
-              👀 Rejoin match
-            </button>
+            <div class="action-message action-message--muted">Match in progress</div>
           </div>
         `;
       }
@@ -1443,7 +1440,7 @@ export class TournamentBracket {
   // Method to generate initial bracket from player list
   public static generateInitialBracket(
     tournamentId: string, 
-    size: 4 | 8 | 16, 
+    size: 4 | 8, 
     players: TournamentPlayer[], 
     createdBy: string,
     name: string = 'Tournament',
@@ -1471,7 +1468,7 @@ export class TournamentBracket {
     }
     
     // Generate subsequent rounds (empty for now)
-    const totalRounds = size === 16 ? 4 : size === 8 ? 3 : 2;
+    const totalRounds = size === 8 ? 3 : 2;
     for (let round = 2; round <= totalRounds; round++) {
       const matchesInRound = Math.pow(2, totalRounds - round);
       for (let i = 0; i < matchesInRound; i++) {

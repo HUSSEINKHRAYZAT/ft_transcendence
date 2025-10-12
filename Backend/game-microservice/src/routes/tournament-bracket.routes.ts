@@ -24,8 +24,8 @@ export async function tournamentBracketRoutes(app: FastifyInstance) {
       const { name, size, createdBy, createdByName } = request.body as any;
 
       // Validate size
-      if (![4, 8, 16].includes(size)) {
-        return reply.code(400).send({ error: 'Tournament size must be 4, 8, or 16' });
+      if (![4, 8].includes(size)) {
+        return reply.code(400).send({ error: 'Tournament size must be 4 or 8' });
       }
 
       // Generate unique 6-character code

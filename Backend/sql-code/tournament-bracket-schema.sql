@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS tournaments (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   code TEXT UNIQUE NOT NULL,                    -- 6-character code (e.g., "ABC123")
   name TEXT NOT NULL,
-  size INTEGER NOT NULL CHECK (size IN (4, 8, 16)),
+  size INTEGER NOT NULL CHECK (size IN (4, 8)),
   status TEXT NOT NULL DEFAULT 'waiting' CHECK (status IN ('waiting', 'active', 'completed')),
   current_round INTEGER DEFAULT 1,
   winner_id TEXT,
@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS tournament_players (
 CREATE TABLE IF NOT EXISTS tournament_matches (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   tournament_id INTEGER NOT NULL,
-  round INTEGER NOT NULL,                       -- 1, 2, 3, 4
+  round INTEGER NOT NULL,                       -- 1, 2, 3
   match_number INTEGER NOT NULL,                -- Position in round (0-indexed)
   player1_id TEXT,                              -- NULL until both prerequisites complete
   player2_id TEXT,                              -- NULL until both prerequisites complete

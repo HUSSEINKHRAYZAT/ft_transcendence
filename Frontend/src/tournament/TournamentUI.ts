@@ -737,7 +737,6 @@ export class TournamentUI {
               <select id="tournament-size" class="form-select" required>
                 <option value="4">4 Players (2 rounds)</option>
                 <option value="8" selected>8 Players (3 rounds)</option>
-                <option value="16">16 Players (4 rounds)</option>
               </select>
             </div>
 
@@ -861,6 +860,11 @@ export class TournamentUI {
                 <button class="btn-start-tournament ${canStart ? 'enabled' : 'disabled'}" data-action="start-tournament" ${!canStart ? 'disabled' : ''}>
                   🚀 START TOURNAMENT
                 </button>
+                ${spotsRemaining > 0 ? `
+                  <p class="start-requirement" style="margin-top: 8px; color: #94a3b8; font-size: 14px;">
+                    Waiting for ${spotsRemaining} more player${spotsRemaining === 1 ? '' : 's'} to join
+                  </p>
+                ` : ''}
                 <div class="control-actions">
                   <button class="btn btn-primary" data-action="invite-friends">
                     🎯 Invite Players
@@ -1227,7 +1231,7 @@ export class TournamentUI {
     }
 
     const name = nameInput.value;
-    const size = parseInt(sizeSelect.value) as 4 | 8 | 16;
+    const size = parseInt(sizeSelect.value) as 4 | 8;
     const isPublic = publicCheck.checked;
     const allowSpectators = spectatorsCheck.checked;
 

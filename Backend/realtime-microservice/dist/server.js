@@ -139,6 +139,10 @@ function handleTournamentStart(tournamentId) {
         console.log(`⚠️ Cannot start tournament ${tournament.code} - not enough players`);
         return;
     }
+    if (tournament.players.length < tournament.size) {
+        console.log(`⚠️ Cannot start tournament ${tournament.code} - waiting for ${tournament.size - tournament.players.length} more player(s) (current ${tournament.players.length}/${tournament.size})`);
+        return;
+    }
     // Build bracket
     tournament.matches = buildNewTournamentBracket(tournament);
     tournament.status = 'active';
@@ -211,20 +215,63 @@ function handleRoundCompletion(tournament) {
     const currentRoundMatches = tournament.matches.filter((m) => m.round === tournament.currentRound && m.status === 'completed');
     const nextRound = tournament.currentRound + 1;
     const nextRoundMatches = tournament.matches.filter((m) => m.round === nextRound);
-    // Fill next round matches with winners
-    for (let i = 0; i < currentRoundMatches.length; i++) {
-        const completedMatch = currentRoundMatches[i];
+    // Fill next round matches with winners - FIXED: Only assign once per winner
+    // Sort current round matches by matchIndex to ensure consistent ordering
+    const sortedMatches = currentRoundMatches.sort((a, b) => a.matchIndex - b.matchIndex);
+    console.log(`🔄 Advancing winners from ${sortedMatches.length} matches to ${nextRoundMatches.length} next round matches`);
+    for (let i = 0; i < sortedMatches.length; i++) {
+        const completedMatch = sortedMatches[i];
         const winner = tournament.players.find((p) => p.id === completedMatch.winnerId);
+        if (!winner) {
+            console.warn(`⚠️ No winner found for match ${completedMatch.id} (winnerId: ${completedMatch.winnerId})`);
+            continue;
+        }
         const nextMatchIndex = Math.floor(i / 2);
         const nextMatch = nextRoundMatches[nextMatchIndex];
-        if (winner && nextMatch) {
-            if (i % 2 === 0) {
-                nextMatch.player1 = winner;
+        if (!nextMatch) {
+            console.warn(`⚠️ No next round match found at index ${nextMatchIndex}`);
+            continue;
+        }
+        // Assign winner to next match based on their position
+        // i=0,1 -> match 0; i=2,3 -> match 1; etc.
+        if (i % 2 === 0) {
+            // First match of pair -> player1 of next match
+            if (!nextMatch.player1) {
+                nextMatch.player1 = { ...winner };
+                console.log(`✅ Match ${i} winner ${winner.name} -> Round ${nextRound} Match ${nextMatchIndex} slot 1`);
+            }
+            else if (nextMatch.player1.id !== winner.id) {
+                console.warn(`⚠️ Slot 1 already occupied by ${nextMatch.player1.name}, cannot assign ${winner.name}`);
             }
             else {
-                nextMatch.player2 = winner;
+                console.log(`ℹ️ ${winner.name} already assigned to Round ${nextRound} Match ${nextMatchIndex} slot 1`);
             }
         }
+        else {
+            // Second match of pair -> player2 of next match
+            if (!nextMatch.player2) {
+                nextMatch.player2 = { ...winner };
+                console.log(`✅ Match ${i} winner ${winner.name} -> Round ${nextRound} Match ${nextMatchIndex} slot 2`);
+            }
+            else if (nextMatch.player2.id !== winner.id) {
+                console.warn(`⚠️ Slot 2 already occupied by ${nextMatch.player2.name}, cannot assign ${winner.name}`);
+            }
+            else {
+                console.log(`ℹ️ ${winner.name} already assigned to Round ${nextRound} Match ${nextMatchIndex} slot 2`);
+            }
+        }
+        const hasPlayer1 = Boolean(nextMatch.player1);
+        const hasPlayer2 = Boolean(nextMatch.player2);
+        nextMatch.waitingForOpponent = !(hasPlayer1 && hasPlayer2);
+        if (nextMatch.status === 'completed') {
+            nextMatch.status = 'pending';
+            delete nextMatch.completedAt;
+        }
+        if (nextMatch.readyPlayers && nextMatch.readyPlayers instanceof Set) {
+            nextMatch.readyPlayers.clear();
+        }
+        delete nextMatch.startedAt;
+        console.log(`📡 Next match ${nextMatch.id} state: player1=${nextMatch.player1?.name || 'null'} (${nextMatch.player1?.id || 'none'}), player2=${nextMatch.player2?.name || 'null'} (${nextMatch.player2?.id || 'none'}), waitingForOpponent=${nextMatch.waitingForOpponent}`);
     }
     // Notify losers (eliminated)
     for (const match of currentRoundMatches) {
@@ -239,8 +286,14 @@ function handleRoundCompletion(tournament) {
             });
         }
     }
+    // Push updated bracket state so clients see newly assigned players immediately
+    broadcastTournamentState(tournament);
     // Check if tournament is complete
-    if (nextRoundMatches.length === 0 || nextRoundMatches.every((m) => m.status === 'completed')) {
+    // Tournament is complete only when:
+    // 1. There are no next round matches (shouldn't happen with proper bracket)
+    // 2. OR we just completed the final round (only 1 match in current round)
+    const isFinalRound = currentRoundMatches.length === 1;
+    if (nextRoundMatches.length === 0 || isFinalRound) {
         // Tournament complete!
         const finalMatch = currentRoundMatches[0];
         tournament.status = 'completed';
@@ -352,8 +405,6 @@ function totalRoundsForSize(size) {
             return 2;
         case 8:
             return 3;
-        case 16:
-            return 4;
         default:
             return 2;
     }
@@ -914,7 +965,7 @@ function handleMessage(playerId, ws, msg) {
                 break;
             }
             const sizeValue = Number(msg.size);
-            const size = sizeValue === 16 ? 16 : sizeValue === 8 ? 8 : 4;
+            const size = sizeValue === 8 ? 8 : 4;
             const maxGoals = 5; // Always 5 goals
             const autoStartMinutes = Number(msg.autoStartMinutes) || 5;
             // Generate unique 6-character code
@@ -1012,6 +1063,24 @@ function handleMessage(playerId, ws, msg) {
         }
         case 'start_new_tournament': {
             const tournamentId = String(msg.tournamentId || '').trim();
+            const tournament = tournaments.get(tournamentId);
+            if (!tournament) {
+                sendToSocket(ws, { type: 'tournament_error', reason: 'tournament_not_found' });
+                break;
+            }
+            if (tournament.status !== 'waiting') {
+                sendToSocket(ws, { type: 'tournament_error', reason: 'tournament_already_started' });
+                break;
+            }
+            if (tournament.players.length < tournament.size) {
+                sendToSocket(ws, {
+                    type: 'tournament_error',
+                    reason: 'tournament_not_full',
+                    required: tournament.size,
+                    current: tournament.players.length
+                });
+                break;
+            }
             handleTournamentStart(tournamentId);
             break;
         }
@@ -1034,14 +1103,24 @@ function handleMessage(playerId, ws, msg) {
                 break;
             }
             if (foundMatch.status === 'completed') {
+                console.log(`ℹ️ Match ${matchId} already completed, ignoring duplicate completion`);
                 break; // Already completed
+            }
+            // Validate winnerId is one of the players
+            const isPlayer1Winner = foundMatch.player1?.id === winnerId;
+            const isPlayer2Winner = foundMatch.player2?.id === winnerId;
+            if (!isPlayer1Winner && !isPlayer2Winner) {
+                console.error(`❌ Invalid winnerId ${winnerId} for match ${matchId}. Players: ${foundMatch.player1?.id}, ${foundMatch.player2?.id}`);
+                sendToSocket(ws, { type: 'tournament_error', reason: 'invalid_winner' });
+                break;
             }
             // Mark match as completed
             foundMatch.status = 'completed';
             foundMatch.winnerId = winnerId;
             foundMatch.score = finalScore;
             foundMatch.completedAt = Date.now();
-            console.log(`🏆 Match completed: ${matchId}, winner: ${winnerId}`);
+            const winnerName = isPlayer1Winner ? foundMatch.player1?.name : foundMatch.player2?.name;
+            console.log(`🏆 Match ${matchId} completed in Round ${foundTournament.currentRound}: Winner = ${winnerName} (${winnerId})`);
             // Broadcast match completion
             broadcastToAll({
                 type: 'match_completed',
@@ -1050,8 +1129,12 @@ function handleMessage(playerId, ws, msg) {
             });
             // Check if round is complete
             const currentRoundMatches = foundTournament.matches.filter((m) => m.round === foundTournament.currentRound);
+            const completedCount = currentRoundMatches.filter((m) => m.status === 'completed').length;
+            const totalCount = currentRoundMatches.length;
+            console.log(`📊 Round ${foundTournament.currentRound} progress: ${completedCount}/${totalCount} matches completed`);
             const allRoundMatchesComplete = currentRoundMatches.every((m) => m.status === 'completed');
             if (allRoundMatchesComplete) {
+                console.log(`✅ All matches in Round ${foundTournament.currentRound} completed - advancing to next round`);
                 handleRoundCompletion(foundTournament);
             }
             break;
@@ -1085,7 +1168,7 @@ function handleMessage(playerId, ws, msg) {
             }
             const name = (msg.name && String(msg.name).trim()) || 'New Tournament';
             const sizeValue = Number(msg.size);
-            const size = sizeValue === 16 ? 16 : sizeValue === 8 ? 8 : 4;
+            const size = sizeValue === 8 ? 8 : 4;
             let tournamentId = generateTournamentId();
             while (tournaments.has(tournamentId)) {
                 tournamentId = generateTournamentId();
@@ -1282,6 +1365,7 @@ function handleMessage(playerId, ws, msg) {
                 // Notify both players
                 const player1SocketId = externalIdToPlayerId.get(player1Id) || player1Id;
                 const player2SocketId = externalIdToPlayerId.get(player2Id) || player2Id;
+                console.log(`📡 Looking for sockets: player1=${player1Id} -> socketId=${player1SocketId}, player2=${player2Id} -> socketId=${player2SocketId}`);
                 const readyPayload = {
                     type: 'both_players_ready',
                     tournamentId,
@@ -1290,11 +1374,20 @@ function handleMessage(playerId, ws, msg) {
                 };
                 const player1Socket = sockets.get(player1SocketId);
                 const player2Socket = sockets.get(player2SocketId);
+                console.log(`📡 Socket status: player1Socket=${player1Socket ? 'found' : 'NOT FOUND'}, player2Socket=${player2Socket ? 'found' : 'NOT FOUND'}`);
                 if (player1Socket && player1Socket.readyState === ws_1.WebSocket.OPEN) {
                     sendToSocket(player1Socket, readyPayload);
+                    console.log(`✅ Sent both_players_ready to player1 (${player1Id})`);
+                }
+                else {
+                    console.warn(`❌ Could not send to player1 (${player1Id}): socket ${player1Socket ? 'not open' : 'not found'}`);
                 }
                 if (player2Socket && player2Socket.readyState === ws_1.WebSocket.OPEN) {
                     sendToSocket(player2Socket, readyPayload);
+                    console.log(`✅ Sent both_players_ready to player2 (${player2Id})`);
+                }
+                else {
+                    console.warn(`❌ Could not send to player2 (${player2Id}): socket ${player2Socket ? 'not open' : 'not found'}`);
                 }
             }
             break;

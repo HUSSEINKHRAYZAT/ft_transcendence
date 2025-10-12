@@ -48,7 +48,7 @@ export type TournamentMatchTS = Static<typeof TournamentMatch>;
 
 export const CreateTournamentBody = Type.Object({
   name: Type.String({ minLength: 1, maxLength: 100 }),
-  size: Type.Union([Type.Literal(4), Type.Literal(8), Type.Literal(16)]),
+  size: Type.Union([Type.Literal(4), Type.Literal(8)]),
   isPublic: Type.Boolean(),
   allowSpectators: Type.Boolean(),
   createdBy: Type.String(),
