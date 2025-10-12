@@ -47,6 +47,13 @@ type TournamentResultSummary = {
   isWinner: boolean;
 };
 
+type RemoteMatchConclusionDetails = {
+  winnerName: string;
+  finalScores: number[];
+  displayNames?: string[];
+  reason?: string;
+};
+
 
 
 
@@ -1082,6 +1089,16 @@ this.rightWall = wall(
     }
   }
 
+  private isRemoteConnection(): boolean {
+    const connection = this.config.connection;
+    return (
+      connection === "remoteHost" ||
+      connection === "remoteGuest" ||
+      connection === "remote4Host" ||
+      connection === "remote4Guest"
+    );
+  }
+
   private initSocketIO() {
     if (!socketManager.connected) {
       console.error("Web socket not connected");
@@ -1145,40 +1162,49 @@ this.rightWall = wall(
       }
     });
 
-    socketManager.on("player_left", (playerId) => {
+    socketManager.on("player_left", async (playerId) => {
       console.log("Player left:", playerId);
       
       // Only end the active game if it's in progress
       if (this.gameState.matchReady) {
-        // Report current game state before ending
-        this.reportGameInterruption();
-        
-        // End the game immediately when any player leaves during gameplay
-        this.gameState.matchReady = false;
-        
-        // For tournament matches, handle disconnection specially
-        if (this.config.tournament) {
-          console.log('🏆 Tournament match - opponent disconnected');
-          // Determine if local player wins by forfeit
-          const localPlayerIndex = this.getLocalControlledIndices()[0] || 0;
-          const localPlayerName = this.getPlayerName(localPlayerIndex);
-          
-          // Award victory to remaining player by forfeit
-          const newScores = [...this.gameState.scores];
-          if (localPlayerIndex === 0) {
-            newScores[0] = this.config.winScore || 5;
-            newScores[1] = 0;
-          } else {
-            newScores[0] = 0;
-            newScores[1] = this.config.winScore || 5;
-          }
-          (this.gameState as any).scores = newScores;
-          
-          this.endAndToast(`Opponent disconnected - ${localPlayerName} wins by forfeit!`);
-        } else {
-          this.endAndToast("Game ended - Player disconnected");
-        }
-      } else if (this.isHost) {
+        const localPlayerIndices = this.getLocalControlledIndices();
+        const winnerIdx = localPlayerIndices[0] ?? 0;
+        const winScore = this.config.winScore || 5;
+        const playerSlots = this.config.playerCount || 2;
+        const finalScoresOverride = Array.from({ length: playerSlots }, (_, idx) =>
+          idx === winnerIdx ? winScore : 0
+        );
+        const displayNamesOverride = this.config.displayNames
+          ? [...this.config.displayNames]
+          : undefined;
+        const localPlayerName =
+          this.getPlayerName(winnerIdx) || `Player ${winnerIdx + 1}`;
+        const reasonText = `Opponent disconnected - ${localPlayerName} wins by forfeit!`;
+
+        console.log("🏁 Player disconnected during active match - awarding forfeit", {
+          winnerIdx,
+          finalScoresOverride,
+          reasonText,
+        });
+
+        void this.finishAndReport(winnerIdx, {
+          reason: reasonText,
+          finalScoresOverride,
+          displayNamesOverride,
+          winnerNameOverride: localPlayerName,
+        });
+
+        void this.reportGameInterruption({
+          winnerIdx,
+          finalScores: finalScoresOverride,
+          reason: "Player disconnected",
+          displayNames: displayNamesOverride,
+          skipBroadcast: true,
+        });
+        return;
+      }
+
+      if (this.isHost) {
         // If game hasn't started yet, just update the waiting status
         this.connectedGuests = Math.max(0, this.connectedGuests - 1);
         // Reset display names
@@ -1410,6 +1436,28 @@ this.rightWall = wall(
       
       this.endAndToast(text);
 
+      const finalScores = Array.isArray(stateMsg.finalScores)
+        ? [...stateMsg.finalScores]
+        : [...this.gameState.scores];
+      const paddedScores = [...finalScores];
+      while (paddedScores.length < this.gameState.scores.length) {
+        paddedScores.push(0);
+      }
+      this.gameState.setScores(paddedScores);
+      this.updateScoreUI();
+
+      const displayNames = Array.isArray(stateMsg.displayNames)
+        ? [...stateMsg.displayNames]
+        : this.config.displayNames
+        ? [...this.config.displayNames]
+        : [];
+      const overlayShown = this.maybeShowRemoteMatchResult(stateMsg.winnerIdx, {
+        finalScores,
+        displayNames,
+        winnerName: stateMsg.winnerName,
+        reason: stateMsg.reason,
+      });
+
       // Chat system removed
 
       // Play correct win/lose cue from local perspective
@@ -1460,12 +1508,14 @@ this.rightWall = wall(
         }
       } else {
         // Non-tournament game: auto-exit after 3 seconds
-        setTimeout(() => {
-          console.log("🕐 3 seconds elapsed - ending game session automatically");
-          this.gameState.matchReady = false;
-          this.stopAllAudio();
-          window.location.reload();
-        }, 3000);
+        if (!overlayShown) {
+          setTimeout(() => {
+            console.log("🕐 3 seconds elapsed - ending game session automatically");
+            this.gameState.matchReady = false;
+            this.stopAllAudio();
+            window.location.reload();
+          }, 3000);
+        }
       }
       return;
     }
@@ -2474,38 +2524,83 @@ this.rightWall = wall(
     }
   }
 
-  private async finishAndReport(winnerIdx: number) {
+  private async finishAndReport(
+    winnerIdx: number,
+    options?: {
+      reason?: string;
+      finalScoresOverride?: number[];
+      displayNamesOverride?: string[];
+      winnerNameOverride?: string;
+    }
+  ) {
     this.gameState.matchReady = false;
-    const text =
+    const defaultText =
       this.config.playerCount === 4
-        ? `Player ${["L", "R", "B", "T"][winnerIdx]} wins!`
+        ? `Player ${["L", "R", "B", "T"][winnerIdx] || winnerIdx + 1} wins!`
         : winnerIdx === 0
         ? (this.config.displayNames?.[0] || "Left") + " wins!"
         : (this.config.displayNames?.[1] || "Right") + " wins!";
-    
+    const toastText = options?.reason ?? defaultText;
+
+    const fallbackWinnerName = this.getPlayerName(winnerIdx);
+    const winnerName = options?.winnerNameOverride ?? fallbackWinnerName;
+    const baseFinalScores = options?.finalScoresOverride
+      ? [...options.finalScoresOverride]
+      : [...this.gameState.scores];
+    const playerSlots =
+      this.config.playerCount || baseFinalScores.length || 2;
+    const sanitizedFinalScores = Array.from(
+      { length: playerSlots },
+      (_, idx) =>
+        Number.isFinite(baseFinalScores[idx]) ? baseFinalScores[idx] : 0
+    );
+    const baseDisplayNames = options?.displayNamesOverride
+      ? [...options.displayNamesOverride]
+      : this.config.displayNames
+      ? [...this.config.displayNames]
+      : [];
+    const sanitizedDisplayNames = baseDisplayNames.slice(0, playerSlots);
+    const paddedScores = [...sanitizedFinalScores];
+    while (paddedScores.length < this.gameState.scores.length) {
+      paddedScores.push(0);
+    }
+
+    this.gameState.setScores(paddedScores);
+    this.updateScoreUI();
+
     // Show win message immediately
-    this.endAndToast(text);
+    this.endAndToast(toastText);
+
+    const remoteOverlayShown = this.maybeShowRemoteMatchResult(winnerIdx, {
+      finalScores: sanitizedFinalScores,
+      displayNames: sanitizedDisplayNames,
+      winnerName,
+      reason: options?.reason,
+    });
 
     // For multiplayer games, broadcast game end to all players
     if (this.isHost && (socketManager.connected || this.ws)) {
       const gameEndData = {
         winnerIdx,
-        winnerName: this.getPlayerName(winnerIdx),
-        finalScores: [...this.gameState.scores],
-        displayNames: [...(this.config.displayNames || [])]
-      };
-      
+        winnerName,
+        finalScores: sanitizedFinalScores,
+        displayNames: sanitizedDisplayNames,
+      } as Record<string, unknown>;
+      if (options?.reason) {
+        gameEndData.reason = options.reason;
+      }
+
       if (socketManager.connected) {
         // Broadcast via Socket.IO
         socketManager.sendGameState({
           gameEnd: true,
-          ...gameEndData
+          ...gameEndData,
         });
       } else if (this.ws) {
         // Broadcast via WebSocket
         this.sendRemoteMessage({
           t: "gameEnd",
-          ...gameEndData
+          ...gameEndData,
         } as any);
       }
     }
@@ -2519,7 +2614,7 @@ this.rightWall = wall(
       const summary: TournamentResultSummary = {
         tournamentId: this.config.tournament.id,
         matchId: this.config.tournament.matchId,
-        scores: [...this.gameState.scores],
+        scores: [...sanitizedFinalScores],
         winnerIdx: winnerIdx,
         players: (this.config.tournament.players || []).map((player: any, idx: number) => ({
           id: player.id,
@@ -2550,7 +2645,8 @@ this.rightWall = wall(
     }
 
     // Wait 3 seconds then automatically exit session (NON-TOURNAMENT ONLY)
-    if (!this.config.tournament) {
+    const shouldAutoReload = !this.config.tournament && !remoteOverlayShown;
+    if (shouldAutoReload) {
       setTimeout(() => {
         console.log("🕐 3 seconds elapsed - ending game session automatically");
         this.gameState.matchReady = false;
@@ -2566,7 +2662,7 @@ this.rightWall = wall(
 
     // Post to DB if this is an online match or tournament. Host does the reporting.
     if (this.isHost) {
-      const scores = [...this.gameState.scores];
+      const scores = [...sanitizedFinalScores];
       try {
         // Tournament support
         if (this.config.matchId) {
@@ -2586,7 +2682,7 @@ this.rightWall = wall(
 
             // Determine winner ID
             const winScore = this.config.winScore || 5;
-            const winners = this.gameState.scores
+            const winners = sanitizedFinalScores
               .map((score, idx) => ({ score, idx }))
               .filter(({ score }) => score === winScore);
 
@@ -2600,11 +2696,11 @@ this.rightWall = wall(
                   tMeta.id,
                   tMeta.matchId,
                   winner.id,
-                  this.gameState.scores[0] || 0,
-                  this.gameState.scores[1] || 0
+                  sanitizedFinalScores[0] || 0,
+                  sanitizedFinalScores[1] || 0
                 );
 
-                console.log(`Tournament match completed: ${winner.name} wins ${this.gameState.scores[0]}-${this.gameState.scores[1]}`);
+                console.log(`Tournament match completed: ${winner.name} wins ${sanitizedFinalScores[0]}-${sanitizedFinalScores[1]}`);
               }
             }
           } catch (error) {
@@ -2645,6 +2741,204 @@ this.rightWall = wall(
     }
 
     Frontend.endAndToast(this, text);
+  }
+
+  private showRemoteMatchResult(
+    outcome: "victory" | "defeat",
+    details: RemoteMatchConclusionDetails
+  ) {
+    if (this.isDisposed) {
+      console.log("🚫 Disposed game skipping remote match result overlay");
+      return;
+    }
+
+    const playerSlots = Math.max(
+      2,
+      this.config.playerCount || details.finalScores.length || 2
+    );
+    const sanitizedScores = Array.from({ length: playerSlots }, (_, idx) =>
+      Number.isFinite(details.finalScores[idx])
+        ? details.finalScores[idx]
+        : 0
+    );
+    const explicitNames = details.displayNames ?? [];
+
+    const scoreboardRows = sanitizedScores
+      .map((score, idx) => {
+        const explicitName = (explicitNames[idx] ?? "").trim();
+        const fallbackName = (
+          this.config.displayNames?.[idx] ?? ""
+        ).trim();
+        const resolvedName =
+          explicitName ||
+          fallbackName ||
+          this.getPlayerName(idx) ||
+          `Player ${idx + 1}`;
+
+        return `
+          <div style="
+            display:flex;
+            justify-content:space-between;
+            align-items:center;
+            padding:12px 18px;
+            margin-bottom:10px;
+            background:rgba(15,23,42,0.7);
+            border:1px solid rgba(148,163,184,0.25);
+            border-radius:12px;
+            backdrop-filter:blur(6px);
+          ">
+            <span style="color:#e2e8f0;font-size:20px;font-weight:600;">${resolvedName}</span>
+            <span style="color:#e2e8f0;font-size:22px;font-weight:700;">${score}</span>
+          </div>
+        `;
+      })
+      .join("");
+
+    const accent = outcome === "victory" ? "#84cc16" : "#ef4444";
+    const emoji = outcome === "victory" ? "🏆" : "💀";
+    const titleText = outcome === "victory" ? "VICTORY" : "GAME OVER";
+    const description =
+      outcome === "victory"
+        ? "You win the match!"
+        : `${details.winnerName} wins the match`;
+    const reasonMarkup = details.reason
+      ? `<p style="color:#94a3b8;font-size:18px;margin:0 0 18px;">${details.reason}</p>`
+      : "";
+
+    this.stopAllAudio();
+    this.engine.stopRenderLoop();
+    this.cleanupTournamentOverlay();
+
+    const overlay = document.createElement("div");
+    overlay.id = "remote-match-result-overlay";
+    overlay.className = "remote-match-overlay";
+    overlay.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(2, 6, 23, 0.95);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 30px 16px;
+      z-index: 10005;
+    `;
+
+    overlay.innerHTML = `
+      <div style="text-align:center;max-width:560px;width:100%;animation:fadeIn 0.8s ease;">
+        <div style="font-size:110px;margin-bottom:24px;">${emoji}</div>
+        <h1 style="color:${accent};font-size:68px;font-weight:800;margin-bottom:12px;text-shadow:0 0 40px ${accent}aa;">
+          ${titleText}
+        </h1>
+        <p style="color:#cbd5f5;font-size:22px;margin-bottom:12px;font-weight:600;">
+          ${description}
+        </p>
+        ${reasonMarkup}
+        <div style="margin:24px 0 30px;text-align:left;">
+          ${scoreboardRows}
+        </div>
+        <button id="exit-remote-match-btn" style="
+          background:${accent};
+          color:#020617;
+          font-weight:700;
+          font-size:20px;
+          padding:14px 26px;
+          border:none;
+          border-radius:12px;
+          cursor:pointer;
+          transition:background 0.2s ease;
+          box-shadow:0 10px 30px ${accent}55;
+        ">
+          Return to Menu (<span id="remote-exit-countdown">10</span>)
+        </button>
+      </div>
+      <style>
+        @keyframes fadeIn {
+          from { opacity: 0; transform: scale(0.94); }
+          to { opacity: 1; transform: scale(1); }
+        }
+        #exit-remote-match-btn:hover {
+          filter: brightness(1.1);
+        }
+      </style>
+    `;
+
+    document.body.appendChild(overlay);
+    this.tournamentOverlay = overlay;
+
+    const exitBtn = overlay.querySelector(
+      "#exit-remote-match-btn"
+    ) as HTMLButtonElement | null;
+    const countdownEl = overlay.querySelector(
+      "#remote-exit-countdown"
+    ) as HTMLSpanElement | null;
+
+    let countdown = 10;
+    const countdownInterval = window.setInterval(() => {
+      countdown -= 1;
+      if (countdownEl) {
+        countdownEl.textContent = `${Math.max(countdown, 0)}`;
+      }
+      if (countdown <= 0) {
+        window.clearInterval(countdownInterval);
+        this.redirectToMainMenu();
+      }
+    }, 1000);
+
+    exitBtn?.addEventListener("click", () => {
+      window.clearInterval(countdownInterval);
+      this.redirectToMainMenu();
+    });
+  }
+
+  private maybeShowRemoteMatchResult(
+    winnerIdx: number | null | undefined,
+    options: {
+      finalScores?: number[];
+      displayNames?: string[];
+      winnerName?: string | null;
+      reason?: string;
+    } = {}
+  ): boolean {
+    if (!this.isRemoteConnection() || this.config.tournament) {
+      return false;
+    }
+
+    if (
+      winnerIdx === undefined ||
+      winnerIdx === null ||
+      winnerIdx < 0
+    ) {
+      return false;
+    }
+
+    const finalScores = Array.isArray(options.finalScores)
+      ? [...options.finalScores]
+      : [...this.gameState.scores];
+    const displayNames = options.displayNames
+      ? [...options.displayNames]
+      : this.config.displayNames
+      ? [...this.config.displayNames]
+      : [];
+    const winnerName =
+      options.winnerName ??
+      this.getPlayerName(winnerIdx) ??
+      `Player ${winnerIdx + 1}`;
+
+    const isLocalWinner = this.getLocalControlledIndices().includes(
+      winnerIdx
+    );
+
+    this.showRemoteMatchResult(isLocalWinner ? "victory" : "defeat", {
+      winnerName,
+      finalScores,
+      displayNames,
+      reason: options.reason,
+    });
+    return true;
   }
 
   /* ---------------- TOURNAMENT SCREENS ---------------- */
@@ -3118,33 +3412,23 @@ this.rightWall = wall(
             <div style="font-size: 18px;">Loading tournament bracket...</div>
           </div>
         </div>
-        <div style="display: flex; gap: 16px; justify-content: center; margin-top: 20px;">
-          <button id="refresh-bracket-btn" style="
-            padding: 14px 36px;
-            font-size: 16px;
-            font-weight: bold;
-            color: #84cc16;
-            background: rgba(132, 204, 22, 0.1);
+        <div style="text-align: center; margin-top: 24px;">
+          <button id="waiting-ready-btn" disabled style="
+            padding: 18px 56px;
+            font-size: 22px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #1f2937, #111827);
             border: 2px solid rgba(132, 204, 22, 0.4);
-            border-radius: 10px;
-            cursor: pointer;
-            transition: all 0.3s;
+            border-radius: 14px;
+            color: #64748b;
+            cursor: not-allowed;
+            box-shadow: 0 6px 24px rgba(15, 23, 42, 0.6);
           ">
-            � Refresh Bracket
+            ✓ Ready
           </button>
-          <button id="exit-tournament-btn" style="
-            padding: 14px 36px;
-            font-size: 16px;
-            font-weight: bold;
-            color: #ef4444;
-            background: rgba(239, 68, 68, 0.1);
-            border: 2px solid rgba(239, 68, 68, 0.4);
-            border-radius: 10px;
-            cursor: pointer;
-            transition: all 0.3s;
-          ">
-            ❌ Exit Tournament
-          </button>
+          <p style="color: #64748b; font-size: 16px; margin-top: 12px;">
+            Your next opponent is still being determined. We'll enable the Ready button when the match is set.
+          </p>
         </div>
       `;
       
@@ -3152,47 +3436,6 @@ this.rightWall = wall(
       if (tournament) {
         this.renderTournamentBracket(tournament);
       }
-      
-      const exitBtn = actionEl.querySelector('#exit-tournament-btn');
-      exitBtn?.addEventListener('click', async () => {
-        const confirmed = await import('../../components/modals/ConfirmDialog').then(m => 
-          m.showConfirmDialog(
-            'Are you sure you want to leave the tournament?',
-            'Exit Tournament',
-            'Yes, Exit',
-            'Stay'
-          )
-        );
-        if (confirmed) {
-          const summary = this.getCachedTournamentSummary();
-          void this.finishTournamentMatch(summary?.isWinner ? 'victory' : 'eliminated', summary || undefined);
-        }
-      });
-      
-      const refreshBtn = actionEl.querySelector('#refresh-bracket-btn');
-      refreshBtn?.addEventListener('click', async () => {
-        try {
-          const summary = this.getCachedTournamentSummary();
-          if (!summary) return;
-          
-          const { tournamentService } = await import('../../tournament/TournamentService');
-          const updatedTournament = await tournamentService.getTournament(summary.tournamentId);
-          
-          this.renderTournamentBracket(updatedTournament);
-          
-          // Show brief feedback
-          const btn = refreshBtn as HTMLButtonElement;
-          const originalText = btn.innerHTML;
-          btn.innerHTML = '✅ Updated!';
-          btn.disabled = true;
-          setTimeout(() => {
-            btn.innerHTML = originalText;
-            btn.disabled = false;
-          }, 1500);
-        } catch (error) {
-          console.error('❌ Failed to refresh bracket:', error);
-        }
-      });
     }
     
     // Set up real-time WebSocket listeners for bracket updates
@@ -3876,55 +4119,88 @@ this.rightWall = wall(
     }
   }
 
-  private async reportGameInterruption() {
+  private async reportGameInterruption(options?: {
+    winnerIdx?: number | null;
+    finalScores?: number[];
+    reason?: string;
+    displayNames?: string[];
+    skipBroadcast?: boolean;
+  }) {
     try {
-      // If this is a host, determine winner based on current scores
-      if (this.isHost && this.gameState.matchReady) {
-        const scores = [...this.gameState.scores];
-        let winnerIdx = -1;
-        
-        // Determine winner by highest score, or -1 if tie
-        if (scores.length >= 2) {
-          if (scores[0] > scores[1]) {
-            winnerIdx = 0;
-          } else if (scores[1] > scores[0]) {
-            winnerIdx = 1;
-          }
-          // If tie, no winner (-1)
-        }
+      const rawScores = Array.isArray(options?.finalScores)
+        ? [...options!.finalScores!]
+        : [...this.gameState.scores];
+      const playerSlots = this.config.playerCount || rawScores.length || 2;
+      const sanitizedFinalScores = Array.from(
+        { length: playerSlots },
+        (_, idx) =>
+          Number.isFinite(rawScores[idx]) ? rawScores[idx] : 0
+      );
+      const displayNames = options?.displayNames
+        ? [...options.displayNames]
+        : this.config.displayNames
+        ? [...this.config.displayNames]
+        : [];
+      let winnerIdx =
+        options?.winnerIdx === null
+          ? -1
+          : options?.winnerIdx ?? -1;
 
-        // Tournament support removed - now handle match results if needed
-        if (this.config.matchId && winnerIdx >= 0) {
-          const winnerUserId = this.config.currentUser?.id || null;
+      if (winnerIdx < 0 && sanitizedFinalScores.length > 0) {
+        const maxScore = Math.max(...sanitizedFinalScores);
+        const contenders = sanitizedFinalScores
+          .map((score, idx) => ({ score, idx }))
+          .filter(({ score }) => score === maxScore);
+        if (contenders.length === 1 && Number.isFinite(maxScore)) {
+          winnerIdx = contenders[0].idx;
+        }
+      }
+
+      const reason = options?.reason ?? "Player disconnected";
+      const winnerName =
+        winnerIdx >= 0
+          ? this.getPlayerName(winnerIdx) ||
+            displayNames[winnerIdx] ||
+            `Player ${winnerIdx + 1}`
+          : null;
+
+      if (this.isHost && winnerIdx >= 0 && this.config.matchId) {
+        const winnerUserId = this.config.currentUser?.id || null;
+        try {
           await ApiClient.postMatchResult({
             matchId: this.config.matchId,
             winnerUserId,
-            scores,
+            scores: sanitizedFinalScores,
           });
-          
           console.log("🎮 Match results reported due to game interruption");
+        } catch (error) {
+          console.warn("⚠️ Failed to report interrupted match result:", error);
         }
+      }
 
-        // Notify other players that game ended due to disconnection
-        if (socketManager.connected || this.ws) {
-          const gameEndData = {
-            gameEnd: true,
-            interrupted: true,
-            winnerIdx: winnerIdx >= 0 ? winnerIdx : null,
-            winnerName: winnerIdx >= 0 ? this.getPlayerName(winnerIdx) : null,
-            reason: "Player disconnected",
-            finalScores: scores,
-            displayNames: [...(this.config.displayNames || [])]
-          };
-          
-          if (socketManager.connected) {
-            socketManager.sendGameState(gameEndData);
-          } else if (this.ws) {
-            this.sendRemoteMessage({
-              t: "gameEnd",
-              ...gameEndData
-            } as any);
-          }
+      const shouldBroadcast =
+        this.isHost &&
+        !options?.skipBroadcast &&
+        (this.gameState.matchReady || winnerIdx >= 0);
+
+      if (shouldBroadcast && (socketManager.connected || this.ws)) {
+        const gameEndData = {
+          gameEnd: true,
+          interrupted: true,
+          winnerIdx: winnerIdx >= 0 ? winnerIdx : null,
+          winnerName,
+          reason,
+          finalScores: sanitizedFinalScores,
+          displayNames,
+        };
+
+        if (socketManager.connected) {
+          socketManager.sendGameState(gameEndData);
+        } else if (this.ws) {
+          this.sendRemoteMessage({
+            t: "gameEnd",
+            ...gameEndData,
+          } as any);
         }
       }
       
