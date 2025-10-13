@@ -6,6 +6,7 @@ import { overlay } from "../game/ui/overlay";
 import { FriendInviteModal } from "../components/modals/FriendInviteModal";
 import { themeBridge } from "../game/utils/ThemeBridge";
 import { t } from "../langs";
+import { API_BASE_URL } from "../utils/Constants";
 
 export function startLocal2P(currentUser: any, onResolve: (cfg: GameConfig) => void) {
     const cfg: GameConfig = {
@@ -31,6 +32,7 @@ export function startVsAI(aiLevel: number, currentUser: any, onResolve: (cfg: Ga
     CameraConfig.radius = 19;
     onResolve(cfg);
 }
+
 // ADD this near the other exports
 export function startVs3AI(aiLevel: number, currentUser: any, onResolve: (cfg: GameConfig) => void) {
     const cfg: GameConfig = {
@@ -131,13 +133,25 @@ export async function createSocketIORoom(gameMode: '2p' | '4p', currentUser: any
         <div id="room-status" style="margin-bottom:16px; color:#f59e0b; text-align:center; font-weight:600;">⏳ ${t('Waiting for players to join...')}</div>
         <div style="display:flex; gap:8px; margin-top:20px;">
           <button class="glass-button" data-close style="flex:1;">${t('Cancel')}</button>
-          <button class="glass-button" id="invite-friends-btn" style="flex:1;">🎯 ${t('Invite Friends')}</button>
+          <button class="glass-button" id="invite-friends-btn" style="flex:1; opacity:0.5;" disabled>🎯 ${t('Invite Friends')}</button>
           <button class="glass-button" id="start-game-btn" data-start style="flex:1; opacity:0.5;" disabled>${t('Start Game')}</button>
         </div>
       `);
 
             const startBtn = loadingOv.querySelector("#start-game-btn") as HTMLButtonElement;
             const inviteBtn = loadingOv.querySelector("#invite-friends-btn") as HTMLButtonElement;
+
+            // Check for online friends and enable/disable invite button
+            checkOnlineFriends().then(hasOnlineFriends => {
+                if (hasOnlineFriends) {
+                    inviteBtn.disabled = false;
+                    inviteBtn.style.opacity = '1';
+                } else {
+                    inviteBtn.disabled = true;
+                    inviteBtn.style.opacity = '0.5';
+                    inviteBtn.title = t('No friends are currently online');
+                }
+            });
 
             // Track player count to enable/disable start button
             let connectedPlayers = 1; // Host is already connected
@@ -187,16 +201,16 @@ export async function createSocketIORoom(gameMode: '2p' | '4p', currentUser: any
                     inviteBtn.textContent = t('Loading friends...');
 
                     const token = localStorage.getItem('ft_pong_token') || '';
-                    // Create and show the friend invite modal
                     const friendInviteModal = new FriendInviteModal(token);
                     await friendInviteModal.show(roomId, gameMode, currentUser?.name || finalPlayerName);
 
-                } catch (error) {
-                    console.error('Error inviting friends:', error);
+                } catch (error: any) {
+                    // Show user-friendly error message
                     if ((window as any).notifyBox) {
-                        (window as any).notifyBox.addNotification(t('Failed to load friends list. Please try again.'), 'error');
-                    } else {
-                        alert(t('Failed to load friends list. Please try again.'));
+                        (window as any).notifyBox.addNotification(
+                            error?.message || t('Unable to load friends list'),
+                            'error'
+                        );
                     }
                 } finally {
                     // Re-enable button
@@ -334,4 +348,43 @@ function getStyledCard(content: string): string {
       ${content}
     </div>
     `;
+}
+
+// Helper function to check if there are online friends
+async function checkOnlineFriends(): Promise<boolean> {
+    try {
+        const token = localStorage.getItem('ft_pong_token') || '';
+        const userData = localStorage.getItem('ft_pong_user_data');
+
+        if (!userData || !token) {
+            return false;
+        }
+
+        const user = JSON.parse(userData);
+        const userId = user.id;
+
+        if (!userId) {
+            return false;
+        }
+
+        const response = await fetch(`${API_BASE_URL}/relation/friends/${userId}`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (!response.ok) {
+            return false;
+        }
+
+        const friends = await response.json();
+        const onlineFriends = friends.filter((friend: any) => friend.status === 'online');
+
+        return onlineFriends.length > 0;
+    } catch (error) {
+        // Silently fail - button stays disabled
+        return false;
+    }
 }

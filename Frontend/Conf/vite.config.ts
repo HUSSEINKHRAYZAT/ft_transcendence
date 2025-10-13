@@ -1,5 +1,7 @@
 import { defineConfig } from 'vite'
 import { fileURLToPath, URL } from 'node:url'
+import fs from 'fs'
+import path from 'path'
 
 export default defineConfig({
   root: fileURLToPath(new URL('../', import.meta.url)),
@@ -14,6 +16,12 @@ export default defineConfig({
     port: 5173,
     host: true,
     open: false,
+
+    // ✅ Enable built-in HTTPS support
+    https: {
+      key: fs.readFileSync(path.resolve(__dirname, '../cert/key.pem')),
+      cert: fs.readFileSync(path.resolve(__dirname, '../cert/cert.pem')),
+    },
   },
 
   resolve: {
@@ -28,8 +36,6 @@ export default defineConfig({
       '@/assets': fileURLToPath(new URL('../src/assets', import.meta.url)),
       '@/langs': fileURLToPath(new URL('../src/langs', import.meta.url)),
       '@/auth': fileURLToPath(new URL('../src/auth', import.meta.url)),
-    }
+    },
   },
-
-  // PostCSS will automatically find postcss.config.js in root
 })

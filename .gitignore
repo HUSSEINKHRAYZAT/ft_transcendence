@@ -1,3 +1,10 @@
 node_modules
+package-lock.json
+dist/
+build/
+tmp/
+.DS_Store
+
 *.env
 *.vscode
+cert/

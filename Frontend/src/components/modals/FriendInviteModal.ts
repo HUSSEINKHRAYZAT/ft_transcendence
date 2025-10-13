@@ -22,12 +22,16 @@ export class FriendInviteModal {
   public async show(roomCode: string, gameMode: string, hostName: string): Promise<void> {
     // Get friends list
     const friends = await this.getFriendsList();
+
+    // Check if there are no friends at all
     if (!friends || friends.length === 0) {
-      throw new Error("No online friends available");
+      throw new Error("You have no friends to invite yet. Add some friends first!");
     }
 
     // Filter only online friends
     const onlineFriends = friends.filter(friend => friend.status === 'online');
+
+    // Check if none of the friends are online
     if (onlineFriends.length === 0) {
       throw new Error("None of your friends are currently online");
     }
