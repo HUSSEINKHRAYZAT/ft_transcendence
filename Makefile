@@ -1,5 +1,7 @@
+# ===============================
 # FT Transcendence Project Makefile
 # Handles Backend (Docker) and Frontend (npm) services with HTTPS setup
+# ===============================
 
 MAKEFLAGS += --no-print-directory
 

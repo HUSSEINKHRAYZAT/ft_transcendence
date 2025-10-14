@@ -1736,6 +1736,56 @@ async getFriendStatistics(friendId: string): Promise<UserStats | null> {
         return null;
     }
 }
+
+async getUserById(userId: string): Promise<any | null> {
+    if (!this.state.token) {
+        console.error('No auth token available');
+        return null;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/users/${userId}`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${this.state.token}`,
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (!response.ok) {
+            console.error('Failed to fetch user by ID:', response.status);
+            return null;
+        }
+
+        const data = await response.json();
+
+        console.log('🔍 Fetched user data for ID', userId, ':', data);
+
+        return data;
+    } catch (error) {
+        console.error('Error fetching user by ID:', error);
+        return null;
+    }
+}
+
+/**
+ * Get the full avatar path for a user
+ * @param profilePath - The profile path from the user data (e.g., "dog.png")
+ * @returns Full path to avatar (e.g., "/avatars/dog.png") or default panda
+ */
+getAvatarPath(profilePath: string | null | undefined): string {
+    if (!profilePath) {
+        return '/avatars/panda.png';
+    }
+
+    // If it's already a full path (starts with / or http), return as is
+    if (profilePath.startsWith('/') || profilePath.startsWith('http')) {
+        return profilePath;
+    }
+
+    // Otherwise, prepend /avatars/
+    return `/avatars/${profilePath}`;
+}
 }
 
 export const authService = new AuthService();

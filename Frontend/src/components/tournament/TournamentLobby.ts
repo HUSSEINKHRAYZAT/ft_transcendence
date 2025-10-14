@@ -1,18 +1,7 @@
-/**
- * Tournament Lobby Component
- * 
- * Shows:
- * - Tournament code and share options
- * - Real-time player list with avatars
- * - Empty slots visualization
- * - Countdown timer
- * - Ready status
- * - Start button (for host)
- */
-
 import { newTournamentService, TournamentData, TournamentPlayer } from '../../tournament/NewTournamentService';
 import { authService } from '../../services/AuthService';
 import { showConfirmDialog } from '../modals/ConfirmDialog';
+import '../../styles/tournament-new.css';
 
 export class TournamentLobby {
   private container: HTMLElement | null = null;
@@ -25,18 +14,33 @@ export class TournamentLobby {
   /**
    * Show tournament lobby
    */
-  public show(tournament: TournamentData): void {
+  public async show(tournament: TournamentData): Promise<void> {
     this.tournament = tournament;
     this.isHost = this.checkIfHost();
 
+    // 🐛 DEBUG: Log all players when lobby is shown
+    console.log('🐛 DEBUG: Tournament Lobby Opened');
+    console.log('🐛 Tournament ID:', tournament.id);
+    console.log('🐛 Total Players:', tournament.players.length);
+    console.log('🐛 ALL PLAYER DATA:');
+    tournament.players.forEach((player, index) => {
+      console.log(`🐛 Player #${index + 1}:`, {
+        id: player.id,
+        name: player.name,
+        avatar: player.avatar,
+        isOnline: player.isOnline,
+        fullPlayerObject: player
+      });
+    });
+
     if (this.container) {
-      this.update();
+      await this.update();
       return;
     }
 
     this.container = document.createElement('div');
     this.container.className = 'tournament-lobby-overlay';
-    this.container.innerHTML = this.getLobbyHTML();
+    this.container.innerHTML = await this.getLobbyHTML();
     document.body.appendChild(this.container);
 
     this.attachEventListeners();
@@ -64,8 +68,20 @@ export class TournamentLobby {
   /**
    * Update lobby with new tournament data
    */
-  public update(): void {
+  public async update(): Promise<void> {
     if (!this.container || !this.tournament) return;
+
+    // 🐛 DEBUG: Log player data on update
+    console.log('🐛 DEBUG: Lobby Update Triggered');
+    console.log('🐛 Current Players:', this.tournament.players.length);
+    this.tournament.players.forEach((player, index) => {
+      console.log(`🐛 Player #${index + 1}:`, {
+        id: player.id,
+        name: player.name,
+        avatar: player.avatar,
+        isOnline: player.isOnline
+      });
+    });
 
     // Update player count
     const playerCountElement = this.container.querySelector('#playerCount');
@@ -77,7 +93,7 @@ export class TournamentLobby {
     // Update player list
     const playerGrid = this.container.querySelector('#playerGrid');
     if (playerGrid) {
-      playerGrid.innerHTML = this.getPlayerGridHTML();
+      playerGrid.innerHTML = await this.getPlayerGridHTML();
     }
 
     // Update status
@@ -95,7 +111,9 @@ export class TournamentLobby {
 
   // ==================== HTML GENERATION ====================
 
-  private getLobbyHTML(): string {
+  private async getLobbyHTML(): Promise<string> {
+    const playerGridHTML = await this.getPlayerGridHTML();
+
     return `
       <div class="tournament-lobby">
         <!-- Header -->
@@ -135,7 +153,7 @@ export class TournamentLobby {
         <div class="players-section">
           <h3>Players</h3>
           <div class="player-grid" id="playerGrid">
-            ${this.getPlayerGridHTML()}
+            ${playerGridHTML}
           </div>
         </div>
 
@@ -182,7 +200,7 @@ export class TournamentLobby {
     `;
   }
 
-  private getPlayerGridHTML(): string {
+  private async getPlayerGridHTML(): Promise<string> {
     if (!this.tournament) return '';
 
     const slots = [];
@@ -193,7 +211,8 @@ export class TournamentLobby {
     for (let i = 0; i < totalSlots; i++) {
       const player = players[i];
       if (player) {
-        slots.push(this.getPlayerSlotHTML(player, i + 1));
+        const html = await this.getPlayerSlotHTML(player, i + 1);
+        slots.push(html);
       } else {
         slots.push(this.getEmptySlotHTML(i + 1));
       }
@@ -202,15 +221,64 @@ export class TournamentLobby {
     return slots.join('');
   }
 
-  private getPlayerSlotHTML(player: TournamentPlayer, slotNumber: number): string {
+  private async getPlayerSlotHTML(player: TournamentPlayer, slotNumber: number): Promise<string> {
     const isOnline = player.isOnline ? 'online' : 'offline';
-    const avatar = player.avatar || this.getDefaultAvatar();
+
+    // 🐛 DEBUG: Log player data
+    console.log(`🐛 Fetching avatar for Player #${slotNumber}:`, {
+      name: player.name,
+      id: player.id,
+      avatarFromPlayer: player.avatar
+    });
+
+    // Fetch user data to get the correct profile path
+    let avatarHtml = '';
+
+    if (player.id) {
+      try {
+        const userData = await authService.getUserById(player.id);
+
+        if (userData && userData.profilePath) {
+          // User has a profile picture
+          const avatar = authService.getAvatarPath(userData.profilePath);
+          avatarHtml = `<img src="${avatar}" alt="${player.name}" />`;
+          console.log(`✅ Avatar found for ${player.name}:`, avatar);
+        } else {
+          // No profile picture - show initials like navbar does
+          const initial = (player.name?.[0] || 'U').toUpperCase();
+          avatarHtml = `
+            <div class="avatar-initials">
+              ${initial}
+            </div>
+          `;
+          console.log(`⚠️ No profilePath for ${player.name}, using initials: ${initial}`);
+        }
+      } catch (error) {
+        console.error(`❌ Error fetching avatar for ${player.name}:`, error);
+        // Fallback to initials on error
+        const initial = (player.name?.[0] || 'U').toUpperCase();
+        avatarHtml = `
+          <div class="avatar-initials">
+            ${initial}
+          </div>
+        `;
+      }
+    } else {
+      // No player ID - show initials
+      console.warn(`⚠️ No player ID for ${player.name}`);
+      const initial = (player.name?.[0] || 'U').toUpperCase();
+      avatarHtml = `
+        <div class="avatar-initials">
+          ${initial}
+        </div>
+      `;
+    }
 
     return `
       <div class="player-slot filled ${isOnline}">
         <div class="slot-number">#${slotNumber}</div>
         <div class="player-avatar">
-          <img src="${avatar}" alt="${player.name}" />
+          ${avatarHtml}
           <span class="online-indicator"></span>
         </div>
         <div class="player-info">
@@ -241,7 +309,7 @@ export class TournamentLobby {
       <button class="btn btn-secondary" data-action="leave">
         Leave Tournament
       </button>
-      
+
       ${canStart ? `
         <button class="btn btn-primary btn-start" data-action="start" id="startBtn">
           <span class="btn-icon">🚀</span>
@@ -291,7 +359,7 @@ export class TournamentLobby {
     if (confirmed) {
       newTournamentService.leaveTournament();
       this.hide();
-      
+
       // Return to main menu
       window.dispatchEvent(new CustomEvent('ft:pong:returnToMenu', {
         detail: { reason: 'tournament-lobby-left' }
@@ -313,22 +381,50 @@ export class TournamentLobby {
     newTournamentService.off('tournament_started', this.handleTournamentStarted);
   }
 
-  private handleTournamentUpdate = (data: any): void => {
+  private handleTournamentUpdate = async (data: any): Promise<void> => {
     console.log('🔄 TournamentLobby received tournament_updated:', data);
+
+    // 🐛 DEBUG: Log incoming player data
+    if (data.tournament && data.tournament.players) {
+      console.log('🐛 DEBUG: Players in update event:');
+      data.tournament.players.forEach((player: any, index: number) => {
+        console.log(`🐛 Player #${index + 1} from event:`, {
+          id: player.id,
+          name: player.name,
+          avatar: player.avatar,
+          isOnline: player.isOnline,
+          fullObject: player
+        });
+      });
+    }
+
     if (data.tournament && this.tournament && data.tournament.id === this.tournament.id) {
       console.log('🔄 Updating tournament from', this.tournament.players.length, 'to', data.tournament.players.length, 'players');
       this.tournament = data.tournament;
-      this.update();
+      await this.update();
     } else {
       console.warn('⚠️ Tournament update ignored - ID mismatch or missing data');
     }
   };
 
-  private handlePlayerJoined = (data: any): void => {
+  private handlePlayerJoined = async (data: any): Promise<void> => {
+    console.log('👤 Player joined event received:', data);
+
+    // 🐛 DEBUG: Log the joining player's data
+    if (data.player) {
+      console.log('🐛 DEBUG: New player data:', {
+        id: data.player.id,
+        name: data.player.name,
+        avatar: data.player.avatar,
+        isOnline: data.player.isOnline,
+        fullObject: data.player
+      });
+    }
+
     if (data.tournament && this.tournament && data.tournament.id === this.tournament.id) {
       this.tournament = data.tournament;
-      this.update();
-      
+      await this.update();
+
       // Show notification
       if (data.player) {
         this.showNotification(`${data.player.name} joined the tournament!`);
@@ -339,7 +435,7 @@ export class TournamentLobby {
   private handleTournamentStarted = (data: any): void => {
     if (data.tournamentId === this.tournament?.id) {
       this.showNotification('Tournament is starting!', 'success');
-      
+
       // Hide lobby and show bracket
       setTimeout(() => {
         this.hide();
@@ -367,6 +463,14 @@ export class TournamentLobby {
     if (!user || !this.tournament) return false;
 
     const userId = user.id || user.email;
+
+    // 🐛 DEBUG: Log host check
+    console.log('🐛 DEBUG: Host Check:', {
+      currentUserId: userId,
+      tournamentCreatedBy: this.tournament.createdBy,
+      isHost: this.tournament.createdBy === userId
+    });
+
     return this.tournament.createdBy === userId;
   }
 
@@ -392,10 +496,6 @@ export class TournamentLobby {
     document.body.appendChild(notification);
 
     setTimeout(() => notification.remove(), 3000);
-  }
-
-  private getDefaultAvatar(): string {
-    return '/avatars/panda.png'; // Default avatar
   }
 
   private escapeHTML(str: string): string {

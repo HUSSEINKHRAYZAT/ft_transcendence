@@ -754,3 +754,53 @@
     flex-direction: column;
   }
 }
+
+
+/* Add this to your tournament lobby CSS file */
+
+.player-avatar {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 3px solid #84cc16; /* lime-500 */
+}
+
+.player-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Initials avatar styling - matches navbar style */
+.player-avatar .avatar-initials {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(to bottom right, #84cc16, #16a34a); /* lime-500 to green-600 */
+  color: white;
+  font-size: 24px;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.online-indicator {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid white;
+}
+
+.player-slot.filled.online .online-indicator {
+  background-color: #22c55e; /* green-500 */
+}
+
+.player-slot.filled.offline .online-indicator {
+  background-color: #ef4444; /* red-500 */
+}
