@@ -4,16 +4,23 @@ import {
   t,
   simpleThemeManager,
   backgroundThemeManager,
-  authService
+  authService,
 } from './';
 import './styles/main.css';
-import './styles/tournament-new.css';  // New tournament system styles
+import './styles/tournament-new.css';
 import { handleOAuthCallback } from './auth/callback';
 import { API_BASE_URL } from './';
 import { sessionBootstrap } from './utils/SessionBootstrap';
 import type { GameConfig } from './types';
 import { CameraConfig } from './game/config/camconfig';
 import { NewTournamentMatchCoordinator } from './tournament/NewTournamentMatchCoordinator';
+import { SettingsBox } from '@/components/home/SettingsBox';
+import { NotificationBox } from '@/components/home/NotificationBox';
+import { FriendsBox } from '@/components/home/FriendsBox';
+import { ModalService } from '@/components/modals/ModalService';
+import { StatisticsModal } from '@/components/modals/StatisticsModal';
+import { ProfileModal } from '@/components/modals/ProfileModal';
+import { LoginModal } from '@/components/modals/LoginModal';
 
 document.addEventListener("DOMContentLoaded", () => {
     if (window.location.hash.includes('token')) {
@@ -93,25 +100,18 @@ async function loadSafeComponents(): Promise<void> {
 
     try {
         const safeComponents = [
-            { path: './components/home/SettingsBox', name: 'SettingsBox' },
-            { path: './components/home/NotificationBox', name: 'NotificationBox' },
-            { path: './components/home/FriendsBox', name: 'FriendsBox' },
-            { path: './components/modals/ModalService', name: 'ModalService' },
-            { path: './components/modals/StatisticsModal', name: 'StatisticsModal' },
-            { path: './components/modals/ProfileModal', name: 'ProfileModal' },
-            { path: './components/modals/LoginModal', name: 'LoginModal' }
+            { name: 'SettingsBox', constructor: SettingsBox },
+            { name: 'NotificationBox', constructor: NotificationBox },
+            { name: 'FriendsBox', constructor: FriendsBox },
+            { name: 'ModalService', constructor: ModalService },
+            { name: 'StatisticsModal', constructor: StatisticsModal },
+            { name: 'ProfileModal', constructor: ProfileModal },
+            { name: 'LoginModal', constructor: LoginModal }
         ];
 
-        const componentPromises = safeComponents.map(comp =>
-            loadComponent(comp.path, comp.name)
-        );
+        console.log(`📊 Component loading: ${safeComponents.length}/${safeComponents.length} successful`);
 
-        const results = await Promise.allSettled(componentPromises);
-        const successful = results.filter(result => result.status === 'fulfilled').length;
-
-        console.log(`📊 Component loading: ${successful}/${safeComponents.length} successful`);
-
-        await initializeWithSafeComponents(results);
+        await initializeWithSafeComponents(safeComponents);
 
     } catch (error) {
         console.error('❌ Safe component loading failed:', error);
@@ -136,25 +136,21 @@ async function loadComponent(path: string, componentName: string): Promise<any> 
     }
 }
 
-async function initializeWithSafeComponents(results: PromiseSettledResult<any>[]): Promise<void> {
-	console.log('🧩 Initializing with safe components...');
+async function initializeWithSafeComponents(components: any[]): Promise<void> {
+    console.log('🧩 Initializing with safe components...');
 
-	const components = results
-		.filter((result): result is PromiseFulfilledResult<any> => result.status === 'fulfilled')
-		.map(result => result.value);
+    try {
+        const modalServiceComponent = components.find(c => c.name === 'ModalService');
+        if (modalServiceComponent) {
+            const modalService = new modalServiceComponent.constructor();
+            (window as any).modalService = modalService;
+            console.log('🔑 Modal service initialized');
+        } else {
+            createBasicModalService();
+        }
 
-	try {
-		const modalServiceComponent = components.find(c => c.name === 'ModalService');
-		if (modalServiceComponent) {
-			const modalService = new modalServiceComponent.constructor();
-			(window as any).modalService = modalService;
-			console.log('🔑 Modal service initialized');
-		} else {
-			createBasicModalService();
-		}
-
-		addBasicNavbar();
-		addBasicJumbotron();
+        addBasicNavbar();
+        addBasicJumbotron();
 
 	// ❌ DISABLED: Auto-start from sessionStorage
 	// This has been replaced with manual "Start Match" button system
@@ -1341,8 +1337,6 @@ function setupAuthListeners(components: Component[]): void {
 		const { gameConfig, tournament, match } = e.detail;
 
 		try {
-			// Hide any existing modals/overlays
-			hideBasicModal();
 
 			// Launch the tournament match using existing function
 			launchTournamentMatch(tournament, match);
@@ -1738,7 +1732,6 @@ async function showTournamentJoinModal() {
       }));
 
       // Hide any tournament UI that might be showing
-      hideBasicModal();
     }, 3000);
   }
 };

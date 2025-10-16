@@ -2,6 +2,7 @@
 import { BaseModal } from './BaseModal';
 import { findElement, createElement } from '../../utils/DOMHelpers';
 import { t } from '../../langs/LanguageManager';
+import { infoImages } from '@/assets/images/info';
 
 type InfoType = 'about' | 'project' | 'home';
 
@@ -237,148 +238,148 @@ export class InfoModal extends BaseModal {
     }, 100);
   }
 
-private getModuleData(module: string): { title: string; content: string } | null {
+  private getModuleData(module: string): { title: string; content: string } | null {
     const modules: Record<string, { title: string; content: string }> = {
       web: {
-        title: `<img src="/info/WebModule.png" alt="Web Module" class="inline w-8 h-8 align-middle mr-2" />${t('Web Module [ 2 / 3 ]')}`,
+        title: `<img src="${infoImages.webModule}" alt="Web Module" class="inline w-8 h-8 align-middle mr-2" />${t('Web Module [ 2 / 3 ]')}`,
         content: `
           <div class="text-left space-y-3">
             <div class="bg-gray-600 p-3 rounded">
-              <img src="/info/True.png" alt="Completed" class="inline w-5 h-5 align-middle mr-1" /><span class="text-orange-400 font-bold">${t('Major:')}</span> ${t('Use a framework to build the backend.')}
+              <img src="${infoImages.completed}" alt="Completed" class="inline w-5 h-5 align-middle mr-1" /><span class="text-orange-400 font-bold">${t('Major:')}</span> ${t('Use a framework to build the backend.')}
             </div>
             <div class="bg-gray-600 p-3 rounded">
-              <img src="/info/True.png" alt="Completed" class="inline w-5 h-5 align-middle mr-1" /><span class="text-blue-400 font-bold">${t('Minor:')}</span> ${t('Use a framework or a toolkit to build the frontend.')}
+              <img src="${infoImages.completed}" alt="Completed" class="inline w-5 h-5 align-middle mr-1" /><span class="text-blue-400 font-bold">${t('Minor:')}</span> ${t('Use a framework or a toolkit to build the frontend.')}
             </div>
             <div class="bg-gray-600 p-3 rounded">
-              <img src="/info/True.png" alt="Completed" class="inline w-5 h-5 align-middle mr-1" /><span class="text-blue-400 font-bold">${t('Minor:')}</span> ${t('Use a database for the backend.')}
+              <img src="${infoImages.completed}" alt="Completed" class="inline w-5 h-5 align-middle mr-1" /><span class="text-blue-400 font-bold">${t('Minor:')}</span> ${t('Use a database for the backend.')}
             </div>
             <div class="bg-gray-600 p-3 rounded">
-              <img src="/info/False.png" alt="Not Completed" class="inline w-5 h-5 align-middle mr-1" /><span class="text-orange-400 font-bold">${t('Major:')}</span> ${t('Store the score of a tournament in the Blockchain.')}
+              <img src="${infoImages.notCompleted}" alt="Not Completed" class="inline w-5 h-5 align-middle mr-1" /><span class="text-orange-400 font-bold">${t('Major:')}</span> ${t('Store the score of a tournament in the Blockchain.')}
             </div>
           </div>
         `
       },
       user: {
-        title: `<img src="/info/UserManagment.png" alt="User Management" class="inline w-8 h-8 align-middle mr-2" />${t('User Management [ 2 / 2 ]')}`,
+        title: `<img src="${infoImages.userManagement}" alt="User Management" class="inline w-8 h-8 align-middle mr-2" />${t('User Management [ 2 / 2 ]')}`,
         content: `
           <div class="text-left space-y-3">
             <div class="bg-gray-600 p-3 rounded">
-              <img src="/info/True.png" alt="Completed" class="inline w-5 h-5 align-middle mr-1" /><span class="text-orange-400 font-bold">${t('Major:')}</span> ${t('Standard user management, authentication, users across tournaments.')}
+              <img src="${infoImages.completed}" alt="Completed" class="inline w-5 h-5 align-middle mr-1" /><span class="text-orange-400 font-bold">${t('Major:')}</span> ${t('Standard user management, authentication, users across tournaments.')}
             </div>
             <div class="bg-gray-600 p-3 rounded">
-              <img src="/info/True.png" alt="Completed" class="inline w-5 h-5 align-middle mr-1" /><span class="text-orange-400 font-bold">${t('Major:')}</span> ${t('Implementing a remote authentication.')}
+              <img src="${infoImages.completed}" alt="Completed" class="inline w-5 h-5 align-middle mr-1" /><span class="text-orange-400 font-bold">${t('Major:')}</span> ${t('Implementing a remote authentication.')}
             </div>
           </div>
         `
       },
       gameplay: {
-        title: `<img src="/info/GamePlay.png" alt="Gameplay" class="inline w-8 h-8 align-middle mr-2" />${t('Gameplay [ 3.5 / 4.5 ]')}`,
+        title: `<img src="${infoImages.gameplay}" alt="Gameplay" class="inline w-8 h-8 align-middle mr-2" />${t('Gameplay [ 3.5 / 4.5 ]')}`,
         content: `
           <div class="text-left space-y-3">
             <div class="bg-gray-600 p-3 rounded">
-              <img src="/info/True.png" alt="Completed" class="inline w-5 h-5 align-middle mr-1" /><span class="text-orange-400 font-bold">${t('Major:')}</span> ${t('Remote players can play Pong together.')}
+              <img src="${infoImages.completed}" alt="Completed" class="inline w-5 h-5 align-middle mr-1" /><span class="text-orange-400 font-bold">${t('Major:')}</span> ${t('Remote players can play Pong together.')}
             </div>
             <div class="bg-gray-600 p-3 rounded">
-              <img src="/info/True.png" alt="Completed" class="inline w-5 h-5 align-middle mr-1" /><span class="text-orange-400 font-bold">${t('Major:')}</span> ${t('Multiple players can play Pong at the same time.')}
+              <img src="${infoImages.completed}" alt="Completed" class="inline w-5 h-5 align-middle mr-1" /><span class="text-orange-400 font-bold">${t('Major:')}</span> ${t('Multiple players can play Pong at the same time.')}
             </div>
             <div class="bg-gray-600 p-3 rounded">
-              <img src="/info/False.png" alt="Not Completed" class="inline w-5 h-5 align-middle mr-1" /><span class="text-orange-400 font-bold">${t('Major:')}</span>${t('Add another game with the same user management.')}
+              <img src="${infoImages.notCompleted}" alt="Not Completed" class="inline w-5 h-5 align-middle mr-1" /><span class="text-orange-400 font-bold">${t('Major:')}</span> ${t('Add another game with the same user management.')}
             </div>
             <div class="bg-gray-600 p-3 rounded">
-              <img src="/info/True.png" alt="Completed" class="inline w-5 h-5 align-middle mr-1" /><span class="text-blue-400 font-bold">${t('Minor:')}</span> ${t('Game customization options (half done).')}
+              <img src="${infoImages.completed}" alt="Completed" class="inline w-5 h-5 align-middle mr-1" /><span class="text-blue-400 font-bold">${t('Minor:')}</span> ${t('Game customization options (half done).')}
             </div>
             <div class="bg-gray-600 p-3 rounded">
-              <img src="/info/True.png" alt="Completed" class="inline w-5 h-5 align-middle mr-1" /><span class="text-orange-400 font-bold">${t('Major:')}</span> ${t('Live chat during the game.')}
+              <img src="${infoImages.completed}" alt="Completed" class="inline w-5 h-5 align-middle mr-1" /><span class="text-orange-400 font-bold">${t('Major:')}</span> ${t('Live chat during the game.')}
             </div>
           </div>
         `
       },
       ai: {
-        title: `<img src="/info/AiAlgo.png" alt="AI Algorithm" class="inline w-8 h-8 align-middle mr-2" />${t('AI-Algorithm [ 1 / 1.5 ]')}`,
+        title: `<img src="${infoImages.aiAlgo}" alt="AI Algorithm" class="inline w-8 h-8 align-middle mr-2" />${t('AI-Algorithm [ 1 / 1.5 ]')}`,
         content: `
           <div class="text-left space-y-3">
             <div class="bg-gray-600 p-3 rounded">
-              <img src="/info/True.png" alt="Completed" class="inline w-5 h-5 align-middle mr-1" /><span class="text-orange-400 font-bold">${t('Major:')}</span> ${t('Introduce an AI opponent.')}
+              <img src="${infoImages.completed}" alt="Completed" class="inline w-5 h-5 align-middle mr-1" /><span class="text-orange-400 font-bold">${t('Major:')}</span> ${t('Introduce an AI opponent.')}
             </div>
             <div class="bg-gray-600 p-3 rounded">
-              <img src="/info/False.png" alt="Not Completed" class="inline w-5 h-5 align-middle mr-1" /><span class="text-blue-400 font-bold">${t('Minor:')}</span> ${t('User and AI statistics dashboard.')}
+              <img src="${infoImages.notCompleted}" alt="Not Completed" class="inline w-5 h-5 align-middle mr-1" /><span class="text-blue-400 font-bold">${t('Minor:')}</span> ${t('User and AI statistics dashboard.')}
             </div>
           </div>
         `
       },
       security: {
-        title: `<img src="/info/Cybersecurity.png" alt="Cybersecurity" class="inline w-8 h-8 align-middle mr-2" />${t('Cybersecurity [ 2 / 2.5 ]')}`,
+        title: `<img src="${infoImages.cybersecurity}" alt="Cybersecurity" class="inline w-8 h-8 align-middle mr-2" />${t('Cybersecurity [ 2 / 2.5 ]')}`,
         content: `
           <div class="text-left space-y-3">
             <div class="bg-gray-600 p-3 rounded">
-              <img src="/info/True.png" alt="Completed" class="inline w-5 h-5 align-middle mr-1" /><span class="text-orange-400 font-bold">${t('Major:')}</span> ${t('Implement WAF/ModSecurity with Hardened Configuration.')}
+              <img src="${infoImages.completed}" alt="Completed" class="inline w-5 h-5 align-middle mr-1" /><span class="text-orange-400 font-bold">${t('Major:')}</span> ${t('Implement WAF/ModSecurity with Hardened Configuration.')}
             </div>
             <div class="bg-gray-600 p-3 rounded">
-              <img src="/info/False.png" alt="Not Completed" class="inline w-5 h-5 align-middle mr-1" /><span class="text-blue-400 font-bold">${t('Minor:')}</span> ${t('GDPR Compliance Options with User Anonymization.')}
+              <img src="${infoImages.notCompleted}" alt="Not Completed" class="inline w-5 h-5 align-middle mr-1" /><span class="text-blue-400 font-bold">${t('Minor:')}</span> ${t('GDPR Compliance Options with User Anonymization.')}
             </div>
             <div class="bg-gray-600 p-3 rounded">
-              <img src="/info/True.png" alt="Completed" class="inline w-5 h-5 align-middle mr-1" /><span class="text-orange-400 font-bold">${t('Major:')}</span> ${t('Implement Two-Factor Authentication (2FA).')}
+              <img src="${infoImages.completed}" alt="Completed" class="inline w-5 h-5 align-middle mr-1" /><span class="text-orange-400 font-bold">${t('Major:')}</span> ${t('Implement Two-Factor Authentication (2FA).')}
             </div>
           </div>
         `
       },
       devops: {
-        title: `<img src="/info/DevOps.png" alt="DevOps" class="inline w-8 h-8 align-middle mr-2" />${t('DevOps [ 2 / 2.5 ]')}`,
+        title: `<img src="${infoImages.devops}" alt="DevOps" class="inline w-8 h-8 align-middle mr-2" />${t('DevOps [ 2 / 2.5 ]')}`,
         content: `
           <div class="text-left space-y-3">
             <div class="bg-gray-600 p-3 rounded">
-              <img src="/info/True.png" alt="Completed" class="inline w-5 h-5 align-middle mr-1" /><span class="text-orange-400 font-bold">${t('Major:')}</span> ${t('Infrastructure Setup for Log Management.')}
+              <img src="${infoImages.completed}" alt="Completed" class="inline w-5 h-5 align-middle mr-1" /><span class="text-orange-400 font-bold">${t('Major:')}</span> ${t('Infrastructure Setup for Log Management.')}
             </div>
             <div class="bg-gray-600 p-3 rounded">
-              <img src="/info/True.png" alt="Completed" class="inline w-5 h-5 align-middle mr-1" /><span class="text-orange-400 font-bold">${t('Major:')}</span> ${t('Designing the Backend as Microservices.')}
+              <img src="${infoImages.completed}" alt="Completed" class="inline w-5 h-5 align-middle mr-1" /><span class="text-orange-400 font-bold">${t('Major:')}</span> ${t('Designing the Backend as Microservices.')}
             </div>
             <div class="bg-gray-600 p-3 rounded">
-              <img src="/info/False.png" alt="Not Completed" class="inline w-5 h-5 align-middle mr-1" /><span class="text-blue-400 font-bold">${t('Minor:')}</span> ${t('Set up ELK (Elasticsearch, Logstash, Kibana) for log management.')}
+              <img src="${infoImages.notCompleted}" alt="Not Completed" class="inline w-5 h-5 align-middle mr-1" /><span class="text-blue-400 font-bold">${t('Minor:')}</span> ${t('Set up ELK (Elasticsearch, Logstash, Kibana) for log management.')}
             </div>
           </div>
         `
       },
       graphics: {
-        title: `<img src="/info/Graphics.png" alt="Graphics" class="inline w-8 h-8 align-middle mr-2" />${t('Graphics [ 1 / 1 ]')}`,
+        title: `<img src="${infoImages.graphics}" alt="Graphics" class="inline w-8 h-8 align-middle mr-2" />${t('Graphics [ 1 / 1 ]')}`,
         content: `
           <div class="text-left space-y-3">
             <div class="bg-gray-600 p-3 rounded">
-              <img src="/info/True.png" alt="Completed" class="inline w-5 h-5 align-middle mr-1" /><span class="text-orange-400 font-bold">${t('Major:')}</span> ${t('Use of advanced 3D techniques.')}
+              <img src="${infoImages.completed}" alt="Completed" class="inline w-5 h-5 align-middle mr-1" /><span class="text-orange-400 font-bold">${t('Major:')}</span> ${t('Use of advanced 3D techniques.')}
             </div>
           </div>
         `
       },
       accessibility: {
-        title: `<img src="/info/Accessibility.png" alt="Accessibility" class="inline w-8 h-8 align-middle mr-2" />${t('Accessibility [ 1 / 2.5 ]')}`,
+        title: `<img src="${infoImages.accessibility}" alt="Accessibility" class="inline w-8 h-8 align-middle mr-2" />${t('Accessibility [ 1 / 2.5 ]')}`,
         content: `
           <div class="text-left space-y-3">
             <div class="bg-gray-600 p-3 rounded">
-              <img src="/info/False.png" alt="Not Completed" class="inline w-5 h-5 align-middle mr-1" /><span class="text-blue-400 font-bold">${t('Minor:')}</span> ${t('Support on all devices.')}
+              <img src="${infoImages.notCompleted}" alt="Not Completed" class="inline w-5 h-5 align-middle mr-1" /><span class="text-blue-400 font-bold">${t('Minor:')}</span> ${t('Support on all devices.')}
             </div>
             <div class="bg-gray-600 p-3 rounded">
-              <img src="/info/True.png" alt="Completed" class="inline w-5 h-5 align-middle mr-1" /><span class="text-blue-400 font-bold">${t('Minor:')}</span> ${t('Expanding Browser Compatibility.')}
+              <img src="${infoImages.completed}" alt="Completed" class="inline w-5 h-5 align-middle mr-1" /><span class="text-blue-400 font-bold">${t('Minor:')}</span> ${t('Expanding Browser Compatibility.')}
             </div>
             <div class="bg-gray-600 p-3 rounded">
-              <img src="/info/True.png" alt="Completed" class="inline w-5 h-5 align-middle mr-1" /><span class="text-blue-400 font-bold">${t('Minor:')}</span> ${t('Multiple language supports.')}
+              <img src="${infoImages.completed}" alt="Completed" class="inline w-5 h-5 align-middle mr-1" /><span class="text-blue-400 font-bold">${t('Minor:')}</span> ${t('Multiple language supports.')}
             </div>
             <div class="bg-gray-600 p-3 rounded">
-              <img src="/info/False.png" alt="Not Completed" class="inline w-5 h-5 align-middle mr-1" /><span class="text-blue-400 font-bold">${t('Minor:')}</span> ${t('Add accessibility features for visually impaired users')}
+              <img src="${infoImages.notCompleted}" alt="Not Completed" class="inline w-5 h-5 align-middle mr-1" /><span class="text-blue-400 font-bold">${t('Minor:')}</span> ${t('Add accessibility features for visually impaired users')}
             </div>
             <div class="bg-gray-600 p-3 rounded">
-              <img src="/info/False.png" alt="Not Completed" class="inline w-5 h-5 align-middle mr-1" /><span class="text-blue-400 font-bold">${t('Minor:')}</span> ${t('Server-Side Rendering (SSR) integration.')}
+              <img src="${infoImages.notCompleted}" alt="Not Completed" class="inline w-5 h-5 align-middle mr-1" /><span class="text-blue-400 font-bold">${t('Minor:')}</span> ${t('Server-Side Rendering (SSR) integration.')}
             </div>
           </div>
         `
       },
       serverside: {
-        title: `<img src="/info/ServerSidePong.png" alt="Server-Side Pong" class="inline w-8 h-8 align-middle mr-2" />${t('Server-Side Pong [ 0 / 2 ]')}`,
+        title: `<img src="${infoImages.serverSidePong}" alt="Server-Side Pong" class="inline w-8 h-8 align-middle mr-2" />${t('Server-Side Pong [ 0 / 2 ]')}`,
         content: `
           <div class="text-left space-y-3">
             <div class="bg-gray-600 p-3 rounded">
-              <img src="/info/False.png" alt="Not Completed" class="inline w-5 h-5 align-middle mr-1" /><span class="text-orange-400 font-bold">${t('Major:')}</span> ${t('Replace basic Pong with server-side Pong and implement an API.')}
+              <img src="${infoImages.notCompleted}" alt="Not Completed" class="inline w-5 h-5 align-middle mr-1" /><span class="text-orange-400 font-bold">${t('Major:')}</span> ${t('Replace basic Pong with server-side Pong and implement an API.')}
             </div>
             <div class="bg-gray-600 p-3 rounded">
-              <img src="/info/False.png" alt="Not Completed" class="inline w-5 h-5 align-middle mr-1" /><span class="text-orange-400 font-bold">${t('Major:')}</span> ${t('Enabling Pong gameplay via CLI against web users with API integration.')}
+              <img src="${infoImages.notCompleted}" alt="Not Completed" class="inline w-5 h-5 align-middle mr-1" /><span class="text-orange-400 font-bold">${t('Major:')}</span> ${t('Enabling Pong gameplay via CLI against web users with API integration.')}
             </div>
           </div>
         `
@@ -389,7 +390,7 @@ private getModuleData(module: string): { title: string; content: string } | null
   }
 
   showModal(type?: InfoType): void {
-      if (type) this.currentInfoType = type;
-      this.show(`info-${this.currentInfoType}`);
+    if (type) this.currentInfoType = type;
+    this.show(`info-${this.currentInfoType}`);
   }
 }

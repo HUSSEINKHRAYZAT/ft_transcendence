@@ -6,7 +6,7 @@ export const APP_CONFIG = {
 
 const HOSTNAME = window.location.hostname;
 
-export const API_BASE_URL = `http://${HOSTNAME}:8080`;
+export const API_BASE_URL = `https://${HOSTNAME}:8080`;
 export const WS_URL = `ws://${HOSTNAME}:3005/ws`;
 
 export const COLORS = {

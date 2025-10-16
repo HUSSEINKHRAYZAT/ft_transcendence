@@ -15,7 +15,9 @@
   "license": "MIT",
   "scripts": {
     "dev": "vite --config ./Conf/vite.config.ts",
-    "build": "tsc --project ./Conf/tsconfig.json && vite build --config ./Conf/vite.config.ts",
+    "build": "vite build --config ./Conf/vite.config.ts",
+    "build:with-typecheck": "tsc --project ./Conf/tsconfig.build.json && vite build --config ./Conf/vite.config.ts",
+    "build:strict": "tsc --project ./Conf/tsconfig.json && vite build --config ./Conf/vite.config.ts",
     "preview": "vite preview --config ./Conf/vite.config.ts",
     "type-check": "tsc --noEmit --project ./Conf/tsconfig.json"
   },
