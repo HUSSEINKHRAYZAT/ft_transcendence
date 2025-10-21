@@ -460,6 +460,12 @@
   "theme.blue": "Blaues Design",
   "theme.purple": "Lila Design",
   "theme.green": "Grünes Design",
+  "Host": "Host",
+  "Your player name": "Dein Spielername",
+  "Connecting to Web socket server…": "Verbindung zum WebSocket-Server wird hergestellt…",
+  "Please wait…": "Bitte warten…",
+  "Server Unavailable": "Server nicht erreichbar",
+  "Web socket server is not running. Please start the server.": "WebSocket-Server läuft nicht. Bitte starten Sie den Server.",
 
   "background_theme.dark": "Dunkler Modus",
   "background_theme.light": "Heller Modus",

@@ -460,6 +460,12 @@
   "theme.blue": "موضوع أزرق",
   "theme.purple": "موضوع بنفسجي",
   "theme.green": "موضوع أخضر",
+  "Host": "المضيف",
+  "Your player name": "اسم اللاعب الخاص بك",
+  "Connecting to Web socket server…": "جارٍ الاتصال بخادم WebSocket…",
+  "Please wait…": "يرجى الانتظار…",
+  "Server Unavailable": "الخادم غير متاح",
+  "Web socket server is not running. Please start the server.": "خادم WebSocket غير قيد التشغيل. يرجى تشغيل الخادم.",
 
   "background_theme.dark": "الوضع الداكن",
   "background_theme.light": "الوضع الفاتح",

@@ -1,4 +1,4 @@
-import { t } from "../langs/LanguageManager";
+import { languageManager } from "../langs/LanguageManager";
 
 interface ThemeConfig {
   name: string;
@@ -15,6 +15,9 @@ class SimpleThemeManager {
   private currentTheme: string = 'lime';
   private themeStyleElement: HTMLStyleElement | null = null;
   private defaultTheme: string = 'lime';
+  private readonly handleTranslationsReady = () => {
+    this.reapplyCurrentTheme();
+  };
 
   private themes: { [key: string]: ThemeConfig } = {
     lime: {
@@ -95,6 +98,7 @@ class SimpleThemeManager {
   };
 
   constructor() {
+    window.addEventListener('languageResourcesReady', this.handleTranslationsReady);
     this.init();
   }
 
@@ -109,6 +113,12 @@ class SimpleThemeManager {
     console.log('🎨 Simple Theme Manager initialized');
   }
 
+  private reapplyCurrentTheme(): void {
+    if (this.currentTheme) {
+      this.applyTheme(this.currentTheme);
+    }
+  }
+
   getAvailableThemes(): ThemeConfig[] {
     return Object.values(this.themes);
   }
@@ -117,13 +127,17 @@ class SimpleThemeManager {
   getAvailableThemesTranslated(): Array<ThemeConfig & { displayName: string }> {
     return Object.values(this.themes).map(theme => ({
       ...theme,
-      displayName: t(theme.displayNameKey)
+      displayName: this.translateDisplayName(theme.displayNameKey)
     }));
   }
 
   resetTheme(): void {
     this.applyTheme(this.defaultTheme);
     console.log(`🎨 Theme reset to default: ${this.defaultTheme}`);
+  }
+
+  private translateDisplayName(key: string): string {
+    return languageManager.translateIfAvailable(key) ?? key;
   }
 
   getCurrentTheme(): string {
@@ -141,7 +155,7 @@ class SimpleThemeManager {
 
     return {
       ...theme,
-      displayName: t(theme.displayNameKey)
+      displayName: this.translateDisplayName(theme.displayNameKey)
     };
   }
 
@@ -168,13 +182,15 @@ class SimpleThemeManager {
       detail: { theme, themeName }
     }));
 
-    console.log(`🎨 Applied theme: ${t(theme.displayNameKey)}`);
+    const displayName = this.translateDisplayName(theme.displayNameKey);
+    console.log(`🎨 Applied theme: ${displayName}`);
     return true;
   }
 
   private generateThemeCSS(theme: ThemeConfig): string {
+    const displayName = this.translateDisplayName(theme.displayNameKey);
     let css = `
-/* Simple Theme: ${t(theme.displayNameKey)} */
+/* Simple Theme: ${displayName} */
 :root {
 `;
 

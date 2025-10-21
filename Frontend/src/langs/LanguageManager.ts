@@ -1,4 +1,6 @@
 // src/langs/LanguageManager.ts
+import enTranslations from './en.json';
+
 export type SupportedLanguage = 'en' | 'fr' | 'de' | 'ar';
 
 interface LanguageOption {
@@ -22,35 +24,58 @@ export class LanguageManager {
   private currentLanguage: SupportedLanguage = DEFAULT_LANGUAGE;
   private listeners: ((language: SupportedLanguage) => void)[] = [];
   private translations: Record<SupportedLanguage, Record<string, string>> = {
-    en: {},
+    en: enTranslations as Record<string, string>,
     fr: {},
     de: {},
     ar: {}
   };
+  private translationsLoaded = false;
+  private translationsReadyPromise: Promise<void>;
+  private resolveTranslationsReady!: () => void;
 
   constructor() {
+    this.translationsReadyPromise = new Promise((resolve) => {
+      this.resolveTranslationsReady = resolve;
+    });
+
     this.loadStoredLanguage();
-    this.loadTranslations();
+    void this.loadTranslations();
     console.log(`🌍 LanguageManager initialized with language: ${this.currentLanguage}`);
   }
 
   private async loadTranslations(): Promise<void> {
     try {
-      const [enTranslations, frTranslations, deTranslations, arTranslations] = await Promise.all([
-        import('./en.json'),
+      const [frTranslations, deTranslations, arTranslations] = await Promise.all([
         import('./fr.json'),
         import('./de.json'),
         import('./ar.json')
       ]);
 
-      this.translations.en = enTranslations.default || enTranslations;
       this.translations.fr = frTranslations.default || frTranslations;
       this.translations.de = deTranslations.default || deTranslations;
       this.translations.ar = arTranslations.default || arTranslations;
 
+      this.translationsLoaded = true;
+      this.resolveTranslationsReady();
+
+      // Trigger subscribers so they can refresh content with fully loaded translations
+      this.listeners.forEach(listener => {
+        try {
+          listener(this.currentLanguage);
+        } catch (error) {
+          console.error('Error in language listener after translation load:', error);
+        }
+      });
+
+      window.dispatchEvent(new CustomEvent('languageResourcesReady', {
+        detail: { language: this.currentLanguage }
+      }));
+
       console.log('✅ Translation files loaded successfully');
     } catch (error) {
       console.error('❌ Error loading translation files:', error);
+      this.translationsLoaded = true;
+      this.resolveTranslationsReady();
     }
   }
 
@@ -158,7 +183,9 @@ export class LanguageManager {
     if (translation === undefined) {
       const fallback = this.translations.en[key];
       if (fallback === undefined) {
-        console.warn(`Translation not found for key: ${key}`);
+        if (this.translationsLoaded) {
+          console.warn(`Translation not found for key: ${key}`);
+        }
         return key;
       }
       return this.replaceVariables(fallback, replacements);
@@ -187,6 +214,26 @@ export class LanguageManager {
   hasTranslation(key: string, language?: SupportedLanguage): boolean {
     const lang = language || this.currentLanguage;
     return this.translations[lang][key] !== undefined;
+  }
+
+  translateIfAvailable(key: string, replacements?: Record<string, string | number>, language?: SupportedLanguage): string | null {
+    const lang = language || this.currentLanguage;
+    const current = this.translations[lang]?.[key];
+    if (current !== undefined) {
+      return this.replaceVariables(current, replacements);
+    }
+
+    const fallback = this.translations.en?.[key];
+    if (fallback !== undefined) {
+      return this.replaceVariables(fallback, replacements);
+    }
+
+    return null;
+  }
+
+  async whenReady(): Promise<void> {
+    if (this.translationsLoaded) return;
+    await this.translationsReadyPromise;
   }
 
   syncWithSettings(): void {

@@ -136,16 +136,25 @@ export class SocketManager {
 
   // WebSocket server URL - dynamically detect protocol and avoid fixed IPs
   private getServerURL(): string {
-    const env = (import.meta as any).env;
-    if (env?.VITE_SOCKET_URL) {
-      return env.VITE_SOCKET_URL;
+    const env = (import.meta as any).env ?? {};
+    const explicitWs =
+      env.VITE_REALTIME_WS_URL ||
+      env.VITE_SOCKET_URL ||
+      env.VITE_SOCKET_WS_URL;
+
+    if (explicitWs) {
+      return explicitWs;
     }
 
-    // Auto-detect based on current location
+    if (env.DEV) {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const host = window.location.hostname;
+      const port = env.VITE_REALTIME_PORT ?? '3020';
+      return `${protocol}//${host}:${port}/`;
+    }
+
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.hostname;
-    const port = '3020';
-    return `${protocol}//${host}:${port}`;
+    return `${protocol}//${window.location.host}/realtime/`;
   }
 
   constructor() {
@@ -712,21 +721,69 @@ export class SocketManager {
    * Check if Web socket server is available
    */
   public static async checkServerAvailability(): Promise<boolean> {
-    try {
-      // Auto-detect health check URL
-      const protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
-      const host = window.location.hostname;
-      const port = '3020';
-      const url = `${protocol}//${host}:${port}/health`;
+    const env = (import.meta as any).env ?? {};
 
+    if (env.DEV && !env.VITE_REALTIME_HTTP_URL) {
+      // In dev we often run into self-signed cert issues; skip proactive health check
+      return true;
+    }
+
+    const url = SocketManager.resolveHealthCheckURL();
+    try {
       const response = await fetch(url, {
         method: 'GET',
         signal: AbortSignal.timeout(3000)
       });
-      return response.ok;
-    } catch {
+
+      if (!response.ok) {
+        console.warn('[SocketManager] Realtime health check returned non-OK status:', response.status);
+        return false;
+      }
+
+      const payload = await response.text().catch(() => '');
+      if (payload) {
+        try {
+          JSON.parse(payload);
+        } catch {
+          console.warn('[SocketManager] Realtime health check response was not JSON; continuing anyway');
+        }
+      }
+
+      return true;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+
+      if (message.includes('net::ERR_CERT_AUTHORITY_INVALID')
+        || message.includes('SSL')
+        || message.includes('certificate')
+        || message.includes('Failed to fetch')
+        || message.includes('NetworkError')
+        || env.DEV) {
+        console.warn('[SocketManager] Health check blocked or failed in dev; assuming realtime service is available.');
+        return true;
+      }
+
+      console.warn('[SocketManager] Health check failed:', error);
       return false;
     }
+  }
+
+  private static resolveHealthCheckURL(): string {
+    const env = (import.meta as any).env ?? {};
+    const explicitHttp = env.VITE_REALTIME_HTTP_URL;
+
+    if (explicitHttp) {
+      return `${explicitHttp.replace(/\/+$/, '')}/health`;
+    }
+
+    if (env.DEV) {
+      const protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
+      const host = window.location.hostname;
+      const port = env.VITE_REALTIME_PORT ?? '3020';
+      return `${protocol}//${host}:${port}/health`;
+    }
+
+    return '/realtime/health';
   }
 }
 

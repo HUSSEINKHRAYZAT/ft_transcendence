@@ -460,6 +460,12 @@
   "theme.blue": "Blue Theme",
   "theme.purple": "Purple Theme",
   "theme.green": "Green Theme",
+  "Host": "Host",
+  "Your player name": "Your player name",
+  "Connecting to Web socket server…": "Connecting to Web socket server…",
+  "Please wait…": "Please wait…",
+  "Server Unavailable": "Server unavailable",
+  "Web socket server is not running. Please start the server.": "Web socket server is not running. Please start the server.",
 
   "background_theme.dark": "Dark Mode",
   "background_theme.light": "Light Mode",
@@ -539,4 +545,3 @@
   "Enter the 6-character tournament code": "Enter the 6-character tournament code",
   "No blocked users" : "No blocked users"
 }
-

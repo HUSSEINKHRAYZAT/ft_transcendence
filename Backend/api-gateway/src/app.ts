@@ -6,6 +6,7 @@ import { tracingPlugin } from './plugins/tracing';
 import { jwtPlugin } from './plugins/jwt';
 import proxyRoutes from './routes/proxy.route';
 import authRoutes from './routes/auth.route';
+import pongRoutes from './routes/pong.route';
 import { swaggerPlugin } from './plugins/swagger';
 import httpProxy from '@fastify/http-proxy';
 
@@ -19,7 +20,8 @@ export async function buildApp() {
   await app.register(jwtPlugin);
   await app.register(swaggerPlugin);
 
-  await app.register(authRoutes); 
+  await app.register(authRoutes);
+  await app.register(pongRoutes);
   await app.register(proxyRoutes);
 
   await app.register(httpProxy, {

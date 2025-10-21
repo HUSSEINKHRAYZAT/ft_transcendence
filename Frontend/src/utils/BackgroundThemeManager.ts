@@ -1,4 +1,4 @@
-import { t } from "../langs/LanguageManager";
+import { languageManager } from "../langs/LanguageManager";
 
 interface BackgroundThemeConfig {
   name: string;
@@ -20,6 +20,9 @@ class BackgroundThemeManager {
   private currentTheme: string = 'dark';
   private readonly defaultTheme: string = 'dark';
   private backgroundStyleElement: HTMLStyleElement | null = null;
+  private readonly handleTranslationsReady = () => {
+    this.reapplyCurrentTheme();
+  };
 
   private themes: { [key: string]: BackgroundThemeConfig } = {
     dark: {
@@ -153,7 +156,12 @@ class BackgroundThemeManager {
   };
 
   constructor() {
+    window.addEventListener('languageResourcesReady', this.handleTranslationsReady);
     this.init();
+  }
+
+  private translateDisplayName(key: string): string {
+    return languageManager.translateIfAvailable(key) ?? key;
   }
 
   resetTheme(): void {
@@ -172,6 +180,12 @@ class BackgroundThemeManager {
     console.log('🌙 Background Theme Manager initialized');
   }
 
+  private reapplyCurrentTheme(): void {
+    if (this.currentTheme) {
+      this.applyBackgroundTheme(this.currentTheme);
+    }
+  }
+
   getAvailableThemes(): BackgroundThemeConfig[] {
     return Object.values(this.themes);
   }
@@ -180,7 +194,7 @@ class BackgroundThemeManager {
   getAvailableThemesTranslated(): Array<BackgroundThemeConfig & { displayName: string }> {
     return Object.values(this.themes).map(theme => ({
       ...theme,
-      displayName: t(theme.displayNameKey)
+      displayName: this.translateDisplayName(theme.displayNameKey)
     }));
   }
 
@@ -199,7 +213,7 @@ class BackgroundThemeManager {
 
     return {
       ...theme,
-      displayName: t(theme.displayNameKey)
+      displayName: this.translateDisplayName(theme.displayNameKey)
     };
   }
 
@@ -226,15 +240,17 @@ class BackgroundThemeManager {
       detail: { theme, themeName }
     }));
 
-    console.log(`🌙 Applied background theme: ${t(theme.displayNameKey)}`);
+    const displayName = this.translateDisplayName(theme.displayNameKey);
+    console.log(`🌙 Applied background theme: ${displayName}`);
     return true;
   }
 
   private generateBackgroundCSS(theme: BackgroundThemeConfig): string {
     const colors = theme.colors;
+    const displayName = this.translateDisplayName(theme.displayNameKey);
 
     let css = `
-/* Background Theme: ${t(theme.displayNameKey)} */
+/* Background Theme: ${displayName} */
 :root {
   /* Background theme variables */
   --bg-primary: ${colors.primary};

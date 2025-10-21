@@ -5,7 +5,7 @@ import { ApiClient } from "../api";
 import { overlay } from "../game/ui/overlay";
 import { FriendInviteModal } from "../components/modals/FriendInviteModal";
 import { themeBridge } from "../game/utils/ThemeBridge";
-import { t } from "../langs";
+import { t, languageManager } from "../langs";
 import { API_BASE_URL } from "../utils/Constants";
 
 export function startLocal2P(currentUser: any, onResolve: (cfg: GameConfig) => void) {
@@ -54,13 +54,16 @@ export function startVs3AI(aiLevel: number, currentUser: any, onResolve: (cfg: G
 
 // === Web socket Only (new UI) ===
 export async function createSocketIORoom(gameMode: '2p' | '4p', currentUser: any, onResolve: (cfg: GameConfig) => void) {
+    await languageManager.whenReady();
+    const tr = (key: string) => languageManager.translateIfAvailable(key) ?? key;
+
     // Check if user can join a new game
     const sessionCheck = await ApiClient.checkUserCanJoin('game');
     if (!sessionCheck.canJoin) {
-        overlay(getStyledCard(`<div style="font-weight:700; margin-bottom:16px; color:#ef4444; font-size:18px;">⚠️ ${t('Cannot Create Game')}</div>
+        overlay(getStyledCard(`<div style="font-weight:700; margin-bottom:16px; color:#ef4444; font-size:18px;">⚠️ ${tr('Cannot Create Game')}</div>
       <div style="margin-bottom:16px; color:#d1d5db;">${sessionCheck.reason}</div>
       <div style="margin-top:20px; text-align:right;">
-        <button class="glass-button" data-close>${t('Got it!')}</button>
+        <button class="glass-button" data-close>${tr('Got it!')}</button>
       </div>`));
         return;
     }
@@ -74,10 +77,10 @@ export async function createSocketIORoom(gameMode: '2p' | '4p', currentUser: any
 
     const nameOv = overlay(getStyledCard(`
     <h2 style="font-weight:700; margin-bottom:20px; color:${primaryHex}; font-size:20px; text-align:center;">
-      🎯 ${t('Host')} <span style="color:#facc15;">${gameMode.toUpperCase()}</span> ${t('Game')}
+      🎯 ${tr('Host')} <span style="color:#facc15;">${gameMode.toUpperCase()}</span> ${tr('Game')}
     </h2>
     <label for="hostPlayerName" style="display:block; margin-bottom:8px; color:#e5e7eb; font-size:18px; font-weight:700;">
-      🎮 ${t('Your player name')}:
+      🎮 ${tr('Your player name')}:
     </label>
     <input
       id="hostPlayerName"
@@ -89,10 +92,10 @@ export async function createSocketIORoom(gameMode: '2p' | '4p', currentUser: any
     />
     <div style="display:flex; gap:12px; margin-top:28px;">
       <button class="glass-button" data-close style="flex:1; padding:12px; border-radius:10px; font-size:15px;">
-        ${t('Cancel')}
+        ${tr('Cancel')}
       </button>
       <button class="glass-button" id="createRoomBtn" style="flex:1; padding:12px; border-radius:10px; font-size:15px;">
-        ${t('Create Room')}
+        ${tr('Create Room')}
       </button>
     </div>
   `));
@@ -104,37 +107,37 @@ export async function createSocketIORoom(gameMode: '2p' | '4p', currentUser: any
         const finalPlayerName = (nameInput.value.trim() || playerNameDefault).slice(0, 20);
         nameOv.remove();
 
-        const loadingOv = overlay(getStyledCard(`<div style="font-weight:700; margin-bottom:8px;">🔌 ${t('Connecting to Web socket server…')}</div>
-      <div style="margin-bottom:16px; color:#d1d5db;">${t('Please wait…')}</div>`));
+        const loadingOv = overlay(getStyledCard(`<div style="font-weight:700; margin-bottom:8px;">🔌 ${tr('Connecting to Web socket server…')}</div>
+      <div style="margin-bottom:16px; color:#d1d5db;">${tr('Please wait…')}</div>`));
 
         try {
             const serverAvailable = await (socketManager.constructor as any).checkServerAvailability();
             if (!serverAvailable) {
-                loadingOv.innerHTML = getStyledCard(`<div style="font-weight:700; margin-bottom:8px;">❌ ${t('Server Unavailable')}</div>
-          <div style="margin-bottom:16px; color:#d1d5db;">${t('Web socket server is not running. Please start the server.')}</div>
+                loadingOv.innerHTML = getStyledCard(`<div style="font-weight:700; margin-bottom:8px;">❌ ${tr('Server Unavailable')}</div>
+          <div style="margin-bottom:16px; color:#d1d5db;">${tr('Web socket server is not running. Please start the server.')}</div>
           <div style="margin:8px 0; padding:8px; background:black/20; border-radius:8px; font-family:monospace; font-size:12px;">
             cd server<br>npm install<br>node server.js
           </div>
-          <div style="margin-top:10px; text-align:right;"><button class="glass-button" data-close>${t('Close')}</button></div>`);
+          <div style="margin-top:10px; text-align:right;"><button class="glass-button" data-close>${tr('Close')}</button></div>`);
                 return;
             }
 
             await socketManager.connect(finalPlayerName);
-            loadingOv.innerHTML = getStyledCard(`<div style="font-weight:700; margin-bottom:8px;">🏠 ${t('Creating')} ${gameMode.toUpperCase()} ${t('room…')}</div><div style="margin-bottom:16px; color:#d1d5db;">${t('Setting up multiplayer session…')}</div>`);
+            loadingOv.innerHTML = getStyledCard(`<div style="font-weight:700; margin-bottom:8px;">🏠 ${tr('Creating')} ${gameMode.toUpperCase()} ${tr('room…')}</div><div style="margin-bottom:16px; color:#d1d5db;">${tr('Setting up multiplayer session…')}</div>`);
             const roomId = await socketManager.createRoom(gameMode);
             if (!roomId)
-                throw new Error(t('Failed to create room'));
+                throw new Error(tr('Failed to create room'));
 
             loadingOv.innerHTML = getStyledCard(`
-        <div style="font-weight:700; margin-bottom:16px; color:#84cc16; font-size:18px;">✅ ${t('Room Created Successfully!')}</div>
-        <div style="margin-bottom:12px; color:#d1d5db;">${t('Share this room ID with other players')}:</div>
+        <div style="font-weight:700; margin-bottom:16px; color:#84cc16; font-size:18px;">✅ ${tr('Room Created Successfully!')}</div>
+        <div style="margin-bottom:12px; color:#d1d5db;">${tr('Share this room ID with other players')}:</div>
         <div style="font-size:28px; font-weight:800; margin:16px 0; padding:16px; background:rgba(0,0,0,0.4); border-radius:12px; text-align:center; border:2px solid #84cc16; color:#84cc16; letter-spacing:2px; font-family:monospace;">${roomId}</div>
-        <div style="margin-bottom:16px; color:#9ca3af; text-align:center;">${t('Other players can join using this code')}</div>
-        <div id="room-status" style="margin-bottom:16px; color:#f59e0b; text-align:center; font-weight:600;">⏳ ${t('Waiting for players to join...')}</div>
+        <div style="margin-bottom:16px; color:#9ca3af; text-align:center;">${tr('Other players can join using this code')}</div>
+        <div id="room-status" style="margin-bottom:16px; color:#f59e0b; text-align:center; font-weight:600;">⏳ ${tr('Waiting for players to join...')}</div>
         <div style="display:flex; gap:8px; margin-top:20px;">
-          <button class="glass-button" data-close style="flex:1;">${t('Cancel')}</button>
-          <button class="glass-button" id="invite-friends-btn" style="flex:1; opacity:0.5;" disabled>🎯 ${t('Invite Friends')}</button>
-          <button class="glass-button" id="start-game-btn" data-start style="flex:1; opacity:0.5;" disabled>${t('Start Game')}</button>
+          <button class="glass-button" data-close style="flex:1;">${tr('Cancel')}</button>
+          <button class="glass-button" id="invite-friends-btn" style="flex:1; opacity:0.5;" disabled>🎯 ${tr('Invite Friends')}</button>
+          <button class="glass-button" id="start-game-btn" data-start style="flex:1; opacity:0.5;" disabled>${tr('Start Game')}</button>
         </div>
       `);
 
