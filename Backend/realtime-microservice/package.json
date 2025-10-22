@@ -1,0 +1,26 @@
+{
+  "name": "realtime-microservice",
+  "version": "1.0.0",
+  "description": "WebSocket service for Pong realtime game sync",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "ts-node src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@fastify/cors": "^11.1.0",
+    "fastify": "^5.5.0",
+    "ws": "^8.13.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "@types/ws": "^8.5.10",
+    "nodemon": "^3.0.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.2"
+  }
+}
