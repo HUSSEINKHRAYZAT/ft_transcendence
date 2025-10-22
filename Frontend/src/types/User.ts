@@ -23,6 +23,8 @@ export interface User {
 export interface UserStats {
   winCount: number;
   lossCount: number;
+  tournamentWinCount: number;
+  tournamentCount: number;
   totalGames: number;
 }
 

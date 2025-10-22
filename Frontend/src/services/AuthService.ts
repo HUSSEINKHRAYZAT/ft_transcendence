@@ -1783,9 +1783,150 @@ getAvatarPath(profilePath: string | null | undefined): string {
         return profilePath;
     }
 
-    // Otherwise, prepend /avatars/
     return `/avatars/${profilePath}`;
 }
+
+
+	async incrementWinCount(userId: string): Promise<boolean> {
+		if (!this.state.token) {
+			console.error('No auth token available');
+			return false;
+		}
+
+		try {
+			const response = await fetch(`${API_BASE_URL}/statistics/${userId}`, {
+				method: 'PATCH',
+				headers: {
+					'Authorization': `Bearer ${this.state.token}`,
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({
+					winDelta: 1,
+					lossDelta: 0,
+					tWinDelta: 0,
+					tCountDelta: 0
+				}),
+			});
+
+			if (!response.ok) {
+				console.error('Failed to increment win count:', response.status);
+				return false;
+			}
+
+			// Refresh statistics after update
+			await this.refreshStatistics();
+			return true;
+		} catch (error) {
+			console.error('Error incrementing win count:', error);
+			return false;
+		}
+	}
+
+	async incrementLossCount(userId: string): Promise<boolean> {
+		if (!this.state.token) {
+			console.error('No auth token available');
+			return false;
+		}
+
+		try {
+			const response = await fetch(`${API_BASE_URL}/statistics/${userId}`, {
+				method: 'PATCH',
+				headers: {
+					'Authorization': `Bearer ${this.state.token}`,
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({
+					winDelta: 0,
+					lossDelta: 1,
+					tWinDelta: 0,
+					tCountDelta: 0
+				}),
+			});
+
+			if (!response.ok) {
+				console.error('Failed to increment loss count:', response.status);
+				return false;
+			}
+
+			// Refresh statistics after update
+			await this.refreshStatistics();
+			return true;
+		} catch (error) {
+			console.error('Error incrementing loss count:', error);
+			return false;
+		}
+	}
+
+	async incrementTournamentWin(userId: string): Promise<boolean> {
+		if (!this.state.token) {
+			console.error('No auth token available');
+			return false;
+		}
+
+		try {
+			const response = await fetch(`${API_BASE_URL}/statistics/${userId}`, {
+				method: 'PATCH',
+				headers: {
+					'Authorization': `Bearer ${this.state.token}`,
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({
+					winDelta: 0,
+					lossDelta: 0,
+					tWinDelta: 1,
+					tCountDelta: 1
+				}),
+			});
+
+			if (!response.ok) {
+				console.error('Failed to increment tournament win:', response.status);
+				return false;
+			}
+
+			// Refresh statistics after update
+			await this.refreshStatistics();
+			return true;
+		} catch (error) {
+			console.error('Error incrementing tournament win:', error);
+			return false;
+		}
+	}
+
+	async incrementTournamentCount(userId: string): Promise<boolean> {
+		if (!this.state.token) {
+			console.error('No auth token available');
+			return false;
+		}
+
+		try {
+			const response = await fetch(`${API_BASE_URL}/statistics/${userId}`, {
+				method: 'PATCH',
+				headers: {
+					'Authorization': `Bearer ${this.state.token}`,
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({
+					winDelta: 0,
+					lossDelta: 0,
+					tWinDelta: 0,
+					tCountDelta: 1
+				}),
+			});
+
+			if (!response.ok) {
+				console.error('Failed to increment tournament count:', response.status);
+				return false;
+			}
+
+			// Refresh statistics after update
+			await this.refreshStatistics();
+			return true;
+		} catch (error) {
+			console.error('Error incrementing tournament count:', error);
+			return false;
+		}
+	}
+
 }
 
 export const authService = new AuthService();

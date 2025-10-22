@@ -18,6 +18,7 @@ import { ApiClient } from "../../api";
 import type { GameConfig, ObstacleShape } from "../../types";
 import type { RemoteMsg } from "../utils/helpers";
 import { GameState } from "./GameState";
+import { authService } from "../../services/AuthService";
 import {
   clamp,
   clampHorizontal,
@@ -167,14 +168,14 @@ export class Pong3D {
 
     this.engine = new Engine(canvas, true);
     this.scene = new Scene(this.engine);
-    
+
     // Initialize theme system first
     this.currentGameTheme = themeBridge.getCurrentTheme();
     this.scene.clearColor = this.currentGameTheme.background;
-    
+
     // Set ambient color for better overall scene brightness
     this.scene.ambientColor = new Color3(0.4, 0.4, 0.4); // Increased ambient light
-    
+
     // Initialize background effects with theme color
     const primaryHex = `#${Math.round(this.currentGameTheme.primary.r * 255).toString(16).padStart(2, '0')}${Math.round(this.currentGameTheme.primary.g * 255).toString(16).padStart(2, '0')}${Math.round(this.currentGameTheme.primary.b * 255).toString(16).padStart(2, '0')}`;
     this.backgroundEffects = new GameBackgroundEffects(primaryHex);
@@ -266,7 +267,7 @@ export class Pong3D {
   }
 
   /* ---------------- Utility Methods ---------------- */
-  
+
   private hashString(str: string): number {
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
@@ -281,9 +282,9 @@ export class Pong3D {
     const c = v * s;
     const x = c * (1 - Math.abs(((h * 6) % 2) - 1));
     const m = v - c;
-    
+
     let r = 0, g = 0, b = 0;
-    
+
     if (h >= 0 && h < 1/6) {
       r = c; g = x; b = 0;
     } else if (h >= 1/6 && h < 2/6) {
@@ -297,7 +298,7 @@ export class Pong3D {
     } else {
       r = c; g = 0; b = x;
     }
-    
+
     return new Color3(r + m, g + m, b + m);
   }
 
@@ -347,7 +348,7 @@ export class Pong3D {
   private updateNamesUI() {
   Frontend.updateNamesUI(this);
   }
-  
+
   private updateScoreUI() {
   Frontend.updateScoreUI(this);
   }
@@ -379,7 +380,7 @@ export class Pong3D {
     // Set disposed flag immediately to prevent any further operations
     this.isDisposed = true;
     console.log('🗑️ Game instance marked as disposed');
-    
+
     if (this.themeUnsubscribe) {
       this.themeUnsubscribe();
       this.themeUnsubscribe = undefined;
@@ -413,7 +414,7 @@ export class Pong3D {
 
   private stopAllAudio() {
     console.log("🔇 Stopping all audio to prevent loops");
-    
+
     // Stop all sound categories
     Object.values(this.sounds).forEach(soundArray => {
       soundArray.forEach(sound => {
@@ -453,17 +454,17 @@ export class Pong3D {
       console.log('🚫 Game disposed, skipping beginMatch');
       return;
     }
-    
+
     this.hideWaitingOverlay();
 
     // For Socket.IO games (4P), notify other players to start game
     if (socketManager.connected) {
       console.log("🎮 Host beginMatch() - starting Socket.IO game flow");
-      
+
       // Notify other players to start the game (countdown will be handled in game_started event)
       console.log("🎮 Host calling socketManager.startGame()");
       socketManager.startGame();
-      
+
       // Host will start countdown when receiving game_started confirmation
       return;
     }
@@ -796,7 +797,7 @@ this.rightWall = wall(
     const map: Record<number, number> = {
       0: 0,            // Player 0 (left paddle): No rotation, already on left
       1: Math.PI,      // Player 1 (right paddle): Rotate 180° so right becomes left
-      2: -Math.PI / 2, // Player 2 (bottom paddle): Rotate -90° so bottom becomes left  
+      2: -Math.PI / 2, // Player 2 (bottom paddle): Rotate -90° so bottom becomes left
       3: Math.PI / 2,  // Player 3 (top paddle): Rotate 90° so top becomes left
     };
     this.viewTheta = map[idx] ?? 0;
@@ -916,8 +917,8 @@ this.rightWall = wall(
     "/textures/40.jpg",
     "/textures/41.jpg",
   ];
-  const actualTextureIndex = textureIndex !== undefined 
-    ? textureIndex 
+  const actualTextureIndex = textureIndex !== undefined
+    ? textureIndex
     : this.hashString(`${x.toFixed(3)}-${z.toFixed(3)}`) % textures.length;
   const randomTexture = textures[actualTextureIndex];
 
@@ -1118,7 +1119,7 @@ this.rightWall = wall(
         this.handleRemoteState(state);
       }
     });
-    
+
     // Listen for game exit messages via Socket.IO
     socketManager.on("game_exit", (data) => {
       console.log("🚪 Received game exit signal via Socket.IO:", data);
@@ -1164,7 +1165,7 @@ this.rightWall = wall(
 
     socketManager.on("player_left", async (playerId) => {
       console.log("Player left:", playerId);
-      
+
       // Only end the active game if it's in progress
       if (this.gameState.matchReady) {
         const localPlayerIndices = this.getLocalControlledIndices();
@@ -1228,18 +1229,18 @@ this.rightWall = wall(
 
     socketManager.on("game_started", (data) => {
       console.log("Game started signal received", data);
-      
+
       // Update player assignments if provided
       if (data && data.players) {
         const myPlayer = data.players.find((p: any) => p.id === socketManager.id);
         if (myPlayer) {
           this.remoteIndex = myPlayer.playerIndex;
           console.log(`🎮 My player index: ${this.remoteIndex} (isHost: ${this.isHost})`);
-          
+
           // Set view rotation so this player's paddle appears on the right side
           this.setViewRotationForIndex(this.remoteIndex);
           console.log(`🎮 Assigned player index ${this.remoteIndex}; camera set. (alpha=${this.camera.alpha}, theta=${this.viewTheta})`);
-          
+
           // Update display names with correct order for all players
         } else {
           console.log(`🎮 WARNING: Could not find my player in data.players. Available players:`, data.players);
@@ -1250,21 +1251,21 @@ this.rightWall = wall(
             console.log(`🎮 Fallback: Set host as player 0 with rotation`);
           }
         }
-        
+
         // Update display names with correct order for all players
         if (this.config.displayNames && data.players) {
             // Clear existing names first
             for (let i = 0; i < 4; i++) {
               this.config.displayNames[i] = "";
             }
-            
+
             // Set actual player names
             data.players.forEach((player: any, index: number) => {
               if (index < 4 && player.name && this.config.displayNames) {
                 this.config.displayNames[index] = player.name;
               }
             });
-            
+
             // For any remaining slots without names, set appropriate defaults
             for (let i = 0; i < 4; i++) {
               if (this.config.displayNames && !this.config.displayNames[i]) {
@@ -1272,16 +1273,16 @@ this.rightWall = wall(
               }
             }
           }
-          
+
           this.updateNamesUI();
         }
-      
+
       // Both host and guests show countdown on game_started event for synchronization
       if (!this.gameState.matchReady) {
         console.log(`🎮 Player ${this.isHost ? 'host' : 'guest'} received game_started - showing countdown (remoteIndex: ${this.remoteIndex})`);
         this.hideWaitingOverlay();
-        
-        // Show countdown for all Socket.IO players simultaneously  
+
+        // Show countdown for all Socket.IO players simultaneously
         if (this.config.skipCountdown) {
           console.log("⏭️ game_started skipping countdown");
           this.gameState.matchReady = true;
@@ -1303,13 +1304,13 @@ this.rightWall = wall(
 
     socketManager.on("game_ready", (data) => {
       console.log("Game ready signal received:", data);
-      
+
       // Update display names based on proper player positions
       if (this.config.displayNames) {
         this.config.displayNames[0] = data.hostPlayer.name;
         this.config.displayNames[1] = data.joinerPlayer.name;
       }
-      
+
       // Determine if this client is host or joiner and set remote index accordingly
       if (socketManager.id === data.hostPlayer.id) {
         this.remoteIndex = 0; // Host is always player 0
@@ -1322,11 +1323,11 @@ this.rightWall = wall(
           this.setViewRotationForIndex(this.remoteIndex);
         }
       }
-      
+
       // Update UI with correct names and positions
       this.updateNamesUI();
       this.updateScoreUI();
-      
+
       // If both players are ready, allow game to start
       if (this.isHost && this.connectedGuests >= this.requiredGuests) {
         this.checkMatchReady();
@@ -1352,7 +1353,7 @@ this.rightWall = wall(
       console.log('🚫 Game disposed, skipping checkMatchReady');
       return;
     }
-    
+
     // Check if we have enough players to start the match
     if (this.connectedGuests >= this.requiredGuests) {
       await this.beginMatch();
@@ -1382,22 +1383,22 @@ this.rightWall = wall(
       console.log("🚪 Received game exit signal from:", stateMsg.exitedBy);
       this.gameState.matchReady = false;
       this.stopAllAudio();
-      
-      const exitMessage = stateMsg.playerRole === 'Host' 
-        ? `🏠 Game ended by Host - ${stateMsg.exitedBy || 'Host'} left the game` 
+
+      const exitMessage = stateMsg.playerRole === 'Host'
+        ? `🏠 Game ended by Host - ${stateMsg.exitedBy || 'Host'} left the game`
         : `🔗 Game ended by Joiner - ${stateMsg.exitedBy || 'Joiner'} left the game`;
-      
+
       // For tournament matches, don't show toast or reload
       if (this.config.tournament) {
         console.log("🏆 Tournament match - opponent exited. Checking for forfeit...");
         // The opponent left, so local player wins by forfeit
         const localPlayerIndex = this.getLocalControlledIndices()[0] || 0;
-        
+
         // Create tournament summary for forfeit win
         const summary: TournamentResultSummary = {
           tournamentId: this.config.tournament.id,
           matchId: this.config.tournament.matchId,
-          scores: [localPlayerIndex === 0 ? (this.config.winScore || 5) : 0, 
+          scores: [localPlayerIndex === 0 ? (this.config.winScore || 5) : 0,
                    localPlayerIndex === 1 ? (this.config.winScore || 5) : 0],
           winnerIdx: localPlayerIndex,
           players: (this.config.tournament.players || []).map((player, idx) => ({
@@ -1407,15 +1408,15 @@ this.rightWall = wall(
           })),
           isWinner: true,
         };
-        
+
         this.latestTournamentSummary = summary;
 
         void this.showTournamentWinnerScreen(summary);
         return;
       }
-      
+
       this.endAndToast(exitMessage);
-      
+
       // Auto-return to menu after 3 seconds (non-tournament only)
       setTimeout(() => {
         console.log("🕐 3 seconds elapsed - exiting game session automatically");
@@ -1429,11 +1430,11 @@ this.rightWall = wall(
     // Handle game end message
     if (stateMsg.gameEnd) {
       this.gameState.matchReady = false;
-      
+
       // Determine the appropriate message for this player
       const isLocalWinner = this.getLocalControlledIndices().includes(stateMsg.winnerIdx);
       const text = isLocalWinner ? "You win!" : "You lose!";
-      
+
       this.endAndToast(text);
 
       const finalScores = Array.isArray(stateMsg.finalScores)
@@ -1476,7 +1477,7 @@ this.rightWall = wall(
 
         console.log("🏆 Tournament match ended");
         this.stopAllAudio();
-        
+
         const summary: TournamentResultSummary = {
           tournamentId: this.config.tournament.id,
           matchId: this.config.tournament.matchId,
@@ -1498,6 +1499,26 @@ this.rightWall = wall(
           console.warn('Unable to cache tournament result summary:', error);
         }
 
+        // Update tournament statistics for remote player (joiner)
+        void (async () => {
+          try {
+            const userId = this.config.currentUser?.id;
+            if (userId) {
+              if (isLocalWinner) {
+                await authService.incrementWinCount(userId);
+                console.log('📊 Tournament match: Incremented win count for joiner');
+              } else {
+                await authService.incrementLossCount(userId);
+                console.log('📊 Tournament match: Incremented loss count for joiner');
+              }
+              await authService.incrementTournamentCount(userId);
+              console.log('📊 Tournament match: Incremented tournament count for joiner');
+            }
+          } catch (statsError) {
+            console.error('Failed to update tournament statistics for joiner:', statsError);
+          }
+        })();
+
         this.dispatchTournamentMatchEvent(isLocalWinner ? 'victory' : 'eliminated', summary, 'auto');
 
         // Show appropriate screen based on match outcome
@@ -1507,6 +1528,24 @@ this.rightWall = wall(
           this.showTournamentGameOverScreen(summary);
         }
       } else {
+        // Non-tournament online game: Update statistics for joiner
+        void (async () => {
+          try {
+            const userId = this.config.currentUser?.id;
+            if (userId) {
+              if (isLocalWinner) {
+                await authService.incrementWinCount(userId);
+                console.log('📊 Online match: Incremented win count for joiner');
+              } else {
+                await authService.incrementLossCount(userId);
+                console.log('📊 Online match: Incremented loss count for joiner');
+              }
+            }
+          } catch (statsError) {
+            console.error('Failed to update statistics for joiner:', statsError);
+          }
+        })();
+
         // Non-tournament game: auto-exit after 3 seconds
         if (!overlayShown) {
           setTimeout(() => {
@@ -1523,16 +1562,16 @@ this.rightWall = wall(
     // Handle pause toggle message
     if (stateMsg.pauseToggle) {
       this.gameState.isPaused = stateMsg.isPaused;
-      
+
       if (this.gameState.isPaused) {
         this.showPauseOverlay();
         console.log(`⏸️ Game paused by ${stateMsg.pausedBy}`);
-        
+
         // Chat system removed
       } else {
         this.hidePauseOverlay();
         console.log(`▶️ Game resumed by ${stateMsg.pausedBy}`);
-        
+
         // Chat system removed
       }
       return;
@@ -1682,7 +1721,7 @@ this.rightWall = wall(
           let neg = false,
             pos = false;
           const idx = this.remoteIndex;
-          
+
           // ALL players use UP/DOWN arrows only
           // UP should always move the paddle "up" from the player's rotated perspective
           neg = !!this.keys["arrowup"];   // UP arrow is "neg" (move towards goal)
@@ -1693,7 +1732,7 @@ this.rightWall = wall(
             neg,
             pos,
           };
-          
+
           // For Web socket connections, use socketManager
           if (socketManager.connected) {
             socketManager.sendPlayerInput(inputData);
@@ -1721,7 +1760,7 @@ this.rightWall = wall(
     if (!this.isHost) return;
     if (now - this.lastStateSent < 33) return; // ~30Hz
     this.lastStateSent = now;
-    
+
     const gameState = {
       ball: {
         x: this.ball.position.x,
@@ -1739,7 +1778,7 @@ this.rightWall = wall(
       scores: [...this.gameState.scores],
       obstacles: this.obstacleInfo.map((o) => ({ ...o })), // includes shape
     };
-    
+
     // For Web socket connections, use socketManager
     if (socketManager.connected) {
       socketManager.sendGameState(gameState);
@@ -1848,12 +1887,12 @@ this.rightWall = wall(
           neg: isViewRotated ? !!this.keys["arrowdown"] : !!this.keys["arrowup"],
           pos: isViewRotated ? !!this.keys["arrowup"] : !!this.keys["arrowdown"]
         };
-        
+
         // Only send if input has changed to avoid spamming
         const currentInputKey = `${guestInputState.neg}-${guestInputState.pos}`;
         if (this.lastGuestInputKey !== currentInputKey) {
           this.lastGuestInputKey = currentInputKey;
-          
+
           if (socketManager.connected) {
             socketManager.sendPlayerInput({
               playerIndex: 1,
@@ -1870,7 +1909,7 @@ this.rightWall = wall(
             });
           }
         }
-        
+
         // Guest renders only; the actual game state comes from the host via handleRemoteState()
         // Don't run any game logic here, just render what we receive from the host
       } else {
@@ -1987,7 +2026,7 @@ this.rightWall = wall(
         this.gameState.obstacleAfterHit = false;
         flashPaddle(p);
         this.playHit("paddle"); // SOUND
-        
+
         // Trigger background effects for ball hit
         const ballScreenX = ((this.ball.position.x + width/2) / width) * 100;
         const ballScreenY = ((this.ball.position.z + height/2) / height) * 100;
@@ -2018,7 +2057,7 @@ this.rightWall = wall(
         this.gameState.obstacleAfterHit = false;
         flashPaddle(p);
         this.playHit("paddle"); // SOUND
-        
+
         // Trigger background effects for ball hit
         const ballScreenX = ((this.ball.position.x + width/2) / width) * 100;
         const ballScreenY = ((this.ball.position.z + height/2) / height) * 100;
@@ -2085,7 +2124,7 @@ this.rightWall = wall(
           this.gameState.addScore(this.gameState.lastHitter);
           this.gameState.lastScorer = this.gameState.lastHitter;
           this.updateScoreUI();
-          
+
           // Trigger background effects for scoring
           this.backgroundEffects?.onScore(this.gameState.lastHitter);
 
@@ -2123,10 +2162,10 @@ this.rightWall = wall(
             this.ball.position.z
           );
           this.updateScoreUI();
-          
+
           // Trigger background effects for scoring
           this.backgroundEffects?.onScore(0);
-          
+
           const winResult = this.gameState.isWinConditionMet();
           if (winResult.hasWinner) {
             this.finishAndReport(winResult.winner);
@@ -2147,10 +2186,10 @@ this.rightWall = wall(
             this.ball.position.z
           );
           this.updateScoreUI();
-          
+
           // Trigger background effects for scoring
           this.backgroundEffects?.onScore(1);
-          
+
           const winResult = this.gameState.isWinConditionMet();
           if (winResult.hasWinner) {
             this.finishAndReport(winResult.winner);
@@ -2609,7 +2648,7 @@ this.rightWall = wall(
     if (this.config.tournament) {
       console.log("🏆 Tournament match ended (host) - showing tournament UI");
       this.stopAllAudio();
-      
+
       const isLocalWinner = this.getLocalControlledIndices().includes(winnerIdx);
       const summary: TournamentResultSummary = {
         tournamentId: this.config.tournament.id,
@@ -2640,7 +2679,7 @@ this.rightWall = wall(
       } else {
         this.showTournamentGameOverScreen(summary);
       }
-      
+
       return; // Don't continue with non-tournament logic
     }
 
@@ -2700,11 +2739,50 @@ this.rightWall = wall(
                   sanitizedFinalScores[1] || 0
                 );
 
+                // Update tournament statistics for host
+                try {
+                  const userId = this.config.currentUser?.id;
+                  if (userId) {
+                    const isWinner = winner.id === userId;
+
+                    if (isWinner) {
+                      await authService.incrementWinCount(userId);
+                      console.log('📊 Tournament match: Incremented win count for host');
+                    } else {
+                      await authService.incrementLossCount(userId);
+                      console.log('📊 Tournament match: Incremented loss count for host');
+                    }
+
+                    await authService.incrementTournamentCount(userId);
+                    console.log('📊 Tournament match: Incremented tournament count for host');
+                  }
+                } catch (statsError) {
+                  console.error('Failed to update tournament statistics for host:', statsError);
+                }
+
                 console.log(`Tournament match completed: ${winner.name} wins ${sanitizedFinalScores[0]}-${sanitizedFinalScores[1]}`);
               }
             }
           } catch (error) {
             console.error('Failed to complete tournament match:', error);
+          }
+        } else {
+          // Non-tournament online match: Update statistics for host
+          try {
+            const userId = this.config.currentUser?.id;
+            if (userId) {
+              const isLocalWinner = this.getLocalControlledIndices().includes(winnerIdx);
+
+              if (isLocalWinner) {
+                await authService.incrementWinCount(userId);
+                console.log('📊 Online match: Incremented win count for host');
+              } else {
+                await authService.incrementLossCount(userId);
+                console.log('📊 Online match: Incremented loss count for host');
+              }
+            }
+          } catch (statsError) {
+            console.error('Failed to update statistics for host:', statsError);
           }
         }
       } catch {}
@@ -3003,13 +3081,13 @@ this.rightWall = wall(
     // Show game over message for 2 seconds, then return to main menu
     setTimeout(() => {
       console.log('❌ Loser returning to main menu after 2 seconds');
-      
+
       // Clean up overlay
       if (overlay.parentElement) {
         overlay.parentElement.removeChild(overlay);
       }
       this.tournamentOverlay = null;
-      
+
       // Stop game and return to main menu
       this.gameState.matchReady = false;
       this.stopAllAudio();
@@ -3087,14 +3165,14 @@ this.rightWall = wall(
     // Show victory message for 2 seconds, then show bracket
     setTimeout(async () => {
       console.log('🏆 Winner viewing tournament bracket');
-      
+
       try {
         // Clear the overlay content and show bracket
         overlay.innerHTML = '';
         overlay.style.background = 'rgba(0, 0, 0, 0.95)';
         overlay.style.padding = '40px 20px';
         overlay.style.overflowY = 'auto';
-        
+
         // Show bracket/next match screen
         this.checkForNextTournamentMatch(overlay, summary);
       } catch (error) {
@@ -3160,18 +3238,18 @@ this.rightWall = wall(
       // Check for any next-round match (active or pending)
       // Both players click "Ready" and match auto-starts when both are ready
       const nextMatch = tournament.matches.find((m: any) =>
-        !m.isComplete && 
-        (m.player1 && m.player2) && 
-        (m.player1.id === userId || m.player2.id === userId) && 
+        !m.isComplete &&
+        (m.player1 && m.player2) &&
+        (m.player1.id === userId || m.player2.id === userId) &&
         m.round > prevRound
       );
-      
+
       if (nextMatch) {
-        console.log('✅[loop-fix] Next-round match found -> showing Ready button', { 
-          matchId: nextMatch.id, 
-          round: nextMatch.round, 
+        console.log('✅[loop-fix] Next-round match found -> showing Ready button', {
+          matchId: nextMatch.id,
+          round: nextMatch.round,
           prevRound,
-          isActive: nextMatch.isActive 
+          isActive: nextMatch.isActive
         });
         // Show bracket with "Ready" button - auto-starts when both players ready
         this.showNextMatchScreen(overlay, tournament, nextMatch);
@@ -3188,7 +3266,7 @@ this.rightWall = wall(
 
   private async showNextMatchScreen(overlay: HTMLElement, tournament: any, match: any) {
     this.tournamentOverlay = overlay;
-    
+
     // IMPORTANT: Refetch the latest tournament state to ensure bracket is up-to-date
     try {
       const { tournamentService } = await import('../../tournament/TournamentService');
@@ -3198,20 +3276,20 @@ this.rightWall = wall(
     } catch (error) {
       console.warn('⚠️ Failed to refetch tournament, using provided data:', error);
     }
-    
+
     // Clear overlay and show bracket with ready button
     overlay.innerHTML = '';
     overlay.style.background = 'rgba(0, 0, 0, 0.95)';
     overlay.style.padding = '40px 20px';
     overlay.style.overflowY = 'auto';
-    
+
     const container = document.createElement('div');
     container.style.cssText = 'max-width: 1400px; margin: 0 auto;';
-    
-    const opponent = match.player1?.id === (this.config.currentUser?.id || this.config.currentUser?.email) 
-      ? match.player2 
+
+    const opponent = match.player1?.id === (this.config.currentUser?.id || this.config.currentUser?.email)
+      ? match.player2
       : match.player1;
-    
+
     container.innerHTML = `
       <div style="text-align: center; margin-bottom: 32px;">
         <div style="font-size: 80px; margin-bottom: 16px;">🏆</div>
@@ -3261,23 +3339,23 @@ this.rightWall = wall(
         </button>
       </div>
     `;
-    
+
     overlay.appendChild(container);
     await this.renderTournamentBracket(tournament);
-    
+
     // Set up ready button handler
     const readyBtn = container.querySelector('#ready-btn') as HTMLButtonElement;
     const readyStatus = container.querySelector('#ready-status');
     let isReady = false;
-    
+
     readyBtn?.addEventListener('click', async () => {
       if (isReady) return;
-      
+
       isReady = true;
       readyBtn.disabled = true;
       readyBtn.style.background = 'linear-gradient(135deg, #64748b, #475569)';
       readyBtn.innerHTML = '✓ Waiting for opponent...';
-      
+
       if (readyStatus) {
         readyStatus.innerHTML = `
           <div style="display: flex; align-items: center; justify-content: center; gap: 12px;">
@@ -3299,7 +3377,7 @@ this.rightWall = wall(
           </style>
         `;
       }
-      
+
       // Mark player as ready
       try {
         const { tournamentService } = await import('../../tournament/TournamentService');
@@ -3309,7 +3387,7 @@ this.rightWall = wall(
         console.error('❌ Failed to mark ready:', error);
       }
     });
-    
+
     // Listen for when both players are ready
     this.setupBothPlayersReadyListener(overlay, tournament, match);
   }
@@ -3317,17 +3395,17 @@ this.rightWall = wall(
   private async setupBothPlayersReadyListener(overlay: HTMLElement, tournament: any, match: any) {
     const { tournamentService } = await import('../../tournament/TournamentService');
     const { authService } = await import('../../');
-    
+
     const currentUser = authService.getUser();
     const userId = currentUser?.id || currentUser?.email;
     const isPlayer1 = match.player1?.id === userId;
-    
+
     const handleBothReady = ({ matchId, players }: any) => {
       if (matchId !== match.id) return;
-      
+
       console.log('🎮 Both players ready! Starting match...', players);
       tournamentService.off('bothPlayersReady', handleBothReady);
-      
+
       // Show transition and start match
       const readyStatus = overlay.querySelector('#ready-status');
       if (readyStatus) {
@@ -3337,18 +3415,18 @@ this.rightWall = wall(
           </div>
         `;
       }
-      
+
       // Start match immediately when both players are ready
       console.log(`🏆 ${isPlayer1 ? 'Player 1 (Host)' : 'Player 2 (Guest)'} starting match flow`);
-      
+
       // Small delay to show the "Both players ready!" message
       setTimeout(() => {
         this.startNextTournamentMatch(tournament, match);
       }, 500);
     };
-    
+
     tournamentService.on('bothPlayersReady', handleBothReady);
-    
+
     // Clean up listener if overlay is removed
     const overlayObserver = new MutationObserver(() => {
       if (!document.body.contains(overlay)) {
@@ -3363,7 +3441,7 @@ this.rightWall = wall(
     this.tournamentOverlay = overlay;
     let statusEl = overlay.querySelector('#tournament-status');
     let actionEl = overlay.querySelector('#tournament-action');
-    
+
     // Create structure if it doesn't exist
     if (!statusEl || !actionEl) {
       overlay.innerHTML = `
@@ -3375,7 +3453,7 @@ this.rightWall = wall(
       statusEl = overlay.querySelector('#tournament-status');
       actionEl = overlay.querySelector('#tournament-action');
     }
-    
+
     if (statusEl) {
       statusEl.innerHTML = `
         <div style="display: flex; flex-direction: column; align-items: center; gap: 16px;">
@@ -3392,7 +3470,7 @@ this.rightWall = wall(
         </div>
       `;
     }
-    
+
     if (actionEl) {
       actionEl.innerHTML = `
         <div id="tournament-bracket-container" style="
@@ -3431,24 +3509,24 @@ this.rightWall = wall(
           </p>
         </div>
       `;
-      
+
       // Render bracket if tournament data available
       if (tournament) {
         this.renderTournamentBracket(tournament);
       }
     }
-    
+
     // Set up real-time WebSocket listeners for bracket updates
     const { tournamentService } = await import('../../tournament/TournamentService');
     const { authService } = await import('../../');
-    
+
     const handleTournamentUpdate = (updatedTournament: any) => {
       // Only update if overlay is still visible
       if (!document.body.contains(overlay)) return;
-      
+
       console.log('🔄 Real-time bracket update received');
       this.renderTournamentBracket(updatedTournament);
-      
+
       // Check if tournament is completed
       if (updatedTournament.status === 'completed') {
         tournamentService.off('tournamentUpdated', handleTournamentUpdate);
@@ -3457,16 +3535,16 @@ this.rightWall = wall(
         // this.showTournamentCompleteScreen(overlay);
         return;
       }
-      
+
       // Check for active match for this player
       const currentUser = authService.getUser();
       const userId = currentUser?.id || currentUser?.email;
-      
+
       const activeMatch = updatedTournament.matches.find((m: any) =>
         m.isActive &&
         (m.player1?.id === userId || m.player2?.id === userId)
       );
-      
+
       if (activeMatch) {
         tournamentService.off('tournamentUpdated', handleTournamentUpdate);
         tournamentService.off('matchCompleted', handleMatchCompleted);
@@ -3484,20 +3562,20 @@ this.rightWall = wall(
         }, 1500);
       }
     };
-    
+
     const handleMatchCompleted = ({ tournament: updatedTournament }: any) => {
       console.log('✅ Match completed event received');
       handleTournamentUpdate(updatedTournament);
     };
-    
+
     // Subscribe to real-time events
     tournamentService.on('tournamentUpdated', handleTournamentUpdate);
     tournamentService.on('matchCompleted', handleMatchCompleted);
-    
+
     // AGGRESSIVE POLLING: Fetch tournament state every 2 seconds as backup
     const summary = this.getCachedTournamentSummary();
     let pollingInterval: any = null;
-    
+
     if (summary) {
       console.log('🔄 Starting aggressive polling (every 2 seconds) for tournament updates');
       pollingInterval = setInterval(async () => {
@@ -3507,14 +3585,14 @@ this.rightWall = wall(
             if (pollingInterval) clearInterval(pollingInterval);
             return;
           }
-          
+
           // Fetch latest tournament state
           const updatedTournament = await tournamentService.getTournament(summary.tournamentId);
-          
+
           // Update bracket display
           this.renderTournamentBracket(updatedTournament);
           console.log('🔄 Polling: Bracket updated');
-          
+
           // Check for tournament completion
           if (updatedTournament.status === 'completed') {
             if (pollingInterval) clearInterval(pollingInterval);
@@ -3523,22 +3601,22 @@ this.rightWall = wall(
             // this.showTournamentCompleteScreen(overlay);
             return;
           }
-          
+
           // Check for active match
           const currentUser = authService.getUser();
           const userId = currentUser?.id || currentUser?.email;
-          
+
           const activeMatch = updatedTournament.matches.find((m: any) =>
             m.isActive &&
             (m.player1?.id === userId || m.player2?.id === userId)
           );
-          
+
           if (activeMatch) {
             if (pollingInterval) clearInterval(pollingInterval);
             tournamentService.off('tournamentUpdated', handleTournamentUpdate);
             tournamentService.off('matchCompleted', handleMatchCompleted);
             console.log('🎮 Polling detected: Next match is ready!');
-            
+
             if (statusEl) {
               statusEl.innerHTML = `
                 <div style="font-size: 28px; color: #84cc16; font-weight: bold; animation: pulse 1s infinite;">
@@ -3546,7 +3624,7 @@ this.rightWall = wall(
                 </div>
               `;
             }
-            
+
             setTimeout(() => {
               this.showNextMatchScreen(overlay, updatedTournament, activeMatch);
             }, 1500);
@@ -3556,7 +3634,7 @@ this.rightWall = wall(
         }
       }, 2000); // Poll every 2 seconds
     }
-    
+
     // Clean up event listeners and polling when overlay is removed
     const overlayObserver = new MutationObserver(() => {
       if (!document.body.contains(overlay)) {
@@ -3576,9 +3654,9 @@ this.rightWall = wall(
     this.engine.stopRenderLoop();
     this.stopAllAudio();
     this.gameState.matchReady = false;
-    
+
     this.tournamentOverlay = overlay;
-    
+
     // Clear overlay and create full victory screen
     overlay.innerHTML = '';
     overlay.style.cssText = `
@@ -3594,7 +3672,7 @@ this.rightWall = wall(
       align-items: center;
       z-index: 10000;
     `;
-    
+
     overlay.innerHTML = `
       <div style="text-align: center; animation: fadeIn 1.5s;">
         <div style="font-size: 150px; margin-bottom: 40px; animation: bounce 1s infinite;"></div>
@@ -3618,7 +3696,7 @@ this.rightWall = wall(
           cursor: pointer;
           transition: all 0.3s;
           box-shadow: 0 8px 24px rgba(132, 204, 22, 0.4);
-        " onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 12px 32px rgba(132, 204, 22, 0.6)';" 
+        " onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 12px 32px rgba(132, 204, 22, 0.6)';"
            onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 8px 24px rgba(132, 204, 22, 0.4)';">
           🏠 Return to Main Menu
         </button>
@@ -3626,7 +3704,7 @@ this.rightWall = wall(
           Redirecting automatically in <span id="countdown">10</span> seconds...
         </p>
       </div>
-      
+
       <style>
         @keyframes fadeIn {
           from { opacity: 0; transform: translateY(-30px); }
@@ -3638,9 +3716,9 @@ this.rightWall = wall(
         }
       </style>
     `;
-    
+
     document.body.appendChild(overlay);
-    
+
     // Auto-redirect countdown
     let countdown = 10;
     const countdownEl = overlay.querySelector('#countdown');
@@ -3649,13 +3727,13 @@ this.rightWall = wall(
       if (countdownEl) {
         countdownEl.textContent = countdown.toString();
       }
-      
+
       if (countdown <= 0) {
         clearInterval(countdownInterval);
         this.redirectToMainMenu();
       }
     }, 1000);
-    
+
     // Manual exit button
     const btn = overlay.querySelector('#exit-tournament-btn');
     btn?.addEventListener('click', () => {
@@ -3663,18 +3741,18 @@ this.rightWall = wall(
       this.redirectToMainMenu();
     });
   }
-  
+
   private redirectToMainMenu() {
     console.log('🏠 Redirecting to main menu');
     this.cleanupTournamentOverlay();
     this.stopAllAudio();
     this.dispose();
-    
+
     // Clear tournament data
     try {
       sessionStorage.removeItem('ft_pong_tournament_match_ended');
     } catch {}
-    
+
     // Redirect to main page
     window.location.href = '/';
   }
@@ -3737,7 +3815,7 @@ this.rightWall = wall(
     try {
       const container = document.getElementById('tournament-bracket-container');
       if (!container) return;
-      
+
       const { TournamentBracket } = await import('../../tournament/TournamentBracket');
       new TournamentBracket(container as HTMLElement, tournament);
     } catch (error) {
@@ -3795,19 +3873,19 @@ this.rightWall = wall(
 
     // Set up real-time WebSocket listeners for bracket updates
     const { tournamentService } = await import('../../tournament/TournamentService');
-    
+
     const handleEliminatedUpdate = (updatedTournament: any) => {
       // Only update if overlay is still visible
       if (!document.body.contains(overlay)) return;
-      
+
       console.log('🔄 Real-time bracket update for eliminated player');
       this.renderTournamentBracket(updatedTournament);
-      
+
       // Check if tournament is completed
       if (updatedTournament.status === 'completed') {
         tournamentService.off('tournamentUpdated', handleEliminatedUpdate);
         tournamentService.off('matchCompleted', handleEliminatedMatchCompleted);
-        
+
         // Show tournament completed message
         const container = overlay.querySelector('#tournament-bracket-container');
         if (container) {
@@ -3825,16 +3903,16 @@ this.rightWall = wall(
         }
       }
     };
-    
+
     const handleEliminatedMatchCompleted = ({ tournament: updatedTournament }: any) => {
       console.log('✅ Match completed event received (eliminated player view)');
       handleEliminatedUpdate(updatedTournament);
     };
-    
+
     // Subscribe to real-time events
     tournamentService.on('tournamentUpdated', handleEliminatedUpdate);
     tournamentService.on('matchCompleted', handleEliminatedMatchCompleted);
-    
+
     // Clean up event listeners when overlay is removed
     const overlayObserver = new MutationObserver(() => {
       if (!document.body.contains(overlay)) {
@@ -3847,7 +3925,7 @@ this.rightWall = wall(
     overlayObserver.observe(document.body, { childList: true, subtree: true });
 
     overlay.querySelector('#exit-tournament-btn')?.addEventListener('click', async () => {
-      const confirmed = await import('../../components/modals/ConfirmDialog').then(m => 
+      const confirmed = await import('../../components/modals/ConfirmDialog').then(m =>
         m.showConfirmDialog(
           'Are you sure you want to leave the tournament?',
           'Leave Tournament',
@@ -3855,10 +3933,10 @@ this.rightWall = wall(
           'Stay'
         )
       );
-      
+
       if (confirmed) {
         console.log('🚪 Eliminated player leaving tournament');
-        
+
         // Disconnect from tournament
         try {
           const { newTournamentService } = await import('../../tournament/NewTournamentService');
@@ -3867,18 +3945,18 @@ this.rightWall = wall(
         } catch (error) {
           console.warn('⚠️ Failed to disconnect from tournament:', error);
         }
-        
+
         // Clean up and return to main menu
         this.cleanupTournamentOverlay();
         this.stopAllAudio();
         this.dispose();
-        
+
         try {
           sessionStorage.removeItem('ft_pong_tournament_match_ended');
         } catch (error) {
           console.warn('Failed to clear cached tournament summary:', error);
         }
-        
+
         window.location.reload();
       }
     });
@@ -3887,10 +3965,10 @@ this.rightWall = wall(
   private async startNextTournamentMatch(tournament: any, match: any) {
     try {
       console.log('🎮 Starting next tournament match:', match);
-      
+
       // Clear tournament overlay first
       this.cleanupTournamentOverlay();
-      
+
       // Clean up current game
       console.log('🧹 Disposing current game...');
       this.dispose();
@@ -3900,22 +3978,22 @@ this.rightWall = wall(
 
       // Use the coordinator to prepare and start the next match
       const { NewTournamentMatchCoordinator } = await import('../../tournament/NewTournamentMatchCoordinator');
-      
+
       console.log('� Preparing next match...');
       const gameConfig = await NewTournamentMatchCoordinator.prepareMatchGameConfig({
         tournament: { id: tournament.tournamentId, maxGoals: 5 },
         match,
         onStatus: (msg, type) => console.log(`[${type}] ${msg}`)
       });
-      
+
       console.log('✅ Match config ready, starting new game...');
-      
+
       // Import and create new game instance
       const { Pong3D } = await import('./Pong3D');
       const newGame = new Pong3D(gameConfig);
-      
+
       console.log('✅ Next tournament match started!');
-      
+
       // Store reference to prevent garbage collection
       (window as any).__currentPongGame = newGame;
     } catch (error) {
@@ -3987,7 +4065,7 @@ this.rightWall = wall(
     const s = this.sounds.win[0];
     const ready =
       s && ((s as any).isReadyToPlay === true || (s as any).isReady?.());
-    
+
     if (ready) {
       // Stop any currently playing sound first to prevent overlap
       try {
@@ -3998,15 +4076,15 @@ this.rightWall = wall(
       } catch (e) {
         console.log("⚠️ Could not stop existing sound:", e);
       }
-      
+
       // Ensure sound doesn't loop
       (s as any).loop = false;
       (s as any).setPlaybackRate?.(1);
-      
+
       // Play the sound once
       s.play();
       console.log("🎵 WIN sound started playing (no loop)");
-      
+
       // Automatically stop after expected duration to prevent hanging
       setTimeout(() => {
         try {
@@ -4018,7 +4096,7 @@ this.rightWall = wall(
           console.log("⚠️ Could not auto-stop sound:", e);
         }
       }, 5000); // 5 second safety timeout
-      
+
     } else {
       console.log("🔊 WIN sound not ready, using fallback beeps");
       // little triumphant beep fallback
@@ -4032,7 +4110,7 @@ this.rightWall = wall(
     const s = this.sounds.lose[0];
     const ready =
       s && ((s as any).isReadyToPlay === true || (s as any).isReady?.());
-    
+
     if (ready) {
       // Stop any currently playing sound first to prevent overlap
       try {
@@ -4043,15 +4121,15 @@ this.rightWall = wall(
       } catch (e) {
         console.log("⚠️ Could not stop existing sound:", e);
       }
-      
+
       // Ensure sound doesn't loop
       (s as any).loop = false;
       (s as any).setPlaybackRate?.(1);
-      
+
       // Play the sound once
       s.play();
       console.log("🎵 LOSE sound started playing (no loop)");
-      
+
       // Automatically stop after expected duration to prevent hanging
       setTimeout(() => {
         try {
@@ -4063,7 +4141,7 @@ this.rightWall = wall(
           console.log("⚠️ Could not auto-stop sound:", e);
         }
       }, 5000); // 5 second safety timeout
-      
+
     } else {
       console.log("🔊 LOSE sound not ready, using fallback beeps");
       // descending tones fallback
@@ -4203,7 +4281,7 @@ this.rightWall = wall(
           } as any);
         }
       }
-      
+
       // Clean up connections
       if (socketManager.connected) {
         socketManager.leaveRoom();
@@ -4211,7 +4289,7 @@ this.rightWall = wall(
       if (this.ws) {
         this.ws.close();
       }
-      
+
     } catch (error) {
       console.error("❌ Error reporting game interruption:", error);
     }
