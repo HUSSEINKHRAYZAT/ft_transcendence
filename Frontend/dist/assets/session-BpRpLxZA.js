@@ -1,1 +1,0 @@
-function r(){const a=localStorage.getItem("ft_pong_auth_token"),t=localStorage.getItem("ft_pong_user_data");if(!a||!t)return null;try{const e=JSON.parse(t);return{name:e.firstName?`${e.firstName} ${e.lastName}`:e.userName||e.email,firstName:e.firstName,lastName:e.lastName,userName:e.userName,email:e.email,id:e.id}}catch{return null}}export{r as g};
