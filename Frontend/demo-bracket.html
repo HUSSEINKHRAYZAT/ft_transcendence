@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tournament Bracket - Demo</title>
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  
+  <!-- Bracket Styles -->
+  <link rel="stylesheet" href="../src/styles/tournament-bracket.css">
+  
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #0b1220;
+      color: #e5e7eb;
+      overflow-x: hidden;
+    }
+
+    .demo-controls {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 1000;
+      display: flex;
+      gap: 12px;
+      background: rgba(30, 41, 59, 0.95);
+      padding: 16px;
+      border-radius: 12px;
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      backdrop-filter: blur(12px);
+    }
+
+    .demo-btn {
+      padding: 8px 16px;
+      background: linear-gradient(135deg, #84cc16, #22c55e);
+      color: #000;
+      border: none;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      transition: transform 150ms ease;
+    }
+
+    .demo-btn:hover {
+      transform: translateY(-2px);
+    }
+
+    .demo-btn.secondary {
+      background: rgba(56, 189, 248, 0.15);
+      color: #38bdf8;
+      border: 1px solid rgba(56, 189, 248, 0.3);
+    }
+
+    #bracket-container {
+      width: 100%;
+      min-height: 100vh;
+    }
+
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      font-size: 18px;
+      color: #94a3b8;
+    }
+
+    @media (max-width: 767px) {
+      .demo-controls {
+        top: 10px;
+        right: 10px;
+        padding: 12px;
+        flex-direction: column;
+      }
+
+      .demo-btn {
+        font-size: 11px;
+        padding: 6px 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Demo Controls -->
+  <div class="demo-controls">
+    <button class="demo-btn" onclick="loadTournament(8)">8-Player</button>
+    <button class="demo-btn" onclick="loadTournament(4)">4-Player</button>
+    <button class="demo-btn secondary" onclick="toggleTheme()">Toggle Theme</button>
+    <button class="demo-btn secondary" onclick="simulateMatchComplete()">Simulate Match</button>
+  </div>
+
+  <!-- Bracket Container -->
+  <div id="bracket-container">
+    <div class="loading">Loading tournament...</div>
+  </div>
+
+  <!-- Scripts -->
+  <script type="module">
+    import { TournamentBracket } from './src/components/tournament/TournamentBracket.js';
+    import { createMockTournament, updateMatchWinner } from './src/utils/tournament-bracket-utils.js';
+
+    let currentBracket = null;
+    let currentTournament = null;
+    let currentTheme = 'dark';
+
+    // Initialize with 8-player tournament
+    window.addEventListener('DOMContentLoaded', () => {
+      loadTournament(8);
+    });
+
+    // Load tournament
+    window.loadTournament = function(size) {
+      const container = document.getElementById('bracket-container');
+      
+      // Clear existing
+      if (currentBracket) {
+        currentBracket.destroy();
+      }
+      container.innerHTML = '';
+
+      // Create new tournament
+      currentTournament = createMockTournament(size, '1');
+
+      // Initialize bracket
+      currentBracket = new TournamentBracket({
+        tournament: currentTournament,
+        config: {
+          theme: {
+            mode: currentTheme,
+            colors: currentTheme === 'dark' ? {
+              background: '#0b1220',
+              surface: 'rgba(30, 41, 59, 0.88)',
+              border: 'rgba(148, 163, 184, 0.2)',
+              textPrimary: '#e5e7eb',
+              textSecondary: '#94a3b8',
+              lime: '#84cc16',
+              sky: '#38bdf8',
+              orange: '#f97316',
+              green: '#22c55e',
+              red: '#ef4444'
+            } : {
+              background: '#f8fafc',
+              surface: 'rgba(255, 255, 255, 0.9)',
+              border: 'rgba(148, 163, 184, 0.25)',
+              textPrimary: '#0f172a',
+              textSecondary: '#475569',
+              lime: '#84cc16',
+              sky: '#38bdf8',
+              orange: '#f97316',
+              green: '#22c55e',
+              red: '#ef4444'
+            }
+          }
+        },
+        onStartMatch: (matchId) => {
+          console.log('Starting match:', matchId);
+          alert(`Starting match ${matchId}!\n\nIn a real app, this would navigate to the game screen.`);
+        },
+        onViewMatch: (matchId) => {
+          console.log('Viewing match:', matchId);
+          alert(`Viewing match ${matchId}!\n\nIn a real app, this would open the spectator view.`);
+        },
+        onRefresh: () => {
+          console.log('Refreshing...');
+        }
+      });
+
+      container.appendChild(currentBracket.getElement());
+    };
+
+    // Toggle theme
+    window.toggleTheme = function() {
+      currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
+      document.body.style.background = currentTheme === 'dark' ? '#0b1220' : '#f8fafc';
+      
+      if (currentBracket && currentTournament) {
+        const size = currentTournament.size;
+        loadTournament(size);
+      }
+    };
+
+    // Simulate match completion
+    window.simulateMatchComplete = function() {
+      if (!currentTournament || !currentBracket) {
+        alert('No tournament loaded!');
+        return;
+      }
+
+      // Find first incomplete match
+      let targetMatch = null;
+      for (const round of currentTournament.rounds) {
+        const incompleteMatch = round.matches.find(m => 
+          m.status === 'ready' && m.player1 && m.player2
+        );
+        if (incompleteMatch) {
+          targetMatch = incompleteMatch;
+          break;
+        }
+      }
+
+      if (!targetMatch) {
+        alert('No matches available to complete!');
+        return;
+      }
+
+      // Randomly pick winner
+      const winnerId = Math.random() > 0.5 ? targetMatch.player1.id : targetMatch.player2.id;
+      const score1 = winnerId === targetMatch.player1.id ? 5 : 3;
+      const score2 = winnerId === targetMatch.player2.id ? 5 : 3;
+
+      // Update tournament
+      currentTournament = updateMatchWinner(
+        currentTournament,
+        targetMatch.id,
+        winnerId,
+        score1,
+        score2
+      );
+
+      // Update bracket display
+      currentBracket.update(currentTournament);
+
+      console.log('Match completed:', targetMatch.id, 'Winner:', winnerId);
+    };
+
+    // Keyboard shortcuts info
+    console.log('%c🎮 Tournament Bracket Demo', 'font-size: 20px; font-weight: bold; color: #84cc16;');
+    console.log('%cKeyboard Shortcuts:', 'font-size: 14px; font-weight: bold; color: #38bdf8;');
+    console.log('  J or ↓  - Next match');
+    console.log('  K or ↑  - Previous match');
+    console.log('  →       - Next round');
+    console.log('  ←       - Previous round');
+    console.log('  Enter   - Open/Start match');
+  </script>
+</body>
+</html>

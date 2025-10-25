@@ -1,6 +1,6 @@
-import { newTournamentService, TournamentData, TournamentPlayer } from '../../tournament/NewTournamentService';
+import { newTournamentService, TournamentData, TournamentPlayer } from '../NewTournamentService';
 import { authService } from '../../services/AuthService';
-import { showConfirmDialog } from '../modals/ConfirmDialog';
+import { showConfirmDialog } from '../../components/modals/ConfirmDialog';
 import '../../styles/tournament-new.css';
 
 export class TournamentLobby {

@@ -50,6 +50,15 @@ export class NewTournamentMatchCoordinator {
     const player1 = match.player1 ?? undefined;
     const player2 = match.player2 ?? undefined;
 
+    console.log('🔍 Match player IDs:', {
+      player1Id: player1?.id,
+      player1ExternalId: player1?.externalId,
+      player2Id: player2?.id,
+      player2ExternalId: player2?.externalId,
+      currentUserId: userId,
+      matchId: match.id
+    });
+
     if (!player1 || !player1.id || !player2 || !player2.id) {
       // Fallback: not enough players yet (bye). Run local so bracket can progress.
       onStatus?.("Opponent not ready yet. Starting local warmup match.", "info");
@@ -57,6 +66,15 @@ export class NewTournamentMatchCoordinator {
     }
 
     const isHost = player1.id === userId || player1.externalId === userId;
+    console.log('🎮 Player role determination:', {
+      isHost,
+      player1Id: player1.id,
+      player1ExternalId: player1.externalId,
+      userId,
+      comparison: `${player1.id} === ${userId} = ${player1.id === userId}`,
+      externalComparison: `${player1.externalId} === ${userId} = ${player1.externalId === userId}`
+    });
+    
     const opponent = isHost ? player2 : player1;
 
     if (!opponent || !opponent.id) {
@@ -79,14 +97,42 @@ export class NewTournamentMatchCoordinator {
 
       onStatus?.("Waiting for opponent to connect...", "info");
 
-      this.announceRoomToOpponent({
+      const opponentExtId = opponent.externalId || opponent.id;
+      console.log('📢 Host announcing room to opponent:', {
         roomId,
-        tournamentId: tournament.id,
         matchId: match.id,
-        opponentExternalId: opponent.externalId || opponent.id,
-        match,
-        hostName: me.name || myDisplayName
+        opponentId: opponent.id,
+        opponentExternalId: opponent.externalId,
+        opponentExtIdUsed: opponentExtId,
+        hostExternalId: me.externalId || me.id,
+        socketManagerExternalId: socketManager.externalPlayerId
       });
+
+      // Try multiple ID formats to increase chance of delivery
+      // Some players might be registered with different ID formats
+      const idsToTry = [
+        opponentExtId,
+        opponent.id,
+        opponent.externalId,
+        String(opponent.id),
+        String(opponent.externalId)
+      ].filter((id, index, arr) => id && arr.indexOf(id) === index); // Remove duplicates and nulls
+
+      console.log('📢 Will try announcing to these IDs:', idsToTry);
+
+      // Announce to all possible IDs
+      for (const opponentId of idsToTry) {
+        if (opponentId) {
+          this.announceRoomToOpponent({
+            roomId,
+            tournamentId: tournament.id,
+            matchId: match.id,
+            opponentExternalId: opponentId,
+            match,
+            hostName: me.name || myDisplayName
+          });
+        }
+      }
 
       try {
         await this.waitForGameReady(roomId, 35000);
@@ -110,6 +156,14 @@ export class NewTournamentMatchCoordinator {
 
     // Guest flow
     onStatus?.("Waiting for host to open room...", "info");
+    console.log('🎧 Guest waiting for room announcement:', {
+      tournamentId: tournament.id,
+      matchId: match.id,
+      currentUserId: userId,
+      myExternalId: me.externalId || me.id,
+      socketManagerExternalId: socketManager.externalPlayerId
+    });
+    
     const roomId = await this.waitForRoomAnnouncement({
       tournamentId: tournament.id,
       matchId: match.id,
@@ -316,11 +370,21 @@ export class NewTournamentMatchCoordinator {
       };
 
       const socketListener = (data: any) => {
+        console.log('🎧 Guest received tournament_match_room message:', {
+          data,
+          matchingTournament: data?.tournamentId === tournamentId,
+          matchingMatch: data?.matchId === matchId,
+          hasRoomId: typeof data?.roomId === "string",
+          expectedTournamentId: tournamentId,
+          expectedMatchId: matchId
+        });
+        
         if (
           data?.tournamentId === tournamentId &&
           data?.matchId === matchId &&
           typeof data?.roomId === "string"
         ) {
+          console.log('✅ Guest matched room announcement, finalizing with roomId:', data.roomId);
           finalize(data.roomId);
         }
       };

@@ -7,8 +7,8 @@
  * - Share via link or QR code
  */
 
-import { newTournamentService, TournamentSize, TournamentData } from '../../tournament/NewTournamentService';
-import { showConfirmDialog } from '../modals/ConfirmDialog';
+import { newTournamentService, TournamentSize, TournamentData } from '../NewTournamentService';
+import { showConfirmDialog } from '../../components/modals/ConfirmDialog';
 import { languageManager, t } from '../../langs/LanguageManager';
 
 export class TournamentCreationModal {

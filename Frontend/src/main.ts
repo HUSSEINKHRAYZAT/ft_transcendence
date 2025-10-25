@@ -1315,7 +1315,7 @@ function setupAuthListeners(components: Component[]): void {
 		currentTournamentData = tournament;
 
 		// Show lobby automatically
-		import('./components/tournament/TournamentLobby').then(({ tournamentLobby }) => {
+		import('./tournament/ui/TournamentLobby').then(({ tournamentLobby }) => {
 			tournamentLobby.show(tournament);
 		});
 	}) as EventListener);
@@ -1368,7 +1368,7 @@ function setupAuthListeners(components: Component[]): void {
 		console.log('🏆 Showing full tournament bracket');
 		// Navigate to full tournament view
 		if (currentTournamentData) {
-			import('./components/tournament/TournamentLobby').then(({ tournamentLobby }) => {
+			import('./tournament/ui/TournamentLobby').then(({ tournamentLobby }) => {
 				tournamentLobby.show(currentTournamentData);
 			});
 		}
@@ -1470,7 +1470,7 @@ async function setupNewTournamentListeners() {
 async function updateBracketOverlay(tournament: any): Promise<void> {
 	try {
 		// Import and update the bracket overlay if it exists
-		const { tournamentBracketOverlay } = await import('./components/tournament/TournamentBracketOverlay');
+		const { tournamentBracketOverlay } = await import('./tournament/ui/TournamentBracketOverlay');
 		await tournamentBracketOverlay.updateBracket(tournament.tournamentId || tournament.id);
 	} catch (error) {
 		console.error('❌ Failed to update bracket overlay:', error);
@@ -1599,7 +1599,7 @@ async function showTournamentCreationModal() {
   closeBasicModal();
 
   try {
-    const { tournamentCreationModal } = await import('./components/tournament/TournamentCreationModal');
+    const { tournamentCreationModal } = await import('./tournament/ui/TournamentCreationModal');
     tournamentCreationModal.show();
   } catch (error) {
     console.error('Failed to show tournament creation modal:', error);
@@ -1693,7 +1693,7 @@ async function showTournamentJoinModal() {
     showBasicToast('success', 'Joined tournament!');
 
     // Show lobby
-    const { tournamentLobby } = await import('./components/tournament/TournamentLobby');
+    const { tournamentLobby } = await import('./tournament/ui/TournamentLobby');
     tournamentLobby.show(tournament);
   } catch (error) {
     console.error('Failed to join tournament:', error);
@@ -2020,7 +2020,7 @@ async function showTournamentBracket(tournament: any) {
 
   // Import and render bracket
   try {
-    const { TournamentBracket } = await import('./tournament/TournamentBracket');
+    const { TournamentBracket } = await import('./tournament-bracket');
     const bracketContainer = document.getElementById('tournament-bracket');
     if (bracketContainer) {
       new TournamentBracket(bracketContainer as HTMLElement, tournament);

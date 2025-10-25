@@ -1281,6 +1281,7 @@ this.rightWall = wall(
       if (!this.gameState.matchReady) {
         console.log(`🎮 Player ${this.isHost ? 'host' : 'guest'} received game_started - showing countdown (remoteIndex: ${this.remoteIndex})`);
         this.hideWaitingOverlay();
+        this.cleanupTournamentOverlay(); // Hide tournament bracket when match starts
 
         // Show countdown for all Socket.IO players simultaneously
         if (this.config.skipCountdown) {
@@ -3102,7 +3103,7 @@ this.rightWall = wall(
       return;
     }
 
-    console.log('🏆 Showing Victory screen - will transition to bracket');
+    console.log('🏆 Showing tournament bracket directly');
 
     this.latestTournamentSummary = summary;
 
@@ -3113,10 +3114,7 @@ this.rightWall = wall(
     this.engine.stopRenderLoop();
     this.cleanupTournamentOverlay();
 
-    const [scoreLeft = 0, scoreRight = 0] = summary.scores ?? [];
-    const players = summary.players ?? [];
-    const winner = players[summary.winnerIdx]?.name || 'You';
-
+    // Create overlay directly for bracket
     const overlay = document.createElement('div');
     overlay.id = 'tournament-winner-overlay';
     overlay.className = 'tournament-overlay';
@@ -3127,58 +3125,16 @@ this.rightWall = wall(
       width: 100%;
       height: 100%;
       background: rgba(0, 0, 0, 0.95);
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
+      padding: 40px 20px;
+      overflow-y: auto;
       z-index: 10000;
-    `;
-
-    overlay.innerHTML = `
-      <div style="text-align: center; animation: fadeIn 1s;">
-        <div style="font-size: 120px; margin-bottom: 30px;">🏆</div>
-        <h1 style="color: #84cc16; font-size: 72px; font-weight: bold; margin-bottom: 20px; text-shadow: 0 0 30px rgba(132, 204, 22, 0.8);">
-          VICTORY!
-        </h1>
-        <p style="color: #94a3b8; font-size: 24px; margin-bottom: 24px;">
-          ${winner} wins the match!
-        </p>
-        <p style="color: #64748b; font-size: 20px; margin-bottom: 40px;">
-          Final Score: <strong>${scoreLeft}</strong> - <strong>${scoreRight}</strong>
-        </p>
-        <p id="transition-message" style="color: #84cc16; font-size: 18px; margin-bottom: 20px;">
-          Loading tournament bracket...
-        </p>
-      </div>
-
-      <style>
-        @keyframes fadeIn {
-          from { opacity: 0; transform: scale(0.9); }
-          to { opacity: 1; transform: scale(1); }
-        }
-      </style>
     `;
 
     document.body.appendChild(overlay);
     this.tournamentOverlay = overlay;
 
-    // Show victory message for 2 seconds, then show bracket
-    setTimeout(async () => {
-      console.log('🏆 Winner viewing tournament bracket');
-
-      try {
-        // Clear the overlay content and show bracket
-        overlay.innerHTML = '';
-        overlay.style.background = 'rgba(0, 0, 0, 0.95)';
-        overlay.style.padding = '40px 20px';
-        overlay.style.overflowY = 'auto';
-
-        // Show bracket/next match screen
-        this.checkForNextTournamentMatch(overlay, summary);
-      } catch (error) {
-        console.error('❌ Failed to show bracket:', error);
-      }
-    }, 2000);
+    // Show bracket/next match screen immediately
+    this.checkForNextTournamentMatch(overlay, summary);
   }
 
   private async reportTournamentMatchCompletion(summary: TournamentResultSummary) {
@@ -3341,7 +3297,12 @@ this.rightWall = wall(
     `;
 
     overlay.appendChild(container);
-    await this.renderTournamentBracket(tournament);
+    
+    // Pass the specific container element to avoid rendering in wrong place
+    const bracketContainer = container.querySelector('#tournament-bracket-container') as HTMLElement;
+    if (bracketContainer) {
+      await this.renderTournamentBracket(tournament, bracketContainer);
+    }
 
     // Set up ready button handler
     const readyBtn = container.querySelector('#ready-btn') as HTMLButtonElement;
@@ -3404,6 +3365,9 @@ this.rightWall = wall(
       if (matchId !== match.id) return;
 
       console.log('🎮 Both players ready! Starting match...', players);
+      console.log(`🏆 ${isPlayer1 ? 'Player 1 (Host)' : 'Player 2 (Guest)'} - isPlayer1=${isPlayer1}`);
+      
+      // Remove listener immediately to prevent double-trigger
       tournamentService.off('bothPlayersReady', handleBothReady);
 
       // Show transition and start match
@@ -3416,20 +3380,22 @@ this.rightWall = wall(
         `;
       }
 
-      // Start match immediately when both players are ready
-      console.log(`🏆 ${isPlayer1 ? 'Player 1 (Host)' : 'Player 2 (Guest)'} starting match flow`);
-
       // Small delay to show the "Both players ready!" message
       setTimeout(() => {
+        // Both players call startNextTournamentMatch, but the coordinator
+        // will handle host/guest logic internally based on player1/player2 IDs
+        console.log(`🎮 ${isPlayer1 ? 'HOST' : 'GUEST'} calling startNextTournamentMatch`);
         this.startNextTournamentMatch(tournament, match);
       }, 500);
     };
 
+    console.log(`🎧 Setting up bothPlayersReady listener for ${isPlayer1 ? 'HOST' : 'GUEST'} - matchId: ${match.id}`);
     tournamentService.on('bothPlayersReady', handleBothReady);
 
     // Clean up listener if overlay is removed
     const overlayObserver = new MutationObserver(() => {
       if (!document.body.contains(overlay)) {
+        console.log(`⚠️ Overlay removed, cleaning up bothPlayersReady listener for ${isPlayer1 ? 'HOST' : 'GUEST'}`);
         tournamentService.off('bothPlayersReady', handleBothReady);
         overlayObserver.disconnect();
       }
@@ -3512,7 +3478,10 @@ this.rightWall = wall(
 
       // Render bracket if tournament data available
       if (tournament) {
-        this.renderTournamentBracket(tournament);
+        const container = overlay.querySelector('#tournament-bracket-container') as HTMLElement;
+        if (container) {
+          this.renderTournamentBracket(tournament, container);
+        }
       }
     }
 
@@ -3525,7 +3494,10 @@ this.rightWall = wall(
       if (!document.body.contains(overlay)) return;
 
       console.log('🔄 Real-time bracket update received');
-      this.renderTournamentBracket(updatedTournament);
+      const container = overlay.querySelector('#tournament-bracket-container') as HTMLElement;
+      if (container) {
+        this.renderTournamentBracket(updatedTournament, container);
+      }
 
       // Check if tournament is completed
       if (updatedTournament.status === 'completed') {
@@ -3590,7 +3562,10 @@ this.rightWall = wall(
           const updatedTournament = await tournamentService.getTournament(summary.tournamentId);
 
           // Update bracket display
-          this.renderTournamentBracket(updatedTournament);
+          const container = overlay.querySelector('#tournament-bracket-container') as HTMLElement;
+          if (container) {
+            this.renderTournamentBracket(updatedTournament, container);
+          }
           console.log('🔄 Polling: Bracket updated');
 
           // Check for tournament completion
@@ -3779,6 +3754,20 @@ this.rightWall = wall(
       } catch {}
       this.tournamentOverlay = null;
     }
+    
+    // Also remove any stray tournament overlays that might be left in the DOM
+    try {
+      const allOverlays = document.querySelectorAll('[style*="fixed"][style*="inset: 0"]');
+      allOverlays.forEach((overlay) => {
+        // Check if it contains tournament bracket elements
+        if (overlay.querySelector('#tournament-bracket-container')) {
+          console.log('🧹 Removing stray tournament overlay');
+          overlay.remove();
+        }
+      });
+    } catch (error) {
+      console.warn('Failed to cleanup stray overlays:', error);
+    }
   }
 
   private dispatchTournamentMatchEvent(
@@ -3811,13 +3800,36 @@ this.rightWall = wall(
     this.dispose();
   }
 
-  private async renderTournamentBracket(tournament: any) {
+  private async renderTournamentBracket(tournament: any, containerElement?: HTMLElement) {
     try {
-      const container = document.getElementById('tournament-bracket-container');
-      if (!container) return;
+      // Use provided container or find by ID (for backward compatibility)
+      const container = containerElement || document.getElementById('tournament-bracket-container');
+      if (!container) {
+        console.warn('⚠️ Tournament bracket container not found');
+        return;
+      }
 
-      const { TournamentBracket } = await import('../../tournament/TournamentBracket');
-      new TournamentBracket(container as HTMLElement, tournament);
+      // Clear existing content
+      container.innerHTML = '';
+
+      // Import the adapter to convert old format to new
+      const { convertToNewFormat } = await import('../../tournament/TournamentBracketAdapter');
+      const { TournamentBracket } = await import('../../tournament-bracket');
+      
+      // Get current user ID from auth service
+      const { authService } = await import('../../services/AuthService');
+      const currentUserId = authService.getUser()?.id?.toString();
+      
+      // Convert tournament data from old format to new format
+      const convertedData = convertToNewFormat(tournament, currentUserId);
+      
+      // Create bracket instance
+      const bracket = new TournamentBracket({ tournament: convertedData });
+      
+      // Mount the bracket element to the container
+      container.appendChild(bracket.getElement());
+      
+      console.log('✅ Tournament bracket rendered successfully');
     } catch (error) {
       console.error('❌ Failed to render bracket:', error);
     }
@@ -3869,7 +3881,12 @@ this.rightWall = wall(
     `;
 
     this.tournamentOverlay = overlay;
-    await this.renderTournamentBracket(tournament);
+    
+    // Pass the specific container element
+    const bracketContainer = overlay.querySelector('#tournament-bracket-container') as HTMLElement;
+    if (bracketContainer) {
+      await this.renderTournamentBracket(tournament, bracketContainer);
+    }
 
     // Set up real-time WebSocket listeners for bracket updates
     const { tournamentService } = await import('../../tournament/TournamentService');
@@ -3879,7 +3896,10 @@ this.rightWall = wall(
       if (!document.body.contains(overlay)) return;
 
       console.log('🔄 Real-time bracket update for eliminated player');
-      this.renderTournamentBracket(updatedTournament);
+      const container = overlay.querySelector('#tournament-bracket-container') as HTMLElement;
+      if (container) {
+        this.renderTournamentBracket(updatedTournament, container);
+      }
 
       // Check if tournament is completed
       if (updatedTournament.status === 'completed') {

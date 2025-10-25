@@ -5,7 +5,11 @@
  * Shows current tournament state, player progression, and next match info
  */
 
-import { TournamentBracket } from '../../tournament/TournamentBracket';
+import { TournamentBracket } from '../TournamentBracket';
+import { convertToNewFormat, TournamentBracketData } from '../TournamentBracketAdapter';
+import type { Tournament } from '../../types/tournament-bracket';
+import { authService } from '../../services/AuthService';
+import '../../styles/tournament-bracket.css';
 
 export interface TournamentResultSummary {
   tournamentId: string;
@@ -51,13 +55,14 @@ export class TournamentBracketOverlay {
    * Hide the bracket overlay
    */
   public hide(): void {
+    if (this.bracketComponent) {
+      this.bracketComponent.destroy();
+      this.bracketComponent = null;
+    }
+
     if (this.overlay) {
       this.overlay.remove();
       this.overlay = null;
-    }
-
-    if (this.bracketComponent) {
-      this.bracketComponent = null;
     }
 
     if (this.autoHideTimer) {
@@ -75,7 +80,11 @@ export class TournamentBracketOverlay {
     try {
       const tournament = await this.loadTournamentData(tournamentId);
       if (tournament && this.bracketComponent) {
-        this.bracketComponent.updateData(tournament);
+        // Convert old format to new and update
+        const user = authService.getUser();
+        const currentUserId = user?.id || (user as any)?.externalId;
+        const newFormat = convertToNewFormat(tournament, currentUserId);
+        this.bracketComponent.update(newFormat);
       }
     } catch (error) {
       console.error('❌ Failed to update bracket:', error);
@@ -371,7 +380,7 @@ export class TournamentBracketOverlay {
     }
   };
 
-  private async renderBracket(tournament: any, summary: TournamentResultSummary): Promise<void> {
+  private async renderBracket(tournament: TournamentBracketData, summary: TournamentResultSummary): Promise<void> {
     const bracketContent = this.overlay?.querySelector('#bracketContent');
     if (!bracketContent) return;
 
@@ -379,9 +388,28 @@ export class TournamentBracketOverlay {
       // Clear loading state
       bracketContent.innerHTML = '';
 
-      // Import and create tournament bracket
-      const { TournamentBracket } = await import('../../tournament/TournamentBracket');
-      this.bracketComponent = new TournamentBracket(bracketContent as HTMLElement, tournament);
+      // Get current user ID
+      const user = authService.getUser();
+      const currentUserId = user?.id || (user as any)?.externalId;
+
+      // Convert old format to new format
+      const newFormatTournament = convertToNewFormat(tournament, currentUserId);
+
+      // Create new tournament bracket
+      this.bracketComponent = new TournamentBracket({
+        tournament: newFormatTournament,
+        onStartMatch: (matchId) => {
+          console.log('🚀 Start match:', matchId);
+          // Could navigate to game or trigger match start
+        },
+        onViewMatch: (matchId) => {
+          console.log('👁️ View match:', matchId);
+          // Could open spectator view
+        }
+      });
+
+      // Mount to DOM
+      bracketContent.appendChild(this.bracketComponent.getElement());
 
       // Highlight the completed match
       this.highlightCompletedMatch(summary);
