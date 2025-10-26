@@ -5,11 +5,11 @@ import {
   ServerTournamentMatch,
   ServerTournamentPlayer
 } from '../services/SocketManager';
-import { TournamentBracketData, TournamentPlayer, TournamentMatch } from './TournamentBracket';
+import { TournamentPlayer, TournamentMatch, TournamentBracketData } from './TournamentBracketAdapter';
 
 export interface CreateTournamentRequest {
   name: string;
-  size: 4 | 8;
+  size: 4;
   isPublic: boolean;
   allowSpectators: boolean;
 }
@@ -23,7 +23,7 @@ export interface JoinTournamentRequest {
 export interface TournamentListItem {
   id: string;
   name: string;
-  size: 4 | 8;
+  size: 4;
   currentPlayers: number;
   status: 'waiting' | 'active' | 'completed';
   createdBy: string;

@@ -287,20 +287,12 @@ export class GameModal extends BaseModal {
 
             <div class="bg-gray-700 rounded-lg p-4">
               <label class="block text-sm font-medium text-gray-300 mb-3">${t('Tournament Size:')}</label>
-              <div class="grid grid-cols-2 gap-4">
+              <div class="flex justify-center">
                 <div class="border-2 border-gray-600 rounded-lg p-3 cursor-pointer transition-all duration-300 hover:border-lime-500" onclick="selectTournamentSize(4)">
                   <div class="text-center">
                     <input type="radio" id="tournament-4" name="tournamentSize" value="4" class="w-4 h-4 text-lime-500 focus:ring-lime-500 mb-2" checked>
                     <div class="font-bold text-white">${t('🏆 4 Players')}</div>
                     <div class="text-sm text-gray-400">${t('Semi + Final')}</div>
-                  </div>
-                </div>
-
-                <div class="border-2 border-gray-600 rounded-lg p-3 cursor-pointer transition-all duration-300 hover:border-lime-500" onclick="selectTournamentSize(8)">
-                  <div class="text-center">
-                    <input type="radio" id="tournament-8" name="tournamentSize" value="8" class="w-4 h-4 text-lime-500 focus:ring-lime-500 mb-2">
-                    <div class="font-bold text-white">${t('🏆 8 Players')}</div>
-                    <div class="text-sm text-gray-400">${t('Quarter + Semi + Final')}</div>
                   </div>
                 </div>
               </div>

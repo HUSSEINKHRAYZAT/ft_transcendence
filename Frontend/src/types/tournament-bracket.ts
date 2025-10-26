@@ -5,7 +5,7 @@
 
 export type TournamentStatus = 'waiting' | 'active' | 'completed';
 export type MatchStatus = 'pending' | 'ready' | 'active' | 'completed';
-export type TournamentSize = 4 | 8;
+export type TournamentSize = 4;
 
 export interface Player {
   id: string;

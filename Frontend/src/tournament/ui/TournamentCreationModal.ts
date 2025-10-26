@@ -2,7 +2,7 @@
  * Tournament Creation Modal
  *
  * Allows users to create tournaments with:
- * - Size selection (4 or 8 players)
+ * - Size selection (4 players)
  * - Auto-start timer (optional)
  * - Share via link or QR code
  */
@@ -13,7 +13,7 @@ import { languageManager, t } from '../../langs/LanguageManager';
 
 export class TournamentCreationModal {
   private container: HTMLElement | null = null;
-  private selectedSize: TournamentSize = 8;
+  private selectedSize: TournamentSize = 4;
   private isCreating: boolean = false;
   private unsubscribeLanguageChange?: () => void;
   private boundHandleThemeChange?: () => void;
@@ -97,48 +97,48 @@ export class TournamentCreationModal {
 
   private getModalHTML(): string {
     return `
-      <div class="bg-gray-800 rounded-lg shadow-2xl max-w-2xl w-full mx-4 p-6 max-h-[90vh] overflow-y-auto transform transition-all">
+      <div class="bg-gradient-to-br from-gray-800/80 to-gray-900/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-lime-400/30 max-w-md w-full mx-4 p-8 max-h-[90vh] overflow-y-auto transform transition-all">
         <!-- Header -->
-        <div class="flex items-center justify-between mb-6 border-b border-gray-700 pb-4">
-          <h2 class="text-2xl font-bold text-lime-500">🏆 ${t('Create Tournament')}</h2>
-          <button class="text-gray-400 hover:text-white text-3xl font-bold transition-colors" data-action="close">
+        <div class="flex items-center justify-between mb-8 border-b border-gray-700 pb-4">
+          <h2 class="text-3xl font-extrabold text-lime-400 drop-shadow-lg tracking-wide flex items-center gap-2">
+            <span class="text-2xl">🏆</span> ${t('Create Tournament')}
+          </h2>
+          <button class="text-gray-400 hover:text-white text-3xl font-bold transition-colors focus:outline-none focus:ring-2 focus:ring-lime-400/60 rounded-full px-2" data-action="close">
             ×
           </button>
         </div>
 
         <!-- Body -->
-        <div class="space-y-6">
+        <div class="space-y-8">
           <!-- Size Selection -->
           <div>
-            <label class="block text-sm font-medium text-gray-300 mb-3">${t('Tournament Size')}</label>
-            <div class="grid grid-cols-2 gap-4">
+            <label class="block text-base font-semibold text-gray-200 mb-4 tracking-wide">${t('Tournament Size')}</label>
+            <div class="flex justify-center">
               ${this.getSizeButtonHTML(4)}
-              ${this.getSizeButtonHTML(8)}
             </div>
-            <p class="text-xs text-gray-400 mt-2">${t('Choose the number of players for your tournament')}</p>
           </div>
 
           <!-- Game Settings -->
           <div>
-            <label class="block text-sm font-medium text-gray-300 mb-3">${t('Game Settings')}</label>
-            <div class="bg-gray-700 rounded-lg p-4 space-y-3">
+            <label class="block text-base font-semibold text-gray-200 mb-4 tracking-wide">${t('Game Settings')}</label>
+            <div class="bg-gray-700/70 rounded-xl p-5 space-y-4 shadow-inner">
               <div class="flex items-center gap-3">
                 <span class="text-2xl">⚽</span>
-                <span class="text-gray-300">${t('First to 5 goals wins')}</span>
+                <span class="text-gray-200 font-medium">${t('First to 5 goals wins')}</span>
               </div>
               <div class="flex items-center gap-3">
                 <span class="text-2xl">🏁</span>
-                <span class="text-gray-300">${t('Single elimination bracket')}</span>
+                <span class="text-gray-200 font-medium">${t('Single elimination bracket')}</span>
               </div>
             </div>
           </div>
 
           <!-- Action Buttons -->
-          <div class="flex gap-3 pt-4">
-            <button class="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-4 rounded transition-all duration-300" data-action="cancel">
+          <div class="flex gap-4 pt-4">
+            <button class="flex-1 bg-gray-700/80 hover:bg-gray-800 text-white font-bold py-3 px-4 rounded-xl transition-all duration-300 shadow focus:outline-none focus:ring-2 focus:ring-lime-400/60" data-action="cancel">
               ${t('Cancel')}
             </button>
-            <button class="flex-1 bg-lime-500 hover:bg-lime-600 text-white font-bold py-3 px-4 rounded transition-all duration-300 flex items-center justify-center gap-2" data-action="create" id="createBtn">
+            <button class="flex-1 bg-lime-500 hover:bg-lime-600 text-white font-bold py-3 px-4 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 shadow-lg focus:outline-none focus:ring-2 focus:ring-lime-400/60" data-action="create" id="createBtn">
               <span>🎮</span>
               <span>${t('Create Tournament')}</span>
             </button>
@@ -152,7 +152,7 @@ export class TournamentCreationModal {
 
           <!-- Error State -->
           <div class="hidden" id="errorState">
-            <div class="bg-red-900 border border-red-700 text-red-200 px-4 py-3 rounded">
+            <div class="bg-red-900 border border-red-700 text-red-200 px-4 py-3 rounded-xl">
               <p id="errorMessage"></p>
             </div>
           </div>
@@ -168,18 +168,20 @@ export class TournamentCreationModal {
     return `
       <button
         class="
-          relative p-4 rounded-lg border-2 transition-all duration-300
+          relative p-6 rounded-2xl border-2 transition-all duration-300 font-semibold text-lg
           ${isSelected
-            ? 'bg-lime-500 border-lime-500 text-white shadow-lg transform scale-105'
-            : 'bg-gray-700 border-gray-600 text-gray-300 hover:border-lime-500 hover:bg-gray-600'
+            ? 'bg-lime-500/90 border-lime-400 shadow-xl text-white scale-105 ring-4 ring-lime-400/40 drop-shadow-lg'
+            : 'bg-gray-700/80 border-gray-500 text-gray-200 hover:border-lime-400 hover:bg-gray-600/80'
           }
+          focus:outline-none focus:ring-2 focus:ring-lime-400/60
         "
         data-size="${size}"
+        style="min-width: 110px; min-height: 110px;"
       >
-        <div class="text-3xl font-bold mb-1">${size}</div>
-        <div class="text-sm font-medium mb-1">${t('Players')}</div>
-        <div class="text-xs opacity-75">${rounds} ${t('rounds')}</div>
-        ${isSelected ? '<div class="absolute top-2 right-2 text-xl">✓</div>' : ''}
+        <div class="text-4xl font-extrabold mb-1">${size}</div>
+        <div class="text-base font-medium mb-1 tracking-wide">${t('Players')}</div>
+        <div class="text-xs opacity-80">${rounds} ${t('rounds')}</div>
+        ${isSelected ? '<div class="absolute top-2 right-2 text-2xl animate-pulse">✓</div>' : ''}
       </button>
     `;
   }
@@ -187,7 +189,6 @@ export class TournamentCreationModal {
   private getRoundsForSize(size: TournamentSize): number {
     switch (size) {
       case 4: return 2;
-      case 8: return 3;
     }
     return 2;
   }

@@ -234,7 +234,7 @@
   "Tournament bracket play": "لعب بطولة",
   "Tournament Size:": "حجم البطولة:",
   "Semi + Final": "نصف نهائي + نهائي",
-  "Quarter + Semi + Final": "ربع نهائي + نصف نهائي + نهائي",
+
   "Tournament settings will be configured later": "سيتم تكوين إعدادات البطولة لاحقاً",
   "Welcome to FT_PONG! Get ready for some retro gaming fun!": "مرحباً بك في FT_PONG! استعد لمتعة الألعاب الكلاسيكية!",
   "We are a team of five passionate 42-Beirut developers collaborating on the FT_TRANSCENDENCE project.": "نحن فريق من خمسة مطورين متحمسين من 42-بيروت نتعاون في مشروع FT_TRANSCENDENCE.",
@@ -514,7 +514,7 @@
   "Join 4P": "الانضمام إلى 4 لاعبين",
   "Real-time Web socket multiplayer": "متعدد اللاعبين عبر Web socket في الوقت الفعلي",
   "Size:": "الحجم:",
-  "8 Players": "8 لاعبين",
+
   "Create Tournament": "إنشاء بطولة",
   "Join Tournament": "الانضمام إلى بطولة",
   "Results saved to database": "النتائج محفوظة في قاعدة البيانات",

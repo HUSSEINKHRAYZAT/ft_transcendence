@@ -236,7 +236,7 @@
   "Tournament bracket play": "Tournoi à élimination directe",
   "Tournament Size:": "Taille du tournoi :",
   "Semi + Final": "Demi-finale + Finale",
-  "Quarter + Semi + Final": "Quart + Demi + Finale",
+
   "Tournament settings will be configured later": "Les paramètres du tournoi seront configurés plus tard",
   "Welcome to FT_PONG! Get ready for some retro gaming fun!": "Bienvenue sur FT_PONG ! Préparez-vous pour du fun rétro gaming !",
   "We are a team of five passionate 42-Beirut developers collaborating on the FT_TRANSCENDENCE project.": "Nous sommes une équipe de cinq développeurs passionnés de 42-Beirut collaborant sur le projet FT_TRANSCENDENCE.",
@@ -520,7 +520,7 @@
   "Real-time Web socket multiplayer": "Multijoueur en temps réel Web socket",
 
   "Size:": "Taille :",
-  "8 Players": "8 Joueurs",
+
   "Create Tournament": "Créer un tournoi",
   "Join Tournament": "Rejoindre un tournoi",
   "Results saved to database": "Résultats sauvegardés en base de données",

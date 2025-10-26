@@ -18,7 +18,7 @@ import { socketManager } from '../services/SocketManager';
 
 // ==================== TYPES ====================
 
-export type TournamentSize = 4 | 8;
+export type TournamentSize = 4;
 export type TournamentStatus = 'waiting' | 'ready' | 'active' | 'completed';
 export type MatchStatus = 'pending' | 'active' | 'completed';
 
@@ -379,8 +379,7 @@ export class NewTournamentService {
    */
   public getRoundName(round: number, totalSize: TournamentSize): string {
     const rounds: Record<TournamentSize, string[]> = {
-      4: ['Semifinals', 'Final'],
-      8: ['Quarterfinals', 'Semifinals', 'Final']
+      4: ['Semifinals', 'Final']
     };
 
     return rounds[totalSize][round - 1] || `Round ${round}`;
