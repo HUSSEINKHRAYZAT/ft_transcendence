@@ -1464,8 +1464,6 @@ async removeFriend(usernameOne: string, usernameTwo: string): Promise<AuthRespon
 		this.setLoading(true);
 
 		try {
-
-			// Open Google OAuth popup
 			const authWindow = window.open(
 				`${API_BASE_URL}/users/oauth-upsert`,
 				'googleAuth',

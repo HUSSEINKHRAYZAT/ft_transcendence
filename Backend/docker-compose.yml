@@ -9,8 +9,10 @@ services:
       NODE_ENV: production
       PORT: 3000
       DB_FILE: /app/data/user_management.db
+      MAILER_URL: https://mailer:3000
       ENABLE_HTTPS: "true"
       CERT_PATH: /app/certs
+      NODE_EXTRA_CA_CERTS: /usr/local/share/ca-certificates/transcendence-ca.crt
     volumes:
       - user_data:/app/data
       - ./certs/ca/ca.crt:/usr/local/share/ca-certificates/transcendence-ca.crt:ro
@@ -78,6 +80,7 @@ services:
       DB_FILE: /app/data/game_management.db
       ENABLE_HTTPS: "true"
       CERT_PATH: /app/certs
+      NODE_EXTRA_CA_CERTS: /usr/local/share/ca-certificates/transcendence-ca.crt
     volumes:
       - game_data:/app/data
       - ./certs/ca/ca.crt:/usr/local/share/ca-certificates/transcendence-ca.crt:ro
@@ -115,6 +118,7 @@ services:
       FROM_NAME: Transcender
       ENABLE_HTTPS: "true"
       CERT_PATH: /app/certs
+      NODE_EXTRA_CA_CERTS: /usr/local/share/ca-certificates/transcendence-ca.crt
     volumes:
       - ./certs/ca/ca.crt:/usr/local/share/ca-certificates/transcendence-ca.crt:ro
       - ./certs/services/mailer-microservice:/app/certs:ro
@@ -145,6 +149,7 @@ services:
       DB_FILE: /app/data/session.db
       ENABLE_HTTPS: "true"
       CERT_PATH: /app/certs
+      NODE_EXTRA_CA_CERTS: /usr/local/share/ca-certificates/transcendence-ca.crt
     volumes:
       - session_data:/app/data
       - ./certs/ca/ca.crt:/usr/local/share/ca-certificates/transcendence-ca.crt:ro
@@ -175,12 +180,12 @@ services:
       PORT: 3000
       GOOGLE_CLIENT_ID: 710484980381-ruekfrc3otecdgpq44tms9ifgfff7fij.apps.googleusercontent.com
       GOOGLE_CLIENT_SECRET: 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
-      GOOGLE_REDIRECT_URI: http://localhost:8080/authWithGoogle/callback
+      GOOGLE_REDIRECT_URI: https://localhost:8080/authWithGoogle/callback
       USER_SERVICE_URL: https://user_management:3000
       AUTH_JWT_SECRET: dev-gateway-secret
       AUTH_JWT_TTL: 5h
       STATE_SECRET: dev-state-secret
-      ALLOWED_REDIRECTS: http://localhost:5173,http://127.0.0.1:5173
+      ALLOWED_REDIRECTS: https://localhost:5173,https://127.0.0.1:5173
       ENABLE_HTTPS: "true"
       CERT_PATH: /app/certs
       NODE_EXTRA_CA_CERTS: /usr/local/share/ca-certificates/transcendence-ca.crt
@@ -217,6 +222,7 @@ services:
       AUTH_JWT_SECRET: dev-gateway-secret
       ENABLE_HTTPS: "true"
       CERT_PATH: /app/certs
+      NODE_EXTRA_CA_CERTS: /usr/local/share/ca-certificates/transcendence-ca.crt
     volumes:
       - ./certs/ca/ca.crt:/usr/local/share/ca-certificates/transcendence-ca.crt:ro
       - ./certs/services/realtime-microservice:/app/certs:ro
