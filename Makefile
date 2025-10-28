@@ -6,7 +6,7 @@
 .PHONY: all help setup certs build up down restart clean logs status \
         backend-build backend-up backend-down backend-logs backend-restart \
         frontend-dev frontend-install frontend-reinstall frontend-build frontend-preview \
-        dev-build dev-up dev-down prune health check-docker
+        dev-build dev-up dev-down prune health check-docker launcher eval
 
 MAKEFLAGS += --no-print-directory
 
@@ -58,8 +58,15 @@ help:
 	@echo "$(CYAN)║        FT TRANSCENDENCE - PRODUCTION DEPLOYMENT COMMANDS               ║$(RESET)"
 	@echo "$(CYAN)╚════════════════════════════════════════════════════════════════════════╝$(RESET)"
 	@echo ""
+	@echo "$(GREEN)✨ Interactive Launcher:$(RESET)"
+	@echo "  $(YELLOW)make launcher$(RESET)           - 🎮 Launch interactive menu (recommended!)"
+	@echo "  $(YELLOW)./start.sh$(RESET)              - Same as above"
+	@echo ""
+	@echo "$(YELLOW)🎓 42 Evaluation:$(RESET)"
+	@echo "  $(YELLOW)make eval$(RESET)               - Complete setup for evaluation (setup→certs→build→up)"
+	@echo ""
 	@echo "$(GREEN)🚀 Quick Start:$(RESET)"
-	@echo "  $(YELLOW)make setup$(RESET)              - Initial setup (generate certificates)"
+	@echo "  $(YELLOW)make setup$(RESET)              - Initial setup (certs + frontend npm install)"
 	@echo "  $(YELLOW)make up$(RESET)                 - Start all services (containerized with nginx)"
 	@echo "  $(YELLOW)make dev$(RESET)                - Start backend + local Vite dev server"
 	@echo "  $(YELLOW)make down$(RESET)               - Stop all services"
@@ -112,7 +119,7 @@ help:
 # ==========================================
 # Setup - Initial Project Setup
 # ==========================================
-setup: certs frontend-cert-setup
+setup: certs frontend-cert-setup frontend-install
 	@echo "$(GREEN)✅ Setup complete! Ready to build and deploy.$(RESET)"
 
 frontend-cert-setup:
@@ -155,6 +162,53 @@ frontend-build:
 	@echo "$(BLUE)🔨 Building frontend for production...$(RESET)"
 	@cd $(FRONTEND_DIR) && npm run build
 	@echo "$(GREEN)✅ Frontend built!$(RESET)"
+
+# ==========================================
+# Evaluation - Complete Setup for 42
+# ==========================================
+eval:
+	@echo "$(CYAN)╔════════════════════════════════════════════════════════════════════════╗$(RESET)"
+	@echo "$(CYAN)║                   🎓 42 EVALUATION MODE - FULL SETUP 🎓                ║$(RESET)"
+	@echo "$(CYAN)╚════════════════════════════════════════════════════════════════════════╝$(RESET)"
+	@echo ""
+	@echo "$(YELLOW)This will run the complete setup process:$(RESET)"
+	@echo "  1️⃣  Setup project (certs + frontend npm install)"
+	@echo "  2️⃣  Generate certificates"
+	@echo "  3️⃣  Build all services"
+	@echo "  4️⃣  Start all services"
+	@echo ""
+	@echo "$(MAGENTA)⏱️  This may take a few minutes...$(RESET)"
+	@echo ""
+	@sleep 2
+	@echo "$(BLUE)━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$(RESET)"
+	@echo "$(GREEN)Step 1/4: Running setup...$(RESET)"
+	@$(MAKE) setup
+	@echo ""
+	@echo "$(BLUE)━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$(RESET)"
+	@echo "$(GREEN)Step 2/4: Generating certificates...$(RESET)"
+	@$(MAKE) certs
+	@echo ""
+	@echo "$(BLUE)━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$(RESET)"
+	@echo "$(GREEN)Step 3/4: Building all services...$(RESET)"
+	@$(MAKE) build
+	@echo ""
+	@echo "$(BLUE)━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$(RESET)"
+	@echo "$(GREEN)Step 4/4: Starting all services...$(RESET)"
+	@$(MAKE) up
+	@echo ""
+	@echo "$(GREEN)╔════════════════════════════════════════════════════════════════════════╗$(RESET)"
+	@echo "$(GREEN)║         ✅ EVALUATION SETUP COMPLETE - READY FOR TESTING! ✅           ║$(RESET)"
+	@echo "$(GREEN)╚════════════════════════════════════════════════════════════════════════╝$(RESET)"
+	@echo ""
+	@echo "$(CYAN)📍 Access the application:$(RESET)"
+	@echo "  $(YELLOW)Frontend:$(RESET) https://localhost:5173"
+	@echo "  $(YELLOW)API:$(RESET)      https://localhost:8080"
+	@echo ""
+	@echo "$(MAGENTA)💡 Useful commands:$(RESET)"
+	@echo "  $(CYAN)make status$(RESET)  - Check service health"
+	@echo "  $(CYAN)make logs$(RESET)    - View service logs"
+	@echo "  $(CYAN)make down$(RESET)    - Stop all services"
+	@echo ""
 
 # ==========================================
 # Start Services
@@ -354,4 +408,10 @@ check-docker:
 	else \
 		echo "$(GREEN)✅ Using modern Docker Compose V2 (recommended)$(RESET)"; \
 	fi
+
+# ==========================================
+# Interactive Launcher
+# ==========================================
+launcher:
+	@./start.sh
 
