@@ -1,0 +1,10 @@
+node_modules
+dist/
+build/
+tmp/
+.DS_Store
+
+*.env
+*.vscode
+cert/
+*.md
