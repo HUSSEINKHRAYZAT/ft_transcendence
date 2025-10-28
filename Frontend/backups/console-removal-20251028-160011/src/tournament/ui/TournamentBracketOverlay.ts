@@ -29,7 +29,6 @@ export class TournamentBracketOverlay {
    * Show tournament bracket overlay with match result
    */
   public async show(summary: TournamentResultSummary, tournament?: any): Promise<void> {
-    console.log('🏆 Showing tournament bracket overlay:', summary);
 
     // Clean up any existing overlay
     this.hide();
@@ -398,14 +397,6 @@ export class TournamentBracketOverlay {
       // Create new tournament bracket
       this.bracketComponent = new TournamentBracket({
         tournament: newFormatTournament,
-        onStartMatch: (matchId) => {
-          console.log('🚀 Start match:', matchId);
-          // Could navigate to game or trigger match start
-        },
-        onViewMatch: (matchId) => {
-          console.log('👁️ View match:', matchId);
-          // Could open spectator view
-        }
       });
 
       // Mount to DOM

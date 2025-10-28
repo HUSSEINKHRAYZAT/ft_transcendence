@@ -96,7 +96,6 @@ export class StatisticsModal extends BaseModal {
 }
 
 public static showForFriend(friendId: string, friendUsername: string): void {
-    console.log(`📊 StatisticsModal.showForFriend() called for ${friendUsername} (${friendId})`);
     const modal = new StatisticsModal(friendId, friendUsername);
     modal.showModal();
     // loadFriendStatistics will be called from getModalContent via setTimeout
@@ -335,7 +334,6 @@ protected getModalContent(): string {
 	}
 
 	public static show(): void {
-		console.log('📊 StatisticsModal.show() called');
 		const modal = new StatisticsModal();
 		modal.showModal();
 	}

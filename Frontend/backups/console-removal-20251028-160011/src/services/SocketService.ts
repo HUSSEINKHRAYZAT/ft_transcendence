@@ -289,15 +289,12 @@ export class SocketService {
                     break;
 
                 case 'welcome':
-                    // console.log('[SocketService] Welcome message:', message);
                     break;
 
                 case 'pong':
-                    // console.log('[SocketService] Received heartbeat pong');
                     break;
 
                 default:
-                    // console.warn("[SocketService] Unknown message type:", message.type);
             }
         } catch (error) {
             console.error("[SocketService] Error parsing message:", error, event.data);
@@ -524,7 +521,6 @@ export class SocketService {
 
         try {
             this.socket.send(JSON.stringify(messageData));
-            console.log("[SocketService] Avatar changed message sent:", messageData);
         } catch (error) {
             console.error("[SocketService] Error sending avatar-changed message:", error);
         }
@@ -617,7 +613,6 @@ export class SocketService {
 
     try {
         this.socket.send(JSON.stringify(messageData));
-        console.log("[SocketService] Friend accepted message sent:", messageData);
     } catch (error) {
         console.error("[SocketService] Error sending friend-accepted message:", error);
     }
@@ -637,7 +632,6 @@ public sendUserBlocked(targetUsername: string): void {
 
     try {
         this.socket.send(JSON.stringify(messageData));
-        console.log("[SocketService] User blocked message sent:", messageData);
     } catch (error) {
         console.error("[SocketService] Error sending user-blocked message:", error);
     }

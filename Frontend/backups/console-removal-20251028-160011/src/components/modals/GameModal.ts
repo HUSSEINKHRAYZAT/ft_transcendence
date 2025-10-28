@@ -315,7 +315,6 @@ export class GameModal extends BaseModal {
     if (mode === 'online')
     {
       (window as any).inviteFriend = (friendId: string) => {
-        console.log('📧 Inviting friend:', friendId);
 
         setTimeout(() => {
           const invitedSection = findElement('#invited-players');
@@ -438,7 +437,6 @@ export class GameModal extends BaseModal {
         break;
     }
 
-    console.log('🎮 Game Configuration:', gameConfig);
 
     this.close();
     this.showToast('success', t('Game Configuration Ready!'), t('{mode} mode configured', { mode }));
@@ -455,7 +453,6 @@ export class GameModal extends BaseModal {
   showModal(): void {
     const authToken = localStorage.getItem('ft_pong_auth_token');
     if (!authToken) {
-      console.log('❌ User not authenticated, cannot show game modal');
       this.showToast('error', t('Authentication Required'), t('Please login to play the game'));
       return;
     }

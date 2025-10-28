@@ -52,8 +52,6 @@ const routes: FastifyPluginAsync = async (app) => {
   }, async (req, reply) => {
     const { username, password } = req.body as any;
 
-    console.log('Login attempt for user:', username);
-
     const loginRes = await fetch(`${app.config.USER_SERVICE_URL}/users/login`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -73,7 +71,7 @@ const routes: FastifyPluginAsync = async (app) => {
     else {
       bodyData = { username };
     }
-    console.log('Looking up user with data:', bodyData);
+
     const lookupRes = await fetch(`${app.config.USER_SERVICE_URL}/users/lookup`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },

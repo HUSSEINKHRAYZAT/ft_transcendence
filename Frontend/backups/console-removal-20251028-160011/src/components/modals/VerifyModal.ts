@@ -144,7 +144,6 @@ export class VerifyModal extends BaseModal {
     if (cancel2FABtn) {
       cancel2FABtn.addEventListener('click', () => {
         this.close();
-        console.log('🔐 2FA cancelled - returning to login');
 
         sessionStorage.removeItem('temp_2fa_token');
         sessionStorage.removeItem('temp_2fa_email');
@@ -161,7 +160,6 @@ export class VerifyModal extends BaseModal {
     if (changeEmailBtn) {
       changeEmailBtn.addEventListener('click', () => {
         this.close();
-        console.log('👤 Change email requested - going back to signup');
       });
     }
   }
@@ -174,12 +172,6 @@ export class VerifyModal extends BaseModal {
     try {
       this.currentCode = this.generateRandomCode();
 
-      console.log('✉️ ========================================');
-      console.log('✉️ EMAIL VERIFICATION - CODE GENERATED');
-      console.log('✉️ Email:', this.userEmail);
-      console.log('✉️ CODE:', this.currentCode);
-      console.log('✉️ Is 2FA:', this.is2FA);
-      console.log('✉️ ========================================');
 
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(this.userEmail)) {
@@ -204,11 +196,6 @@ export class VerifyModal extends BaseModal {
         code: this.currentCode
       };
 
-      console.log(`📤 Sending ${this.is2FA ? '2FA' : 'verification'} request:`, {
-        url: `${API_BASE_URL}/users/send-verification`,
-        body: requestBody,
-        is2FA: this.is2FA
-      });
 
       const response = await fetch(`${API_BASE_URL}/users/send-verification`, {
         method: 'POST',
@@ -216,16 +203,13 @@ export class VerifyModal extends BaseModal {
         body: JSON.stringify(requestBody)
       });
 
-      console.log(`📥 ${this.is2FA ? '2FA' : 'Verification'} response status:`, response.status);
 
       if (response.status === 200 || response.status === 201) {
-        console.log(`✅ ${this.is2FA ? '2FA' : 'Verification'} code sent successfully`);
         return;
       }
 
       if (response.status === 400) {
         const errorResponse = await response.json();
-        console.log('📝 400 Bad Request details:', errorResponse);
 
         if (errorResponse.message?.includes('email')) {
           this.showError('Invalid email format. Please check your email address.');
@@ -237,12 +221,10 @@ export class VerifyModal extends BaseModal {
 
       console.error(`❌ Failed to send ${this.is2FA ? '2FA' : 'verification'} code, status: ${response.status}`);
       this.currentCode = '000000';
-      console.log(`📧 Using demo code: 000000 (API error fallback)`);
 
     } catch (error) {
       console.error(`❌ Network error sending ${this.is2FA ? '2FA' : 'verification'} code:`, error);
       this.currentCode = '000000';
-      console.log(`📧 Using demo code: 000000 (network error fallback)`);
     }
   }
 
@@ -268,7 +250,6 @@ export class VerifyModal extends BaseModal {
       return;
     }
 
-    console.log(`🔐 Verifying ${this.is2FA ? '2FA' : 'verification'} code:`, code);
 
     const submitBtn = findElement('#verify-submit') as HTMLButtonElement;
     if (submitBtn) {
@@ -279,7 +260,6 @@ export class VerifyModal extends BaseModal {
     try {
       if (code === this.currentCode) {
         if (this.is2FA) {
-          console.log('🔐 2FA code verified - completing login locally');
 
           const result = await authService.complete2FALogin(this.userEmail, code);
 
@@ -353,7 +333,6 @@ export class VerifyModal extends BaseModal {
     }
   }
   private async handleResendCode(): Promise<void> {
-    console.log(`📧 Resending ${this.is2FA ? '2FA' : 'verification'} code to:`, this.userEmail);
 
     try {
       await this.generateAndSendCode();

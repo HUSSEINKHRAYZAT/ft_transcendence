@@ -167,15 +167,13 @@
           }
         },
         onStartMatch: (matchId) => {
-          console.log('Starting match:', matchId);
+        
           alert(`Starting match ${matchId}!\n\nIn a real app, this would navigate to the game screen.`);
         },
         onViewMatch: (matchId) => {
-          console.log('Viewing match:', matchId);
           alert(`Viewing match ${matchId}!\n\nIn a real app, this would open the spectator view.`);
         },
         onRefresh: () => {
-          console.log('Refreshing...');
         }
       });
 
@@ -234,17 +232,9 @@
       // Update bracket display
       currentBracket.update(currentTournament);
 
-      console.log('Match completed:', targetMatch.id, 'Winner:', winnerId);
     };
 
     // Keyboard shortcuts info
-    console.log('%c🎮 Tournament Bracket Demo', 'font-size: 20px; font-weight: bold; color: #84cc16;');
-    console.log('%cKeyboard Shortcuts:', 'font-size: 14px; font-weight: bold; color: #38bdf8;');
-    console.log('  J or ↓  - Next match');
-    console.log('  K or ↑  - Previous match');
-    console.log('  →       - Next round');
-    console.log('  ←       - Previous round');
-    console.log('  Enter   - Open/Start match');
   </script>
 </body>
 </html>

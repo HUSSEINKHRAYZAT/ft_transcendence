@@ -15,7 +15,6 @@ export class TournamentMatchService {
 
   public static getInstance(): TournamentMatchService {
     if (!TournamentMatchService.instance) {
-      console.log('🏆 Creating TournamentMatchService instance');
       TournamentMatchService.instance = new TournamentMatchService();
     }
     return TournamentMatchService.instance;
@@ -27,23 +26,9 @@ export class TournamentMatchService {
     currentPlayer: TournamentPlayer,
     onGameStart: (gameConfig: GameConfig) => void
   ): Promise<void> {
-    console.log('🏆 Starting tournament match:', {
-      tournament: tournament.name,
-      match: match.id,
-      player1: match.player1?.name,
-      player2: match.player2?.name,
-      currentPlayer: currentPlayer.name
-    });
+
 
     // Determine if current player is player1 (host) or player2 (guest)
-    console.log('🔍 Role assignment:', {
-      'currentPlayer.id': currentPlayer.id,
-      'match.player1?.id': match.player1?.id,
-      'match.player2?.id': match.player2?.id,
-      'isPlayer1Match': match.player1?.id === currentPlayer.id,
-      'isPlayer2Match': match.player2?.id === currentPlayer.id
-    });
-    
     const isHost = match.player1?.id === currentPlayer.id;
     const isPlayerInMatch = match.player1?.id === currentPlayer.id || match.player2?.id === currentPlayer.id;
 
@@ -52,7 +37,6 @@ export class TournamentMatchService {
       throw new Error('Current player is not in this match');
     }
     
-    console.log(`🏆 Player role determined: ${isHost ? 'HOST (player1)' : 'GUEST (player2)'}`);
 
 
     const matchConfig: TournamentMatchConfig = {
@@ -80,13 +64,6 @@ export class TournamentMatchService {
   ): Promise<void> {
     const { tournament, match, currentPlayer, isHost } = matchConfig;
 
-    console.log('🏆 Starting remote multiplayer tournament match:', {
-      isHost,
-      match: match.id,
-      player1: match.player1?.name,
-      player2: match.player2?.name
-    });
-
     try {
       // Connect to socket server
       await socketManager.connect(currentPlayer.name, currentPlayer.id);
@@ -97,14 +74,12 @@ export class TournamentMatchService {
 
       if (isHost) {
         // Host creates the room and announces it so guest can join
-        console.log('🏆 Creating tournament match room as host');
 
         const createdRoomId = await socketManager.createRoom('2p');
         if (!createdRoomId) {
           throw new Error('Failed to create tournament match room');
         }
 
-        console.log('🏆 Tournament match room created:', createdRoomId);
 
         if (opponentId) {
           socketManager.announceTournamentMatchRoom({
@@ -165,13 +140,6 @@ export class TournamentMatchService {
 
       } else {
         // Guest waits for the host's announcement with the generated roomId
-        console.log('🏆 Guest waiting for host to announce room...');
-        const roomId = await this.waitForRoomAnnouncement(
-          tournament.tournamentId,
-          match.id,
-          currentPlayer.id
-        );
-
         if (!roomId) {
           throw new Error('Timed out waiting for room announcement');
         }
@@ -189,7 +157,6 @@ export class TournamentMatchService {
       console.error('🏆 Failed to start remote tournament match:', error);
       
       // Fallback to AI match if remote fails
-      console.log('🏆 Falling back to AI match due to remote failure');
       const aiMatchConfig = { ...matchConfig };
       if (aiMatchConfig.match.player1 && aiMatchConfig.match.player2) {
         if (!aiMatchConfig.match.player1.isAI) {
@@ -286,11 +253,9 @@ export class TournamentMatchService {
     roomId: string,
     onGameStart: (gameConfig: GameConfig) => void
   ): Promise<void> {
-    console.log('🏆 Host waiting for opponent to join...');
 
     // Listen for player joined event
     const playerJoinedHandler = (data: any) => {
-      console.log('🏆 Opponent joined tournament match:', data);
       
       // Start the game once opponent joins
       socketManager.off('player_joined', playerJoinedHandler);
@@ -361,7 +326,6 @@ export class TournamentMatchService {
       }
     };
 
-    console.log('🏆 Starting tournament game with remote connection:', gameConfig);
     onGameStart(gameConfig);
   }
 
@@ -410,7 +374,6 @@ export class TournamentMatchService {
       }
     };
 
-    console.log('🏆 Starting AI tournament match:', gameConfig);
     onGameStart(gameConfig);
   }
 

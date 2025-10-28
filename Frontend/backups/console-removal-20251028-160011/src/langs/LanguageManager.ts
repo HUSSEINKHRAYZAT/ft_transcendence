@@ -40,7 +40,6 @@ export class LanguageManager {
 
     this.loadStoredLanguage();
     void this.loadTranslations();
-    console.log(`🌍 LanguageManager initialized with language: ${this.currentLanguage}`);
   }
 
   private async loadTranslations(): Promise<void> {
@@ -71,7 +70,6 @@ export class LanguageManager {
         detail: { language: this.currentLanguage }
       }));
 
-      console.log('✅ Translation files loaded successfully');
     } catch (error) {
       console.error('❌ Error loading translation files:', error);
       this.translationsLoaded = true;
@@ -145,7 +143,6 @@ export class LanguageManager {
       console.warn('Failed to save language preference:', error);
     }
 
-    console.log(`🌍 Language changed from ${previousLanguage} to ${language}`);
 
     // Notify listeners
     this.listeners.forEach(listener => {

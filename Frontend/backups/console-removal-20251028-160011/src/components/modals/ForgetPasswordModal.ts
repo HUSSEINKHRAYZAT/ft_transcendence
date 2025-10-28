@@ -296,13 +296,11 @@ export class ForgetPasswordModal extends BaseModal {
     submitBtn.textContent = t('Sending...');
 
     try {
-      console.log('🔐 Starting password reset for email:', email);
 
       // Use AuthService for password reset
       const result = await authService.initiatePasswordReset(email, password);
 
       if (result.success) {
-        console.log('✅ Password reset initiated successfully');
 
         // Close current modal and show verification modal
         this.close();
@@ -330,7 +328,6 @@ export class ForgetPasswordModal extends BaseModal {
 
   private async showPasswordResetVerificationModal(email: string, newPassword: string): Promise<void> {
     try {
-      console.log('📧 Showing password reset verification modal');
 
       // Create a custom verification modal specifically for password reset
       this.createPasswordResetVerificationModal(email, newPassword);

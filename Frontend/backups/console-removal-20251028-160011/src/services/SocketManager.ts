@@ -206,7 +206,6 @@ export class SocketManager {
     }
 
     if (this.isConnected) {
-      console.log('Already connected to WebSocket server');
       if (playerName && playerName !== this.playerName) {
         this.playerName = playerName;
       }
@@ -217,7 +216,6 @@ export class SocketManager {
     const serverURL = this.getServerURL();
 
     try {
-      console.log(`🔌 Connecting to WebSocket server at ${serverURL}...`);
 
       this.socket = new WebSocket(serverURL);
 
@@ -231,7 +229,6 @@ export class SocketManager {
           this.isConnected = true;
           this.reconnectAttempts = 0;
 
-          console.log(`✅ Connected to WebSocket server`);
 
           // Register player with server
           this.send('register_player', {
@@ -251,7 +248,6 @@ export class SocketManager {
         };
 
         this.socket!.onclose = (event) => {
-          console.log('🔌 Disconnected from WebSocket server:', event.code, event.reason);
           this.isConnected = false;
           this.currentRoom = null;
           this.emit('disconnected');
@@ -259,7 +255,6 @@ export class SocketManager {
           // Auto-reconnect logic
           if (this.reconnectAttempts < this.maxReconnectAttempts) {
             this.reconnectAttempts++;
-            console.log(`🔄 Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
             this.reconnectTimer = setTimeout(() => {
               this.connect(this.playerName);
             }, 1000 * this.reconnectAttempts);
@@ -292,49 +287,40 @@ export class SocketManager {
     switch (type) {
       case 'registered':
         this.playerId = message.id;
-        console.log(`👤 Registered as ${message.name} (${this.playerId})`);
         this.emit('connected', { playerId: this.playerId, playerName: message.name });
         break;
 
       case 'room_created':
         this.currentRoom = message.roomId;
-        console.log(`🏠 Room created: ${message.roomId}`);
         this.emit('room_created', message);
         break;
 
       case 'room_joined':
         this.currentRoom = message.roomId;
-        console.log(`🚪 Joined room: ${message.roomId}`);
         this.emit('room_joined', message);
         break;
 
       case 'room_updated':
-        console.log(`🔄 Room updated:`, message);
         this.emit('room_updated', message);
         break;
 
       case 'room_state':
-        console.log(`📊 Room state:`, message);
         this.emit('room_state', message);
         break;
 
       case 'player_joined':
-        console.log(`👤 Player joined: ${message.name}`);
         this.emit('player_joined', message);
         break;
 
       case 'player_left':
-        console.log(`👋 Player left: ${message.id}`);
         this.emit('player_left', message.id);
         break;
 
       case 'game_started':
-        console.log('🎮 Game started!', message);
         this.emit('game_started', message);
         break;
 
       case 'game_ready':
-        console.log('🎮 Game ready:', message);
         this.emit('game_ready', message);
         break;
 
@@ -343,7 +329,6 @@ export class SocketManager {
         break;
 
       case 'game_exit':
-        console.log('🚪 Game exit:', message);
         this.emit('game_exit', message);
         break;
 
@@ -423,7 +408,6 @@ export class SocketManager {
         break;
 
       case 'both_players_ready':
-        console.log('✅ Both players ready event received:', message);
         this.emit('both_players_ready', {
           tournamentId: message.tournamentId,
           matchId: message.matchId,

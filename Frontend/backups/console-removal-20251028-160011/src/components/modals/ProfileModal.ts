@@ -282,8 +282,7 @@ private async handleProfileUpdate(event: Event): Promise<void> {
         const result = await authService.updateProfile(updateData);
 
         if (result.success && result.user) {
-            console.log('✅ Profile updated successfully');
-            console.log('👤 Updated user from backend:', result.user);
+
 
             // Check if avatar was changed and send WebSocket notification
             if (currentAvatar !== selectedAvatar) {
@@ -316,7 +315,6 @@ private async handleProfileUpdate(event: Event): Promise<void> {
 			const socketService = (window as any).socketService;
 			if (socketService && socketService.sendAvatarChanged) {
 				socketService.sendAvatarChanged(newAvatar);
-				console.log('📡 Avatar changed notification sent via WebSocket:', newAvatar);
 			} else {
 				console.warn('⚠️ SocketService not available for avatar change notification');
 			}
@@ -326,7 +324,6 @@ private async handleProfileUpdate(event: Event): Promise<void> {
 	}
 
 	private forceUIUpdate(updatedUser: any): void {
-	console.log('🔄 forceUIUpdate called with user:', updatedUser);
 
 	const beforeState = authService.getState();
 
@@ -336,7 +333,6 @@ private async handleProfileUpdate(event: Event): Promise<void> {
 
 
 	setTimeout(() => {
-		console.log('🔄 Updating navbar...');
 
 		const afterState = authService.getState();
 
@@ -351,10 +347,7 @@ private async handleProfileUpdate(event: Event): Promise<void> {
 		}
 
 		const currentAuthState = authService.getState();
-		console.log('📊 Current auth state after update:', {
-		user: currentAuthState.user,
-		avatar: currentAuthState.user?.profilePath
-		});
+
 	}, 100);
 	}
 
@@ -384,7 +377,6 @@ private async handleProfileUpdate(event: Event): Promise<void> {
 	}
 
 	public static show(): void {
-		console.log('👤 ProfileModal.show() called');
 		const modal = new ProfileModal();
 		modal.showModal();
 	}
@@ -409,10 +401,6 @@ private async handleProfileUpdate(event: Event): Promise<void> {
 		return super.close();
 	}
 
-
-	async render(): Promise<void> {
-		console.log('👤 ProfileModal render() called - use show() to display modal');
-	}
 	}
 
 const style = document.createElement('style');

@@ -80,7 +80,6 @@ export class MessageFriendsModal extends BaseModal {
 	 * @param username - The sender's username
 	 */
 	public showReceivedMessage(message: string, username: string): void {
-		console.log('📥 Received message from:', username, '- Message:', message);
 
 		const messageObj = {
 			id: this.generateMessageId(),
@@ -129,7 +128,6 @@ export class MessageFriendsModal extends BaseModal {
 		sendBtn.textContent = t('Sending...');
 
 		try {
-			console.log('📤 Sending message to:', recipient, '- Message:', messageContent);
 
 			// For now, just simulate sending (you'll implement actual sending later)
 			await this.simulateSendMessage(recipient, messageContent);
@@ -153,7 +151,6 @@ export class MessageFriendsModal extends BaseModal {
 			// Show success toast
 			this.showToast('success', t('Message Sent'), t('Message sent to {username}', { username: recipient }));
 
-			console.log('✅ Message sent successfully');
 
 		} catch (error) {
 			console.error('❌ Send message error:', error);
@@ -173,7 +170,6 @@ export class MessageFriendsModal extends BaseModal {
 
 		return new Promise((resolve) => {
 			setTimeout(() => {
-				console.log('🔄 Message ready to send via socket:', { recipient, message });
 
 				// Dispatch event that socket service can listen to
 				window.dispatchEvent(new CustomEvent('send-message-request', {
@@ -295,7 +291,6 @@ export class MessageFriendsModal extends BaseModal {
 	 * Render method for compatibility
 	 */
 	async render(): Promise<void> {
-		console.log('📱 MessageFriendsModal render() called - use showModal() to display modal');
 	}
 }
 

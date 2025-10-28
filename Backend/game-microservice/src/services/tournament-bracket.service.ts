@@ -108,7 +108,6 @@ export function tournamentBracketService(app: FastifyInstance) {
       `).run(index + 1, tournamentDbId, player.id);
     });
 
-    console.log(`🎲 Generating bracket for ${size} players (${totalRounds} rounds)`);
 
     // Generate all rounds
     for (let round = 1; round <= totalRounds; round++) {
@@ -133,9 +132,6 @@ export function tournamentBracketService(app: FastifyInstance) {
           matchData.player2_id = player2?.id || null;
           matchData.status = 'ready'; // Both players assigned, match is ready
           
-          console.log(`  📋 Round 1 Match ${matchNum}: ${player1?.username} vs ${player2?.username}`);
-        } else {
-          console.log(`  ⏳ Round ${round} Match ${matchNum}: Waiting for winners`);
         }
 
         // Insert match
@@ -156,7 +152,7 @@ export function tournamentBracketService(app: FastifyInstance) {
       }
     }
 
-    console.log(`✅ Bracket generated with ${totalRounds} rounds`);
+   
   }
 
   /**
@@ -186,7 +182,7 @@ export function tournamentBracketService(app: FastifyInstance) {
       throw new Error('Winner must be one of the match players');
     }
 
-    console.log(`🏆 Completing match ${matchId}: Winner ${winnerId}`);
+   
 
     // Mark match as completed
     db.prepare(`
@@ -208,7 +204,6 @@ export function tournamentBracketService(app: FastifyInstance) {
       WHERE tournament_id = ? AND user_id = ?
     `).run(match.tournament_id, loserId);
 
-    console.log(`❌ Player ${loserId} eliminated`);
 
     // Advance winner to next round
     await advanceWinner(match, winnerId);
@@ -236,7 +231,6 @@ export function tournamentBracketService(app: FastifyInstance) {
   function advanceAllWinnersToNextRound(tournamentId: number, completedRound: number): void {
     const nextRound = completedRound + 1;
 
-    console.log(`✨ All Round ${completedRound} matches complete! Advancing all winners to Round ${nextRound}...`);
 
     // Get all completed matches from the round
     const completedMatches = db.prepare(`
@@ -250,7 +244,6 @@ export function tournamentBracketService(app: FastifyInstance) {
       const nextMatchNumber = Math.floor(match.match_number / 2);
       const isPlayer1Slot = match.match_number % 2 === 0;
 
-      console.log(`  ➡️ Winner ${match.winner_id} advances to Round ${nextRound} Match ${nextMatchNumber} (${isPlayer1Slot ? 'Player 1' : 'Player 2'})`);
 
       // Get the next match
       const nextMatch = db.prepare(`
@@ -259,7 +252,6 @@ export function tournamentBracketService(app: FastifyInstance) {
       `).get(tournamentId, nextRound, nextMatchNumber) as any;
 
       if (!nextMatch) {
-        console.error(`❌ Could not find next match: Round ${nextRound}, Match ${nextMatchNumber}`);
         continue;
       }
 
@@ -293,7 +285,6 @@ export function tournamentBracketService(app: FastifyInstance) {
           WHERE id = ?
         `).run(match.id);
 
-        console.log(`✅ Round ${nextRound} Match ${match.match_number} is ready: ${match.player1_id} vs ${match.player2_id}`);
       }
     }
   }
@@ -314,7 +305,6 @@ export function tournamentBracketService(app: FastifyInstance) {
 
     // Check if this was the final match
     if (nextRound > totalRounds) {
-      console.log(`🏆 Tournament completed! Winner: ${winnerId}`);
       
       // Mark tournament as completed
       db.prepare(`
@@ -343,7 +333,6 @@ export function tournamentBracketService(app: FastifyInstance) {
 
     if (!allRoundMatchesComplete) {
       // Not all matches complete yet - don't advance anyone
-      console.log(`⏳ Round ${completedMatch.round} not complete yet. Winner ${winnerId} will advance once all matches finish.`);
       return;
     }
 
@@ -396,7 +385,6 @@ export function tournamentBracketService(app: FastifyInstance) {
       WHERE id = ?
     `).run(matchId);
 
-    console.log(`🎮 Match ${matchId} started: ${match.player1_id} vs ${match.player2_id}`);
   }
 
   /**

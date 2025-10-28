@@ -81,13 +81,11 @@ export class SettingsBox {
       return;
     }
 
-    console.log('⚙️ Rendering SettingsBox component...');
 
     try {
       this.updateContent();
       this.setupEventListeners();
       this.isRendered = true;
-      console.log('✅ SettingsBox component rendered successfully');
     } catch (error) {
       console.error('❌ Error rendering SettingsBox:', error);
     }
@@ -863,7 +861,6 @@ export class SettingsBox {
   }
 
   private showLoginModal(): void {
-    console.log('🔐 SettingsBox: Trying to show login modal');
     if ((window as any).modalService?.showLoginModal) {
       (window as any).modalService.showLoginModal();
     } else {
@@ -897,6 +894,5 @@ export class SettingsBox {
       this.container.innerHTML = '';
     }
     this.isRendered = false;
-    console.log('🧹 SettingsBox component destroyed');
   }
 }

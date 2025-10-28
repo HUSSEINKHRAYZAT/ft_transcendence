@@ -12,7 +12,6 @@ export async function handleOAuthCallback(): Promise<void> {
     window.history.replaceState({}, "", window.location.pathname);
 
     const rawUser = await authService.fetchAuthMe(token);
-    console.log("Raw /auth/me response:", JSON.stringify(rawUser, null, 2));
 
     if (rawUser) {
         const user = mapBackendUserToUser(rawUser);

@@ -239,12 +239,10 @@ function handleTournamentStart(tournamentId: string): void {
   if (tournament.status !== 'waiting') return;
 
   if (tournament.players.length < 2) {
-    console.log(`⚠️ Cannot start tournament ${tournament.code} - not enough players`);
     return;
   }
 
   if (tournament.players.length < tournament.size) {
-    console.log(`⚠️ Cannot start tournament ${tournament.code} - waiting for ${tournament.size - tournament.players.length} more player(s) (current ${tournament.players.length}/${tournament.size})`);
     return;
   }
 
@@ -254,7 +252,6 @@ function handleTournamentStart(tournamentId: string): void {
   tournament.currentRound = 1;
   tournament.startedAt = Date.now();
 
-  console.log(`🏆 Tournament ${tournament.code} starting with ${tournament.players.length} players`);
 
   // Broadcast tournament started
   broadcastToAll({
@@ -311,7 +308,6 @@ function startRoundMatches(tournament: any, round: number): void {
     (m: any) => m.round === round && m.status === 'pending' && m.player1 && m.player2
   );
 
-  console.log(`🏆 Starting round ${round} - ${roundMatches.length} matches simultaneously`);
 
   // Activate all matches in the round
   for (const match of roundMatches) {
@@ -335,7 +331,6 @@ function startRoundMatches(tournament: any, round: number): void {
 }
 
 function handleRoundCompletion(tournament: any): void {
-  console.log(`🏆 Round ${tournament.currentRound} completed in tournament ${tournament.code}`);
 
   // Advance winners to next round
   const currentRoundMatches = tournament.matches.filter(
@@ -351,7 +346,6 @@ function handleRoundCompletion(tournament: any): void {
   // Sort current round matches by matchIndex to ensure consistent ordering
   const sortedMatches = currentRoundMatches.sort((a: any, b: any) => a.matchIndex - b.matchIndex);
   
-  console.log(`🔄 Advancing winners from ${sortedMatches.length} matches to ${nextRoundMatches.length} next round matches`);
   
   for (let i = 0; i < sortedMatches.length; i++) {
     const completedMatch = sortedMatches[i];
@@ -378,22 +372,16 @@ function handleRoundCompletion(tournament: any): void {
       // First match of pair -> player1 of next match
       if (!nextMatch.player1) {
         nextMatch.player1 = { ...winner };
-        console.log(`✅ Match ${i} winner ${winner.name} -> Round ${nextRound} Match ${nextMatchIndex} slot 1`);
       } else if (nextMatch.player1.id !== winner.id) {
         console.warn(`⚠️ Slot 1 already occupied by ${nextMatch.player1.name}, cannot assign ${winner.name}`);
-      } else {
-        console.log(`ℹ️ ${winner.name} already assigned to Round ${nextRound} Match ${nextMatchIndex} slot 1`);
-      }
+      } 
     } else {
       // Second match of pair -> player2 of next match
       if (!nextMatch.player2) {
         nextMatch.player2 = { ...winner };
-        console.log(`✅ Match ${i} winner ${winner.name} -> Round ${nextRound} Match ${nextMatchIndex} slot 2`);
       } else if (nextMatch.player2.id !== winner.id) {
         console.warn(`⚠️ Slot 2 already occupied by ${nextMatch.player2.name}, cannot assign ${winner.name}`);
-      } else {
-        console.log(`ℹ️ ${winner.name} already assigned to Round ${nextRound} Match ${nextMatchIndex} slot 2`);
-      }
+      } 
     }
 
     const hasPlayer1 = Boolean(nextMatch.player1);
@@ -411,7 +399,6 @@ function handleRoundCompletion(tournament: any): void {
 
     delete nextMatch.startedAt;
 
-    console.log(`📡 Next match ${nextMatch.id} state: player1=${nextMatch.player1?.name || 'null'} (${nextMatch.player1?.id || 'none'}), player2=${nextMatch.player2?.name || 'null'} (${nextMatch.player2?.id || 'none'}), waitingForOpponent=${nextMatch.waitingForOpponent}`);
   }
 
   // Notify losers (eliminated)
@@ -451,7 +438,6 @@ function handleRoundCompletion(tournament: any): void {
       winner: tournament.players.find((p: any) => p.id === finalMatch.winnerId)
     });
 
-    console.log(`🏆🏆🏆 Tournament ${tournament.code} COMPLETE! Winner: ${finalMatch.winnerId}`);
   } else {
     // Start next round
     tournament.currentRound = nextRound;
@@ -612,15 +598,13 @@ function buildTournamentMatches(tournament: TournamentState): TournamentMatchSta
 }
 
 function activateMatch(tournament: TournamentState, match: TournamentMatchState) {
-  console.log(`🎮 activateMatch: Activating match ${match.id} in round ${match.round}`);
-  console.log(`🎮 Match details: ${match.player1?.name} vs ${match.player2?.name}`);
+
 
   match.status = 'active';
   match.startedAt = Date.now();
   tournament.currentRound = match.round;
 
   if (match.player1 && match.player2) {
-    console.log(`🎮 Sending tournament_match_ready to ${match.player1.name} (host) and ${match.player2.name} (guest)`);
 
     sendToExternalId(match.player1.externalId || match.player1.id, {
       type: 'tournament_match_ready',
@@ -638,7 +622,6 @@ function activateMatch(tournament: TournamentState, match: TournamentMatchState)
       match
     });
 
-    console.log(`✅ Match ${match.id} activated successfully`);
   } else {
     console.warn(`⚠️ Cannot activate match ${match.id} - missing players: p1=${match.player1?.name || 'null'}, p2=${match.player2?.name || 'null'}`);
   }
@@ -656,20 +639,14 @@ function activateNextMatchIfAvailable(tournament: TournamentState) {
 
   const allCurrentRoundComplete = currentRoundMatches.every(m => m.status === 'completed');
 
-  console.log(`🔍 activateNextMatchIfAvailable: currentRound=${currentRound}, matches in round=${currentRoundMatches.length}, all complete=${allCurrentRoundComplete}`);
-  console.log(`🔍 Current round matches:`, currentRoundMatches.map(m => ({
-    id: m.id,
-    status: m.status,
-    p1: m.player1?.name,
-    p2: m.player2?.name
-  })));
+
 
   if (!allCurrentRoundComplete) {
     return;
   }
 
   if (currentRound >= totalRounds) {
-    console.log(`🏆 Tournament ${tournament.id} final round complete.`);
+
 
     if (tournament.status !== 'completed') {
       const winningMatch = currentRoundMatches.find(m => m.winnerId);
@@ -694,7 +671,6 @@ function activateNextMatchIfAvailable(tournament: TournamentState) {
     m => m.round === nextRound && m.player1 && m.player2
   );
 
-  console.log(`🏆 Round ${currentRound} complete! Preparing ${nextRoundMatches.length} matches for round ${nextRound}`);
 
   if (nextRoundMatches.length === 0) {
     console.warn(`⚠️ No fully assigned matches ready to activate in round ${nextRound}. Pending matches:`,
@@ -731,24 +707,18 @@ function advanceWinnerToNextRound(tournament: TournamentState, completedMatch: T
   const nextRound = completedMatch.round + 1;
   const winnerClone: TournamentPlayerInfo = { ...winner };
 
-  console.log(`🔍 advanceWinner DEBUG: completedMatch.id=${completedMatch.id}, completedMatch.round=${completedMatch.round}, completedMatch.matchIndex=${completedMatch.matchIndex}`);
-  console.log(`🔍 Winner being advanced:`, JSON.stringify(winner, null, 2));
-  console.log(`🔍 Winner isAI field:`, winner.isAI);
   
   // If this was the final match, set tournament winner
   if (nextRound > totalRounds) {
     tournament.status = 'completed';
   tournament.winner = winnerClone;
   tournament.updatedAt = Date.now();
-  console.log(`🏆 Tournament completed! Winner: ${winnerClone.name}`);
     broadcastTournamentState(tournament);
     return;
   }
 
   // Find the next round match this winner should advance to
   const targetMatchIndex = Math.floor(completedMatch.matchIndex / 2);
-  console.log(`🔍 Calculated targetMatchIndex=${targetMatchIndex} for nextRound=${nextRound}`);
-  console.log(`🔍 All matches in tournament:`, tournament.matches.map(m => ({ id: m.id, round: m.round, matchIndex: m.matchIndex })));
   
   const nextMatch = tournament.matches.find(m => m.round === nextRound && m.matchIndex === targetMatchIndex);
 
@@ -795,18 +765,11 @@ function advanceWinnerToNextRound(tournament: TournamentState, completedMatch: T
 
   delete nextMatch.startedAt;
 
-  if (nextMatch.waitingForOpponent) {
-    console.log(`⏳ Winner ${winnerClone.name} advanced to ${nextMatch.id}. Waiting for opponent from sibling match.`);
-  } else {
-    console.log(`✅ Winner ${winnerClone.name} advanced to ${nextMatch.id}. Match now has both players and will activate when round ${completedMatch.round} ends.`);
-  }
 
   // Broadcast updated tournament state so brackets update immediately
   tournament.updatedAt = Date.now();
   
-  console.log(`📡 Broadcasting tournament state after advancing winner ${winnerClone.name}`);
-  console.log(`📡 Next match ${nextMatch.id} state: player1=${nextMatch.player1?.name || 'null'} (${nextMatch.player1?.id || 'none'}), player2=${nextMatch.player2?.name || 'null'} (${nextMatch.player2?.id || 'none'}), waitingForOpponent=${nextMatch.waitingForOpponent}`);
-  
+
   broadcastTournamentState(tournament);
 }
 
@@ -859,7 +822,6 @@ function leaveRoom(playerId: string, roomId: string): void {
   const removed = room.removePlayer(playerId);
 
   if (removed && player) {
-    console.log(`👋 Player ${player.name} left room ${roomId}`);
 
     // Update player state
     player.roomId = null;
@@ -870,7 +832,6 @@ function leaveRoom(playerId: string, roomId: string): void {
     // If room is empty, delete it
     if (room.getPlayerCount() === 0) {
       rooms.delete(roomId);
-      console.log(`🗑️ Room ${roomId} deleted (empty)`);
     } else {
       // Send updated room state
       emitToRoom(roomId, { type: 'room_updated', ...room.getRoomInfo() });
@@ -879,7 +840,6 @@ function leaveRoom(playerId: string, roomId: string): void {
 }
 
 function handleDisconnect(playerId: string): void {
-  console.log(`🔌 Player disconnected: ${playerId}`);
 
   const player = players.get(playerId);
   sockets.delete(playerId);
@@ -935,7 +895,6 @@ function handleMessage(playerId: string, ws: WSClient, msg: WSMessage): void {
 
       players.set(playerId, playerRecord);
       sendToSocket(ws, { type: 'registered', id: playerId, name, externalId });
-      console.log(`👤 Player registered: ${name} (${playerId})${externalId ? ` ext:${externalId}` : ''}`);
       sendTournamentSnapshotToPlayer(playerId);
       break;
     }
@@ -952,7 +911,6 @@ function handleMessage(playerId: string, ws: WSClient, msg: WSMessage): void {
       rooms.set(roomId, room);
       player.roomId = roomId;
 
-      console.log(`🏠 Room created: ${roomId} by ${player.name} (${gameMode})`);
       sendToSocket(ws, { type: 'room_created', ...room.getRoomInfo() });
       break;
     }
@@ -983,7 +941,6 @@ function handleMessage(playerId: string, ws: WSClient, msg: WSMessage): void {
       player.roomId = roomId;
       player.name = displayName;
 
-      console.log(`🚪 Player ${displayName} joined room ${roomId} as player 2 (joiner)`);
 
       const playersArray = Array.from(room.players.values());
       const gameConfig = {
@@ -1021,7 +978,6 @@ function handleMessage(playerId: string, ws: WSClient, msg: WSMessage): void {
 
       // If room is full, automatically prepare game start
       if (room.players.size >= 2) {
-        console.log(`🎮 Room ${roomId} ready to start - Host: ${playersArray[0]?.name}, Joiner: ${playersArray[1]?.name}`);
 
         emitToRoom(roomId, {
           type: 'game_ready',
@@ -1062,7 +1018,6 @@ function handleMessage(playerId: string, ws: WSClient, msg: WSMessage): void {
       const started = room.startGame();
       if (started) {
         const playersArray = Array.from(room.players.values());
-        console.log(`🎮 Game started in room ${room.id} - Host: ${playersArray[0]?.name} (Player 0), Joiner: ${playersArray[1]?.name} (Player 1)`);
 
         emitToRoom(room.id, {
           type: 'game_started',
@@ -1089,7 +1044,6 @@ function handleMessage(playerId: string, ws: WSClient, msg: WSMessage): void {
       // Handle special game events
       if (msg.gameEnd) {
         if (room.hostId === playerId) {
-          console.log(`🏆 Game ended in room ${player.roomId}: ${msg.winnerName} wins!`);
           emitToRoom(player.roomId, { type: 'game_state', gameEnd: true, winnerName: msg.winnerName });
         }
         return;
@@ -1097,7 +1051,6 @@ function handleMessage(playerId: string, ws: WSClient, msg: WSMessage): void {
 
       if (msg.gameExit) {
         const playerName = player.name || 'Unknown Player';
-        console.log(`🚪 Game exit requested by ${playerName} in room ${player.roomId}`);
 
         const exitPayload = {
           type: 'game_exit',
@@ -1114,7 +1067,6 @@ function handleMessage(playerId: string, ws: WSClient, msg: WSMessage): void {
 
       if (msg.pauseToggle !== undefined) {
         const playerName = player.name || 'Unknown';
-        console.log(`⏸️ Game pause toggled by ${playerName} in room ${player.roomId}: ${msg.isPaused ? 'paused' : 'resumed'}`);
 
         room.isPaused = msg.isPaused;
         room.pausedBy = playerName;
@@ -1270,7 +1222,6 @@ function handleMessage(playerId: string, ws: WSClient, msg: WSMessage): void {
       setTimeout(() => {
         const t = tournaments.get(tournamentId);
         if (t && t.status === 'waiting' && t.players.length >= 2) {
-          console.log(`⏰ Auto-starting tournament ${code} after ${autoStartMinutes} minutes`);
           handleTournamentStart(tournamentId);
         }
       }, autoStartMinutes * 60 * 1000);
@@ -1280,7 +1231,6 @@ function handleMessage(playerId: string, ws: WSClient, msg: WSMessage): void {
         tournament 
       });
       
-      console.log(`🏆 NEW Tournament created: ${code} (${size} players) by ${player.name}`);
       break;
     }
 
@@ -1319,11 +1269,9 @@ function handleMessage(playerId: string, ws: WSClient, msg: WSMessage): void {
       if (!alreadyJoined) {
         tournament.players.push(playerInfo);
         
-        console.log(`🏆 ${player.name} joined tournament ${code} (${tournament.players.length}/${tournament.size})`);
 
         // Check if tournament is full - auto-start
         if (tournament.players.length === tournament.size) {
-          console.log(`🏆 Tournament ${code} is full - starting automatically!`);
           setTimeout(() => {
             handleTournamentStart(tournament.id);
           }, 2000); // 2 second delay for players to see "FULL" status
@@ -1396,7 +1344,6 @@ function handleMessage(playerId: string, ws: WSClient, msg: WSMessage): void {
       }
 
       if (foundMatch.status === 'completed') {
-        console.log(`ℹ️ Match ${matchId} already completed, ignoring duplicate completion`);
         break; // Already completed
       }
 
@@ -1417,7 +1364,6 @@ function handleMessage(playerId: string, ws: WSClient, msg: WSMessage): void {
       foundMatch.completedAt = Date.now();
 
       const winnerName = isPlayer1Winner ? foundMatch.player1?.name : foundMatch.player2?.name;
-      console.log(`🏆 Match ${matchId} completed in Round ${foundTournament.currentRound}: Winner = ${winnerName} (${winnerId})`);
 
       // Broadcast match completion
       broadcastToAll({
@@ -1433,14 +1379,12 @@ function handleMessage(playerId: string, ws: WSClient, msg: WSMessage): void {
       const completedCount = currentRoundMatches.filter((m: any) => m.status === 'completed').length;
       const totalCount = currentRoundMatches.length;
       
-      console.log(`📊 Round ${foundTournament.currentRound} progress: ${completedCount}/${totalCount} matches completed`);
       
       const allRoundMatchesComplete = currentRoundMatches.every(
         (m: any) => m.status === 'completed'
       );
 
       if (allRoundMatchesComplete) {
-        console.log(`✅ All matches in Round ${foundTournament.currentRound} completed - advancing to next round`);
         handleRoundCompletion(foundTournament);
       }
 
@@ -1458,7 +1402,6 @@ function handleMessage(playerId: string, ws: WSClient, msg: WSMessage): void {
           (p: any) => p.id !== playerInfo.id
         );
 
-        console.log(`🏆 ${player.name} left tournament ${(tournament as any).code}`);
 
         broadcastToAll({
           type: 'tournament_updated',
@@ -1514,7 +1457,6 @@ function handleMessage(playerId: string, ws: WSClient, msg: WSMessage): void {
       tournaments.set(tournamentId, tournament);
       broadcastTournamentState(tournament);
       sendToSocket(ws, { type: 'tournament_created', tournament });
-      console.log(`🏆 Tournament created: ${tournamentId} by ${player.name}`);
       break;
     }
 
@@ -1550,11 +1492,6 @@ function handleMessage(playerId: string, ws: WSClient, msg: WSMessage): void {
       sendToSocket(ws, { type: 'tournament_joined', tournament });
       
       // Notify when tournament is full - host must manually start
-      if (tournament.players.length === tournament.size) {
-        console.log(`🏆 Tournament ${tournament.id} is now full (${tournament.size} players) - waiting for host to start`);
-      } else {
-        console.log(`🏆 ${player.name} joined tournament ${tournament.id} (${tournament.players.length}/${tournament.size})`);
-      }
       break;
     }
 
@@ -1594,14 +1531,12 @@ function handleMessage(playerId: string, ws: WSClient, msg: WSMessage): void {
 
       // Activate ALL first round matches simultaneously
       const firstRoundMatches = tournament.matches.filter(m => m.round === 1 && m.player1 && m.player2);
-      console.log(`🏆 Activating ${firstRoundMatches.length} first-round matches simultaneously`);
       firstRoundMatches.forEach(match => {
         activateMatch(tournament, match);
       });
 
       broadcastTournamentState(tournament);
       sendToSocket(ws, { type: 'tournament_started', tournament });
-      console.log(`🏆 Tournament manually started: ${tournament.id}`);
       break;
     }
 
@@ -1669,7 +1604,6 @@ function handleMessage(playerId: string, ws: WSClient, msg: WSMessage): void {
         deliveredTo: opponentPlayerId
       });
 
-      console.log(`🏆 Tournament room ${msg.roomId} announced to ${opponentExternalId} by ${player.name}`);
       break;
     }
 
@@ -1704,7 +1638,6 @@ function handleMessage(playerId: string, ws: WSClient, msg: WSMessage): void {
 
       // Mark this player as ready
       match.readyPlayers.add(playerExternalId);
-      console.log(`✅ Player ${player.name} marked ready for match ${matchId}. Ready: ${match.readyPlayers.size}/2`);
 
       // Check if both players are ready
       const player1Id = match.player1?.externalId || match.player1?.id;
@@ -1714,7 +1647,6 @@ function handleMessage(playerId: string, ws: WSClient, msg: WSMessage): void {
           match.readyPlayers.has(player1Id) && 
           match.readyPlayers.has(player2Id)) {
         
-        console.log(`🎮 Both players ready for match ${matchId}! Starting match...`);
         
         // Clear ready state
         match.readyPlayers.clear();
@@ -1723,7 +1655,6 @@ function handleMessage(playerId: string, ws: WSClient, msg: WSMessage): void {
         const player1SocketId = externalIdToPlayerId.get(player1Id) || player1Id;
         const player2SocketId = externalIdToPlayerId.get(player2Id) || player2Id;
 
-        console.log(`📡 Looking for sockets: player1=${player1Id} -> socketId=${player1SocketId}, player2=${player2Id} -> socketId=${player2SocketId}`);
 
         const readyPayload = {
           type: 'both_players_ready',
@@ -1735,18 +1666,15 @@ function handleMessage(playerId: string, ws: WSClient, msg: WSMessage): void {
         const player1Socket = sockets.get(player1SocketId);
         const player2Socket = sockets.get(player2SocketId);
 
-        console.log(`📡 Socket status: player1Socket=${player1Socket ? 'found' : 'NOT FOUND'}, player2Socket=${player2Socket ? 'found' : 'NOT FOUND'}`);
 
         if (player1Socket && player1Socket.readyState === WebSocket.OPEN) {
           sendToSocket(player1Socket, readyPayload);
-          console.log(`✅ Sent both_players_ready to player1 (${player1Id})`);
         } else {
           console.warn(`❌ Could not send to player1 (${player1Id}): socket ${player1Socket ? 'not open' : 'not found'}`);
         }
         
         if (player2Socket && player2Socket.readyState === WebSocket.OPEN) {
           sendToSocket(player2Socket, readyPayload);
-          console.log(`✅ Sent both_players_ready to player2 (${player2Id})`);
         } else {
           console.warn(`❌ Could not send to player2 (${player2Id}): socket ${player2Socket ? 'not open' : 'not found'}`);
         }
@@ -1786,18 +1714,14 @@ function handleMessage(playerId: string, ws: WSClient, msg: WSMessage): void {
       match.score2 = score2;
 
       let winnerPlayer: TournamentPlayerInfo | undefined;
-      console.log(`🔍 Resolving winner: winnerId=${winnerId}, match.player1.id=${match.player1?.id}, match.player2.id=${match.player2?.id}`);
       
       if (match.player1 && match.player1.id === winnerId) {
         winnerPlayer = match.player1;
-        console.log(`✅ Winner matched player1: ${winnerPlayer.name}`);
       } else if (match.player2 && match.player2.id === winnerId) {
         winnerPlayer = match.player2;
-        console.log(`✅ Winner matched player2: ${winnerPlayer.name}`);
       }
 
       if (!winnerPlayer) {
-        console.log(`⚠️ Winner not found in match players, checking tournament roster...`);
         const fallbackWinner = tournament.players.find(p => p.id === winnerId || p.externalId === winnerId);
         if (fallbackWinner) {
           winnerPlayer = { ...fallbackWinner };
@@ -1808,38 +1732,25 @@ function handleMessage(playerId: string, ws: WSClient, msg: WSMessage): void {
         }
       }
 
-      console.log(`🏆 Match completed: ${match.id}, round ${match.round}, winner: ${winnerPlayer?.name || 'unknown'}`);
-      console.log(`🏆 Tournament state before advancement: currentRound=${tournament.currentRound}, status=${tournament.status}`);
-
+      
       if (winnerPlayer) {
         advanceWinnerToNextRound(tournament, match, { ...winnerPlayer });
       }
 
       tournament.updatedAt = Date.now();
 
-      console.log(`🏆 Tournament state after advanceWinner: currentRound=${tournament.currentRound}, status=${tournament.status}`);
 
       if (tournament.status !== 'completed') {
-        console.log(`🏆 Calling activateNextMatchIfAvailable...`);
         activateNextMatchIfAvailable(tournament);
       }
 
-      console.log(`🏆 Final tournament state: currentRound=${tournament.currentRound}, status=${tournament.status}`);
-      console.log(`🏆 All matches status:`, tournament.matches.map(m => ({
-        id: m.id,
-        round: m.round,
-        index: m.matchIndex,
-        p1: m.player1?.name || 'null',
-        p2: m.player2?.name || 'null',
-        status: m.status
-      })));
+
 
       broadcastTournamentState(tournament);
       sendToSocket(ws, { type: 'tournament_ack', message: 'match_completed', tournamentId, matchId });
 
       if (tournament.status === 'completed' && tournament.winner) {
         broadcastTournamentState(tournament);
-        console.log(`🏆 Tournament completed: ${tournament.id} - Winner ${tournament.winner.name}`);
       }
 
       break;
@@ -1879,7 +1790,6 @@ function handleMessage(playerId: string, ws: WSClient, msg: WSMessage): void {
           tournaments.delete(id);
           clearedCount++;
           const reason = !hasOnlinePlayer ? 'no online players' : tournament.status;
-          console.log(`🗑️ Cleared tournament: ${tournament.id} (${reason})`);
         }
       }
 
@@ -1893,7 +1803,6 @@ function handleMessage(playerId: string, ws: WSClient, msg: WSMessage): void {
         }
       }
 
-      console.log(`🗑️ Cleared ${clearedCount} inactive tournaments`);
       break;
     }
 
@@ -2040,8 +1949,7 @@ async function start(): Promise<void> {
   try {
     await app.listen({ port: PORT, host: '0.0.0.0' });
     const protocol = httpsConfig.enabled ? 'HTTPS' : 'HTTP';
-    console.log(`🚀 FT Transcendence WebSocket server running on port ${PORT} (${protocol})`);
-    console.log(`📊 Health check available at: ${protocol.toLowerCase()}://localhost:${PORT}/health`);
+
 
     // Initialize WebSocket server
     const wss = new WebSocketServer({
@@ -2054,7 +1962,7 @@ async function start(): Promise<void> {
       const wsClient = ws as WSClient;
       wsClient._id = playerId;
       sockets.set(playerId, wsClient);
-      console.log(`🔌 Player connected: ${playerId}`);
+
 
       ws.on('message', (raw: any) => {
         try {
@@ -2090,14 +1998,11 @@ async function start(): Promise<void> {
         }
       }
 
-      if (cleanedUp > 0) {
-        console.log(`🧹 Cleaned up ${cleanedUp} old rooms`);
-      }
+
     }, 5 * 60 * 1000); // Every 5 minutes
 
     // Graceful shutdown
     process.on('SIGINT', async () => {
-      console.log('\n🛑 Shutting down server...');
 
       // Notify all connected clients
       broadcast({ type: 'server_shutdown', message: 'Server is shutting down' });
@@ -2105,7 +2010,6 @@ async function start(): Promise<void> {
       // Close server
       try {
         await app.close();
-        console.log('✅ Server shut down gracefully');
         process.exit(0);
       } catch (err) {
         console.error('Error during shutdown:', err);

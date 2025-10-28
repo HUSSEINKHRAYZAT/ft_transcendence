@@ -163,7 +163,6 @@ export class TournamentService {
     socketManager.on('both_players_ready', (payload) => {
       if (!payload) return;
       const { tournamentId, matchId, players } = payload;
-      console.log('🎮 Both players ready event received:', { tournamentId, matchId, players });
       
       this.emit('bothPlayersReady', {
         tournamentId,
@@ -539,7 +538,6 @@ export class TournamentService {
       matchId
     });
     
-    console.log('🏆 Marked player as ready for match:', matchId);
   }
 
   public async requestTournaments(): Promise<void> {

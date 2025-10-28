@@ -136,18 +136,14 @@
   }
 
   export function waitForDOM(): Promise<void> {
-    console.log('🔍 waitForDOM called, checking document state...');
-    console.log('📄 Current document.readyState:', document.readyState);
+
 
     return new Promise((resolve) => {
       if (document.readyState === 'loading') {
-        console.log('⏳ Document still loading, adding DOMContentLoaded listener...');
         document.addEventListener('DOMContentLoaded', () => {
-          console.log('✅ DOMContentLoaded fired in waitForDOM!');
           resolve();
         });
       } else {
-        console.log('✅ Document already ready, resolving immediately...');
         resolve();
       }
     });

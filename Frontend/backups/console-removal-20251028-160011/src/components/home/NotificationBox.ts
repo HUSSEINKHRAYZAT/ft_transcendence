@@ -24,13 +24,11 @@ export class NotificationBox {
       return;
     }
 
-    console.log('📢 Rendering NotificationBox component...');
 
     try {
       this.updateContent();
       this.setupEventListeners();
       this.isRendered = true;
-      console.log('✅ NotificationBox component rendered successfully');
     } catch (error) {
       console.error('❌ Error rendering NotificationBox:', error);
     }
@@ -102,7 +100,6 @@ export class NotificationBox {
   }
 
   private showLoginModal(): void {
-    console.log('🔍 NotificationBox: Trying to show login modal');
     if ((window as any).modalService && (window as any).modalService.showLoginModal) {
       (window as any).modalService.showLoginModal();
     } else {
@@ -261,7 +258,6 @@ export class NotificationBox {
       // Call the join room function directly
       await joinSocketIORoom(gameMode as '2p' | '4p', currentUser, () => {
         // Game config resolved, game will start
-        console.log('Joined game from invitation');
       });
 
     } catch (error) {
@@ -295,6 +291,5 @@ export class NotificationBox {
       this.container.innerHTML = '';
     }
     this.isRendered = false;
-    console.log('🧹 NotificationBox component destroyed');
   }
 }

@@ -39,7 +39,6 @@ export abstract class BaseModal {
   }
 
   async show(modalId: string): Promise<void> {
-    console.log(`🔐 Opening ${modalId} modal...`);
 
     await this.close();
 
@@ -57,7 +56,6 @@ export abstract class BaseModal {
     }
 
     this.unsubscribeLanguageChange = languageManager.onLanguageChange(() => {
-      console.log('🌐 Language changed for modal:', this.activeModal);
       if (this.isOpen()) {
         this.updateContent();
         this.setupBaseEventListeners();
@@ -85,11 +83,9 @@ export abstract class BaseModal {
     this.setupEventListeners();
     this.animateIn();
 
-    console.log('✅ Modal opened:', modalId);
   }
 
   showSync(modalId: string): void {
-    console.log(`🔐 Opening ${modalId} modal (sync)...`);
 
     this.closeSync();
 
@@ -142,12 +138,10 @@ export abstract class BaseModal {
         return;
       }
 
-      console.log('❌ Closing modal:', this.activeModal);
 
       if (this.unsubscribeLanguageChange) {
         this.unsubscribeLanguageChange();
         this.unsubscribeLanguageChange = undefined;
-        console.log('🧹 Language listener cleaned up for:', this.activeModal);
       }
 
       this.animateOut(() => {
@@ -156,7 +150,6 @@ export abstract class BaseModal {
           this.backdropElement = null;
         }
         this.activeModal = null;
-        console.log('✅ Modal fully closed and cleaned up');
         resolve();
       });
 
@@ -167,7 +160,6 @@ export abstract class BaseModal {
   closeSync(): void {
     if (!this.activeModal || !this.modalContainer) return;
 
-    console.log('❌ Closing modal (sync):', this.activeModal);
 
     if (this.unsubscribeLanguageChange) {
       this.unsubscribeLanguageChange();
@@ -212,7 +204,6 @@ export abstract class BaseModal {
   protected setupBaseEventListeners(): void {
     // No X button to set up listeners for anymore
     // Click outside to close is handled by backdrop click in createBackdrop()
-    console.log('✅ Base modal listeners setup (click outside to close)');
   }
 
   protected animateIn(): void {

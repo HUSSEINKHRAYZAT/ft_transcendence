@@ -19,7 +19,6 @@ export class ModalManager {
     this.infoModal = new InfoModal();
     this.gameModal = new GameModal();
 
-    console.log('🔑 ModalManager initialized with all modal components');
   }
 
   showLoginModal(): void {
@@ -252,7 +251,6 @@ export class ModalManager {
     this.signupModal.destroy();
     this.infoModal.destroy();
     this.gameModal.destroy();
-    console.log('🧹 ModalManager destroyed');
   }
 }
 

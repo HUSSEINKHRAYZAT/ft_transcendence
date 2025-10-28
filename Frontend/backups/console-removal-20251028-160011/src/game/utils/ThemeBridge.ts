@@ -58,10 +58,7 @@ export class ThemeBridge {
       }
     });
 
-    console.log('🎮 Game theme updated:', {
-      accent: accentTheme?.name || 'default',
-      background: backgroundTheme?.name || 'default'
-    });
+
   }
 
   private getCurrentAccentTheme(): any {

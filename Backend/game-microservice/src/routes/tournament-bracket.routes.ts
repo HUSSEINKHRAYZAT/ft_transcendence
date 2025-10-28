@@ -157,7 +157,6 @@ export async function tournamentBracketRoutes(app: FastifyInstance) {
       // Get complete bracket
       const bracket = bracketService.getBracket(code);
 
-      console.log(`🏁 Tournament ${code} started with ${players.length} players`);
 
       return reply.send(bracket);
     } catch (error) {

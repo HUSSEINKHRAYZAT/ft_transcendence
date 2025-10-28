@@ -1122,12 +1122,6 @@ private async settingsAPI(username: string): Promise<any | null> {
 		try {
 			const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
 
-			console.log('🔑 ========================================');
-			console.log('🔑 PASSWORD RESET - VERIFICATION CODE GENERATED');
-			console.log('🔑 Email:', email);
-			console.log('🔑 CODE:', verificationCode);
-			console.log('🔑 ========================================');
-
 			localStorage.setItem('password_reset_code', verificationCode);
 			localStorage.setItem('password_reset_email', email);
 			localStorage.setItem('password_reset_password', newPassword);
@@ -1757,7 +1751,6 @@ async getUserById(userId: string): Promise<any | null> {
 
         const data = await response.json();
 
-        console.log('🔍 Fetched user data for ID', userId, ':', data);
 
         return data;
     } catch (error) {

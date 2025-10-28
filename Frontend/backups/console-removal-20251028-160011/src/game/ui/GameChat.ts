@@ -43,7 +43,6 @@ export class GameChat {
     this.container = this.createChatContainer();
     gameContainer.appendChild(this.container);
     this.setupEventListeners();
-    console.log('🎮 Game chat initialized');
   }
 
   private createChatContainer(): HTMLElement {
@@ -413,6 +412,5 @@ export class GameChat {
     this.messages = [];
     this.users.clear();
     
-    console.log('🎮 Game chat destroyed');
   }
 }

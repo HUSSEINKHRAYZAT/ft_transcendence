@@ -72,7 +72,6 @@ export class LoginModal extends BaseModal {
 
 		if (switchBtn) {
 			switchBtn.addEventListener('click', () => {
-				console.log('🔄 Switch to signup clicked');
 				this.close();
 				if (this.onSwitchToSignup) {
 					this.onSwitchToSignup();
@@ -101,7 +100,6 @@ export class LoginModal extends BaseModal {
 	}
 
 	private async handleForgotPassword(): Promise<void> {
-		console.log('🔐 Forgot password clicked...');
 
 		try {
 			this.close();
@@ -152,19 +150,15 @@ export class LoginModal extends BaseModal {
 		submitBtn.textContent = t('Logging in...');
 
 		try {
-			console.log('🔐 Attempting login with AuthService...');
 
 			const result = await authService.login({
 				email: email,
 				password: password
 			});
 
-			console.log('🔐 Login result:', result);
 
 			if (result.success && result.user && result.token) {
-				console.log('✅ Login successful!');
-				console.log('🎫 JWT Token stored:', result.token);
-				console.log('👤 User data:', result.user);
+
 
 				this.close();
 				this.showToast('success', t('Welcome back!'), t('Hello {name}!', { name: result.user.firstName }));
@@ -172,8 +166,6 @@ export class LoginModal extends BaseModal {
 			} else {
 				if (result.message && result.message.includes('email not verified:')) {
 					const userEmail = result.message.split('email not verified:')[1];
-					console.log('📧 Email not verified (303) - switching to verification modal');
-					console.log('📧 Using email:', userEmail);
 
 					this.close();
 
@@ -188,8 +180,7 @@ export class LoginModal extends BaseModal {
 
 				if (result.message && result.message.includes('2fa required:')) {
 					const userEmail = result.message.split('2fa required:')[1];
-					console.log('🔐 2FA verification required (202) - switching to 2FA verification modal');
-					console.log('📧 Using email:', userEmail);
+
 
 					this.close();
 
@@ -215,14 +206,12 @@ export class LoginModal extends BaseModal {
 
 	private async show2FAVerificationModal(userEmail: string): Promise<void> {
 		try {
-			console.log('🔐 Showing 2FA verification modal for email:', userEmail);
 
 			const { VerifyModal } = await import('./VerifyModal');
 
 			const verify2FAModal = new VerifyModal(
 				userEmail,
 				() => {
-					console.log('✅ 2FA verification completed - user logged in successfully');
 					this.showToast('success', t('Login Successful!'),
 						t('Two-factor authentication completed successfully.'));
 
@@ -232,7 +221,6 @@ export class LoginModal extends BaseModal {
 					}
 				},
 				() => {
-					console.log('📧 2FA verification code resent');
 				},
 				undefined,
 				true
@@ -248,14 +236,12 @@ export class LoginModal extends BaseModal {
 
 	private async showEmailVerificationModal(userEmail: string, password: string): Promise<void> {
 		try {
-			console.log('📧 Showing verification modal for email:', userEmail);
 
 			const { VerifyModal } = await import('./VerifyModal');
 
 			const verifyModal = new VerifyModal(
 				userEmail,
 				async () => {
-					console.log('✅ Email verification completed - retrying login automatically');
 
 					// Close verification modal
 					verifyModal.close();
@@ -264,7 +250,6 @@ export class LoginModal extends BaseModal {
 					await this.retryLogin(userEmail, password);
 				},
 				() => {
-					console.log('📧 Verification code resent');
 					this.showToast('info', t('Code Resent'),
 						t('A new verification code has been sent to your email.'));
 				}
@@ -280,7 +265,6 @@ export class LoginModal extends BaseModal {
 
 	private async retryLogin(email: string, password: string): Promise<void> {
 		try {
-			console.log('🔄 Retrying login after successful verification...');
 
 			const result = await authService.login({
 				email: email,
@@ -288,9 +272,6 @@ export class LoginModal extends BaseModal {
 			});
 
 			if (result.success && result.user && result.token) {
-				console.log('✅ Login successful after verification!');
-				console.log('🎫 JWT Token stored:', result.token);
-				console.log('👤 User data:', result.user);
 
 				this.close();
 				this.showToast('success', t('Welcome!'), t('Hello {name}!', { name: result.user.firstName }));
@@ -312,7 +293,6 @@ export class LoginModal extends BaseModal {
 	}
 
 	protected triggerAuthUpdate(isAuthenticated: boolean, user?: any): void {
-		console.log('🔄 Triggering auth update:', { isAuthenticated, user: user?.email });
 
 		// Dispatch the auth state change event
 		window.dispatchEvent(new CustomEvent('auth-state-changed', {
@@ -336,7 +316,6 @@ export class LoginModal extends BaseModal {
 	async render(): Promise<void> {
 		// This method exists for compatibility but doesn't actually render
 		// The modal is shown using showModal() or when needed
-		console.log('🔐 LoginModal render() called - use showModal() to display modal');
 	}
 }
 

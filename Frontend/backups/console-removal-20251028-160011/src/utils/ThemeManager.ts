@@ -34,7 +34,6 @@ class ThemeManager {
     // Load available themes
     await this.loadThemes();
 
-    console.log('🎨 Theme Manager initialized');
   }
 
   async loadThemes(): Promise<void> {
@@ -45,7 +44,6 @@ class ThemeManager {
         if (response.ok) {
           const themeConfig: ThemeConfig = await response.json();
           this.availableThemes.set(themeName, themeConfig);
-          console.log(`✅ Loaded theme: ${themeConfig.displayName}`);
         }
     }
   }
@@ -77,7 +75,6 @@ class ThemeManager {
 
     localStorage.setItem('ft_pong_current_theme', themeConfig.name);
 
-    console.log(`🎨 Applied theme: ${themeConfig.displayName}`);
 
     window.dispatchEvent(new CustomEvent('theme-changed', {
       detail: { theme: themeConfig }

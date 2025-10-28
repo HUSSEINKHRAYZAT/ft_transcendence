@@ -86,7 +86,6 @@ export class FriendsBox {
     private handleFriendStatusChange(event: Event): void {
         const customEvent = event as CustomEvent;
         const { username, status } = customEvent.detail;
-        console.log(`Friend status update: ${username} is ${status}`);
 
         this.updateFriendStatus(username, status);
 
@@ -107,14 +106,12 @@ export class FriendsBox {
         const customEvent = event as CustomEvent;
         const { from, text, messageId, timestamp } = customEvent.detail;
 
-        console.log(`📨 Message received from: ${from} - "${text}"`);
 
         const msgId = messageId || `${from}_${text}_${Date.now()}`;
         const messageKey = `${from}_received`;
         const lastMessage = this.lastMessageContent.get(messageKey);
 
         if (this.processedMessageIds.has(msgId) || lastMessage === text) {
-            console.log('📨 Duplicate message detected, ignoring');
             return;
         }
 
@@ -157,14 +154,12 @@ export class FriendsBox {
             const customEvent = event as CustomEvent;
             const { to, text, messageId, timestamp } = customEvent.detail;
 
-            console.log(`📤 Message sent to: ${to} - "${text}"`);
 
             const msgId = messageId || `sent_${Date.now()}`;
             const messageKey = `${to}_sent`;
             const lastMessage = this.lastMessageContent.get(messageKey);
 
             if (this.processedMessageIds.has(msgId) || lastMessage === text) {
-                console.log('📤 Duplicate sent message detected, ignoring');
                 return;
             }
 
@@ -211,7 +206,6 @@ export class FriendsBox {
         );
 
         if (isDuplicate) {
-            console.log('💬 Duplicate message in chat history, skipping');
             return;
         }
 
@@ -647,7 +641,6 @@ export class FriendsBox {
                     const username = usernameText.replace('@', '');
 
                     if (seenUsernames.has(username)) {
-                        console.log(`🔍 Removing duplicate friend card for ${username}`);
                         card.remove();
                     } else {
                         seenUsernames.add(username);
@@ -659,7 +652,6 @@ export class FriendsBox {
 
     private closeChatInterface(): void {
         if (this.activeChatUser) {
-            console.log(`🗑️ Clearing messages for ${this.activeChatUser}`);
             this.chatMessages.delete(this.activeChatUser);
 
             const userMessageIds = Array.from(this.processedMessageIds).filter(id =>
@@ -672,7 +664,6 @@ export class FriendsBox {
 
             this.saveMessagesToStorage();
 
-            console.log(`✅ Messages cleared for ${this.activeChatUser}`);
         }
 
         this.activeChatUser = null;
@@ -749,7 +740,6 @@ export class FriendsBox {
             return;
         }
 
-        console.log(`🟢 FriendsBox: Sending message to ${this.activeChatUser}: ${messageText}`);
 
         const userData = localStorage.getItem('ft_pong_user_data');
         const user = userData ? JSON.parse(userData) : null;
@@ -761,7 +751,6 @@ export class FriendsBox {
 
         chatInput.value = '';
 
-        console.log('🟢 FriendsBox: Dispatching send-message-request event');
         window.dispatchEvent(new CustomEvent('send-message-request', {
             detail: {
                 recipient: this.activeChatUser,
@@ -798,7 +787,6 @@ export class FriendsBox {
                     }));
                     this.chatMessages.set(username, parsedMessages);
                 });
-                console.log('💾 Chat messages loaded from storage');
             }
         } catch (error) {
             console.error('Error loading stored messages:', error);
@@ -806,7 +794,6 @@ export class FriendsBox {
     }
 
     public handleReconnection(): void {
-        console.log('🔄 Handling reconnection - reloading messages');
         this.loadMessagesFromStorage();
         if (this.activeChatUser) {
             this.renderChatMessages();

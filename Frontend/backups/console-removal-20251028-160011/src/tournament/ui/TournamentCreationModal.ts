@@ -30,7 +30,6 @@ export class TournamentCreationModal {
     this.boundHandleThemeChange = () => {
       if (this.container) {
         // Theme changes are handled by CSS, but we can trigger refresh if needed
-        console.log('🎨 Theme changed in tournament modal');
       }
     };
     window.addEventListener('theme-changed', this.boundHandleThemeChange);
@@ -264,7 +263,6 @@ export class TournamentCreationModal {
         autoStartMinutes: 0  // No auto-start
       });
 
-      console.log('✅ Tournament created:', tournament);
 
       // Hide creation modal
       this.hide();
@@ -344,7 +342,6 @@ export class TournamentCreationModal {
     }
 
     this.hide();
-    console.log('🧹 TournamentCreationModal destroyed');
   }
 }
 

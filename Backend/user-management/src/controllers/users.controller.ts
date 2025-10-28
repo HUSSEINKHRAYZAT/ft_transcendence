@@ -51,9 +51,6 @@ const plugin: FastifyPluginAsync = async (app: FastifyInstance) => {
     },
     async (req, reply) => {
       const { email, firstName, code } = req.body as any;
-      console.log('🔐 USER-MANAGEMENT: Received verification request');
-      console.log('🔐 Email:', email);
-      console.log('🔐 CODE:', code);
       const user = svc.getUserByEmail(email);
       if (!user) return reply.status(404).send({ error: 'not found' });
       fetch(`${app.config.MAILER_URL}/send/verification`, {

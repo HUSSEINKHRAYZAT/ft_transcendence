@@ -35,7 +35,7 @@ export class ToastMessageModal extends BaseModal {
         window.addEventListener('direct-message-received', this.boundHandleDirectMessageReceived);
         window.addEventListener('direct-message-sent', this.boundHandleDirectMessageSent);
 
-        console.log(`💬 ToastMessageModal created for user: ${this.targetUser || 'general'}`);
+
     }
 
     protected getModalTitle(): string {

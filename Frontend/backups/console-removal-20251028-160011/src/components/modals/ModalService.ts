@@ -3,7 +3,6 @@ import { modalManager } from './ModalManager';
 
 export class ModalService {
   constructor() {
-    console.log('🔑 ModalService initialized with modular structure');
   }
 
   showLoginModal(): void {
@@ -59,7 +58,6 @@ export class ModalService {
 
   destroy(): void {
     modalManager.destroy();
-    console.log('🧹 ModalService destroyed');
   }
 }
 

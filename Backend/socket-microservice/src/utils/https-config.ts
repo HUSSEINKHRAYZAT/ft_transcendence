@@ -34,7 +34,6 @@ export function getHttpsConfig(): HttpsConfig {
       cert: fs.readFileSync(certFilePath),
     };
 
-    console.log(`✅ HTTPS enabled with certificates from ${certPath}`);
     return { enabled: true, options: httpsOptions };
   } catch (error) {
     console.error('❌ Error loading HTTPS certificates:', error);

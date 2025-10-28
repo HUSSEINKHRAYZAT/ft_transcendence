@@ -166,7 +166,6 @@ class BackgroundThemeManager {
 
   resetTheme(): void {
     this.applyBackgroundTheme(this.defaultTheme);
-    console.log(`🌙 Background theme reset to default: ${this.defaultTheme}`);
   }
 
   init(): void {
@@ -177,7 +176,6 @@ class BackgroundThemeManager {
     const savedTheme = localStorage.getItem('ft_pong_background_theme') || 'dark';
     this.applyBackgroundTheme(savedTheme);
 
-    console.log('🌙 Background Theme Manager initialized');
   }
 
   private reapplyCurrentTheme(): void {
@@ -241,7 +239,6 @@ class BackgroundThemeManager {
     }));
 
     const displayName = this.translateDisplayName(theme.displayNameKey);
-    console.log(`🌙 Applied background theme: ${displayName}`);
     return true;
   }
 
