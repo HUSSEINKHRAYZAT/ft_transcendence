@@ -1,7 +1,6 @@
 import { API_ENDPOINTS, ERROR_MESSAGES, API_BASE_URL } from '../utils/Constants';
 import { authService } from './AuthService';
 
-
 interface RequestConfig {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
   headers?: Record<string, string>;
@@ -96,7 +95,6 @@ export class ApiService {
       };
 
     } catch (error) {
-      console.error('API request error:', error);
 
       if (error instanceof Error) {
         return {
@@ -168,7 +166,7 @@ export class ApiService {
       };
 
     } catch (error) {
-      console.error('File upload error:', error);
+
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Upload failed',
@@ -344,7 +342,6 @@ class FTPongAPI extends ApiService {
     return this.get(API_ENDPOINTS.DEFAULT.OPENAPI);
   }
 }
-
 
 export const apiService = new FTPongAPI();
 

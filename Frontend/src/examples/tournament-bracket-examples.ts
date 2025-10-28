@@ -13,7 +13,7 @@ import '../styles/tournament-bracket.css';
 export function initializeBasicTournament(containerId: string) {
   const container = document.getElementById(containerId);
   if (!container) {
-    console.error(`Container #${containerId} not found`);
+
     return;
   }
 
@@ -45,17 +45,17 @@ export function initializeBasicTournament(containerId: string) {
       }
     },
     onStartMatch: (matchId) => {
-      console.log('Starting match:', matchId);
+
       // Navigate to game screen or trigger match start
       // Example: window.location.href = `/game/${matchId}`;
     },
     onViewMatch: (matchId) => {
-      console.log('Viewing match:', matchId);
+
       // Navigate to spectate match
       // Example: window.location.href = `/spectate/${matchId}`;
     },
     onRefresh: () => {
-      console.log('Refreshing tournament data...');
+
       // Fetch latest tournament data from API
     }
   });
@@ -118,7 +118,6 @@ export function updateTournamentExample() {
     3    // Bob's score
   );
 
-  console.log('Tournament updated:', updatedTournament);
   return updatedTournament;
 }
 
@@ -135,8 +134,7 @@ export function setupRealtimeUpdates(bracket: TournamentBracket) {
     
     // Update the bracket
     // bracket.update(updatedData);
-    
-    console.log('Tournament updated via WebSocket');
+
   };
 
   // Example: update every 5 seconds
@@ -163,7 +161,7 @@ export function initializeSpectatorView(containerId: string, tournamentId: strin
   const bracket = new TournamentBracket({
     tournament,
     onViewMatch: (matchId) => {
-      console.log('Spectating match:', matchId);
+
       // Join spectator room for this match
     }
   });
@@ -203,7 +201,7 @@ export class TournamentBracketManager {
 
       this.container.appendChild(this.bracket.getElement());
     } catch (error) {
-      console.error('Failed to initialize tournament:', error);
+
       this.showError('Failed to load tournament');
     }
   }
@@ -221,19 +219,17 @@ export class TournamentBracketManager {
     try {
       // Start match via API
       // await fetch(`/api/matches/${matchId}/start`, { method: 'POST' });
-      
-      console.log('Match started:', matchId);
-      
+
       // Navigate to game
       // window.location.href = `/game/${matchId}`;
     } catch (error) {
-      console.error('Failed to start match:', error);
+
     }
   }
 
   async handleViewMatch(matchId: string) {
     // Navigate to spectate/view
-    console.log('Viewing match:', matchId);
+
   }
 
   async refresh() {
@@ -241,7 +237,7 @@ export class TournamentBracketManager {
       const updatedData = await this.fetchTournamentData();
       this.bracket?.update(updatedData);
     } catch (error) {
-      console.error('Failed to refresh tournament:', error);
+
     }
   }
 

@@ -3,8 +3,6 @@ import { RequestModal } from '../modals/RequestModal';
 import { authService } from '../../services/AuthService';
 import { BlockedUsersModal } from '../modals/BlockedUsersModal';
 
-
-
 interface ChatMessage {
     id: string;
     from: string;
@@ -86,7 +84,6 @@ export class FriendsBox {
     private handleFriendStatusChange(event: Event): void {
         const customEvent = event as CustomEvent;
         const { username, status } = customEvent.detail;
-        console.log(`Friend status update: ${username} is ${status}`);
 
         this.updateFriendStatus(username, status);
 
@@ -96,7 +93,7 @@ export class FriendsBox {
             }
             this.refreshTimeout = window.setTimeout(() => {
                 this.loadAndRenderFriends().catch(err => {
-                    console.error("Error refreshing friends list after status change:", err);
+
                 });
                 this.refreshTimeout = null;
             }, 300);
@@ -107,14 +104,12 @@ export class FriendsBox {
         const customEvent = event as CustomEvent;
         const { from, text, messageId, timestamp } = customEvent.detail;
 
-        console.log(`📨 Message received from: ${from} - "${text}"`);
-
         const msgId = messageId || `${from}_${text}_${Date.now()}`;
         const messageKey = `${from}_received`;
         const lastMessage = this.lastMessageContent.get(messageKey);
 
         if (this.processedMessageIds.has(msgId) || lastMessage === text) {
-            console.log('📨 Duplicate message detected, ignoring');
+
             return;
         }
 
@@ -146,7 +141,7 @@ export class FriendsBox {
         const friendExists = this.friendsData.some(f => f.username === from);
         if (!friendExists) {
             this.loadAndRenderFriends().catch(err => {
-                console.error("Error refreshing friends list after message:", err);
+
             });
         } else {
             this.removeDuplicateFriendCards();
@@ -157,14 +152,12 @@ export class FriendsBox {
             const customEvent = event as CustomEvent;
             const { to, text, messageId, timestamp } = customEvent.detail;
 
-            console.log(`📤 Message sent to: ${to} - "${text}"`);
-
             const msgId = messageId || `sent_${Date.now()}`;
             const messageKey = `${to}_sent`;
             const lastMessage = this.lastMessageContent.get(messageKey);
 
             if (this.processedMessageIds.has(msgId) || lastMessage === text) {
-                console.log('📤 Duplicate sent message detected, ignoring');
+
                 return;
             }
 
@@ -211,7 +204,7 @@ export class FriendsBox {
         );
 
         if (isDuplicate) {
-            console.log('💬 Duplicate message in chat history, skipping');
+
             return;
         }
 
@@ -308,10 +301,9 @@ export class FriendsBox {
 
     async render(): Promise<void> {
         if (!this.container) {
-            console.error("Friends box container not found");
+
             return;
         }
-
 
         try {
             this.updateContent();
@@ -319,7 +311,7 @@ export class FriendsBox {
             await this.loadAndRenderFriends();
             this.isRendered = true;
         } catch (error) {
-            console.error("Error rendering FriendsBox:", error);
+
         }
     }
 
@@ -423,13 +415,12 @@ export class FriendsBox {
         `;
     }
 
-
     private handleViewFriendStats(friendId: string, friendUsername: string): void {
 
     if ((window as any).StatisticsModal) {
         (window as any).StatisticsModal.showForFriend(friendId, friendUsername);
     } else {
-        console.error("StatisticsModal not available");
+
         alert('Statistics modal not loaded');
     }
     }
@@ -486,7 +477,6 @@ export class FriendsBox {
         if (addFriendForm) {
             addFriendForm.addEventListener("submit", (e) => this.handleAddFriendSubmit(e));
         }
-
 
     }
 
@@ -548,7 +538,7 @@ export class FriendsBox {
                 this.showNotification(errorMessage, 'error');
             }
         } catch (err: any) {
-            console.error('Error sending friend request:', err);
+
             this.showNotification(t('Could not send request') + ': ' + err.message, 'error');
         } finally {
             submitBtn.disabled = false;
@@ -647,7 +637,7 @@ export class FriendsBox {
                     const username = usernameText.replace('@', '');
 
                     if (seenUsernames.has(username)) {
-                        console.log(`🔍 Removing duplicate friend card for ${username}`);
+
                         card.remove();
                     } else {
                         seenUsernames.add(username);
@@ -659,7 +649,7 @@ export class FriendsBox {
 
     private closeChatInterface(): void {
         if (this.activeChatUser) {
-            console.log(`🗑️ Clearing messages for ${this.activeChatUser}`);
+
             this.chatMessages.delete(this.activeChatUser);
 
             const userMessageIds = Array.from(this.processedMessageIds).filter(id =>
@@ -672,7 +662,6 @@ export class FriendsBox {
 
             this.saveMessagesToStorage();
 
-            console.log(`✅ Messages cleared for ${this.activeChatUser}`);
         }
 
         this.activeChatUser = null;
@@ -733,35 +722,32 @@ export class FriendsBox {
         event.preventDefault();
 
         if (!this.activeChatUser) {
-            console.error("No active chat user");
+
             return;
         }
 
         const chatInput = document.getElementById('chat-input') as HTMLInputElement;
         if (!chatInput) {
-            console.error("Chat input not found");
+
             return;
         }
 
         const messageText = chatInput.value.trim();
         if (!messageText) {
-            console.error("Empty message");
+
             return;
         }
-
-        console.log(`🟢 FriendsBox: Sending message to ${this.activeChatUser}: ${messageText}`);
 
         const userData = localStorage.getItem('ft_pong_user_data');
         const user = userData ? JSON.parse(userData) : null;
 
         if (!user || !user.userName) {
-            console.error('User not logged in');
+
             return;
         }
 
         chatInput.value = '';
 
-        console.log('🟢 FriendsBox: Dispatching send-message-request event');
         window.dispatchEvent(new CustomEvent('send-message-request', {
             detail: {
                 recipient: this.activeChatUser,
@@ -782,7 +768,7 @@ export class FriendsBox {
             });
             localStorage.setItem('ft_pong_chat_messages', JSON.stringify(messagesObj));
         } catch (error) {
-            console.error('Error saving messages to storage:', error);
+
         }
     }
 
@@ -798,15 +784,15 @@ export class FriendsBox {
                     }));
                     this.chatMessages.set(username, parsedMessages);
                 });
-                console.log('💾 Chat messages loaded from storage');
+
             }
         } catch (error) {
-            console.error('Error loading stored messages:', error);
+
         }
     }
 
     public handleReconnection(): void {
-        console.log('🔄 Handling reconnection - reloading messages');
+
         this.loadMessagesFromStorage();
         if (this.activeChatUser) {
             this.renderChatMessages();
@@ -817,7 +803,7 @@ export class FriendsBox {
         if ((window as any).modalService && (window as any).modalService.showLoginModal) {
             (window as any).modalService.showLoginModal();
         } else {
-            console.error("Modal service not available");
+
             alert(t('Login - Modal service not loaded'));
         }
     }
@@ -857,7 +843,7 @@ export class FriendsBox {
                 }
             }
         } catch (err: any) {
-            console.error('Error removing friend:', err);
+
             alert(t('Failed to remove friend:') + ' ' + err.message);
         }
     }
@@ -920,7 +906,7 @@ export class FriendsBox {
                 }
             }
         } catch (e) {
-            console.error("Failed to load friends:", e);
+
             if (emptyEl) {
                 emptyEl.style.display = "block";
                 emptyEl.textContent = t("Could not load friends.");
@@ -1181,7 +1167,7 @@ private renderFriendCard(friend: any): string {
             }
         }
     } catch (err: any) {
-        console.error('Error blocking user:', err);
+
         this.showNotification(t('Failed to block user:') + ' ' + err.message, 'error');
     }
 }

@@ -19,18 +19,9 @@ export class TournamentLobby {
     this.isHost = this.checkIfHost();
 
     // 🐛 DEBUG: Log all players when lobby is shown
-    console.log('🐛 DEBUG: Tournament Lobby Opened');
-    console.log('🐛 Tournament ID:', tournament.id);
-    console.log('🐛 Total Players:', tournament.players.length);
-    console.log('🐛 ALL PLAYER DATA:');
+
     tournament.players.forEach((player, index) => {
-      console.log(`🐛 Player #${index + 1}:`, {
-        id: player.id,
-        name: player.name,
-        avatar: player.avatar,
-        isOnline: player.isOnline,
-        fullPlayerObject: player
-      });
+
     });
 
     if (this.container) {
@@ -72,22 +63,16 @@ export class TournamentLobby {
     if (!this.container || !this.tournament) return;
 
     // 🐛 DEBUG: Log player data on update
-    console.log('🐛 DEBUG: Lobby Update Triggered');
-    console.log('🐛 Current Players:', this.tournament.players.length);
+
     this.tournament.players.forEach((player, index) => {
-      console.log(`🐛 Player #${index + 1}:`, {
-        id: player.id,
-        name: player.name,
-        avatar: player.avatar,
-        isOnline: player.isOnline
-      });
+
     });
 
     // Update player count
     const playerCountElement = this.container.querySelector('#playerCount');
     if (playerCountElement) {
       playerCountElement.textContent = `${this.tournament.players.length} / ${this.tournament.size}`;
-      console.log('✅ Player count updated:', this.tournament.players.length, '/', this.tournament.size);
+
     }
 
     // Update player list
@@ -225,11 +210,6 @@ export class TournamentLobby {
     const isOnline = player.isOnline ? 'online' : 'offline';
 
     // 🐛 DEBUG: Log player data
-    console.log(`🐛 Fetching avatar for Player #${slotNumber}:`, {
-      name: player.name,
-      id: player.id,
-      avatarFromPlayer: player.avatar
-    });
 
     // Fetch user data to get the correct profile path
     let avatarHtml = '';
@@ -242,7 +222,7 @@ export class TournamentLobby {
           // User has a profile picture
           const avatar = authService.getAvatarPath(userData.profilePath);
           avatarHtml = `<img src="${avatar}" alt="${player.name}" />`;
-          console.log(`✅ Avatar found for ${player.name}:`, avatar);
+
         } else {
           // No profile picture - show initials like navbar does
           const initial = (player.name?.[0] || 'U').toUpperCase();
@@ -251,10 +231,10 @@ export class TournamentLobby {
               ${initial}
             </div>
           `;
-          console.log(`⚠️ No profilePath for ${player.name}, using initials: ${initial}`);
+
         }
       } catch (error) {
-        console.error(`❌ Error fetching avatar for ${player.name}:`, error);
+
         // Fallback to initials on error
         const initial = (player.name?.[0] || 'U').toUpperCase();
         avatarHtml = `
@@ -265,7 +245,7 @@ export class TournamentLobby {
       }
     } else {
       // No player ID - show initials
-      console.warn(`⚠️ No player ID for ${player.name}`);
+
       const initial = (player.name?.[0] || 'U').toUpperCase();
       avatarHtml = `
         <div class="avatar-initials">
@@ -341,10 +321,10 @@ export class TournamentLobby {
     if (!this.tournament) return;
 
     try {
-      console.log('🚀 Starting tournament manually...');
+
       await newTournamentService.startTournament(this.tournament.id);
     } catch (error) {
-      console.error('❌ Failed to start tournament:', error);
+
       alert('Failed to start tournament. Please try again.');
     }
   }
@@ -382,43 +362,29 @@ export class TournamentLobby {
   }
 
   private handleTournamentUpdate = async (data: any): Promise<void> => {
-    console.log('🔄 TournamentLobby received tournament_updated:', data);
 
     // 🐛 DEBUG: Log incoming player data
     if (data.tournament && data.tournament.players) {
-      console.log('🐛 DEBUG: Players in update event:');
+
       data.tournament.players.forEach((player: any, index: number) => {
-        console.log(`🐛 Player #${index + 1} from event:`, {
-          id: player.id,
-          name: player.name,
-          avatar: player.avatar,
-          isOnline: player.isOnline,
-          fullObject: player
-        });
+
       });
     }
 
     if (data.tournament && this.tournament && data.tournament.id === this.tournament.id) {
-      console.log('🔄 Updating tournament from', this.tournament.players.length, 'to', data.tournament.players.length, 'players');
+
       this.tournament = data.tournament;
       await this.update();
     } else {
-      console.warn('⚠️ Tournament update ignored - ID mismatch or missing data');
+
     }
   };
 
   private handlePlayerJoined = async (data: any): Promise<void> => {
-    console.log('👤 Player joined event received:', data);
 
     // 🐛 DEBUG: Log the joining player's data
     if (data.player) {
-      console.log('🐛 DEBUG: New player data:', {
-        id: data.player.id,
-        name: data.player.name,
-        avatar: data.player.avatar,
-        isOnline: data.player.isOnline,
-        fullObject: data.player
-      });
+
     }
 
     if (data.tournament && this.tournament && data.tournament.id === this.tournament.id) {
@@ -465,11 +431,6 @@ export class TournamentLobby {
     const userId = user.id || user.email;
 
     // 🐛 DEBUG: Log host check
-    console.log('🐛 DEBUG: Host Check:', {
-      currentUserId: userId,
-      tournamentCreatedBy: this.tournament.createdBy,
-      isHost: this.tournament.createdBy === userId
-    });
 
     return this.tournament.createdBy === userId;
   }

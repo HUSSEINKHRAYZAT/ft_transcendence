@@ -34,7 +34,6 @@ class ThemeManager {
     // Load available themes
     await this.loadThemes();
 
-    console.log('🎨 Theme Manager initialized');
   }
 
   async loadThemes(): Promise<void> {
@@ -45,7 +44,7 @@ class ThemeManager {
         if (response.ok) {
           const themeConfig: ThemeConfig = await response.json();
           this.availableThemes.set(themeName, themeConfig);
-          console.log(`✅ Loaded theme: ${themeConfig.displayName}`);
+
         }
     }
   }
@@ -65,7 +64,7 @@ class ThemeManager {
 
   applyTheme(themeConfig: ThemeConfig): void {
     if (!this.themeStyleElement) {
-      console.error('Theme style element not initialized');
+
       return;
     }
 
@@ -76,8 +75,6 @@ class ThemeManager {
     this.themeStyleElement.textContent = css;
 
     localStorage.setItem('ft_pong_current_theme', themeConfig.name);
-
-    console.log(`🎨 Applied theme: ${themeConfig.displayName}`);
 
     window.dispatchEvent(new CustomEvent('theme-changed', {
       detail: { theme: themeConfig }
@@ -90,7 +87,7 @@ class ThemeManager {
       this.applyTheme(theme);
       return true;
     }
-    console.warn(`No theme found for language: ${language}`);
+
     return false;
   }
 
@@ -100,7 +97,7 @@ class ThemeManager {
       this.applyTheme(theme);
       return true;
     }
-    console.warn(`No theme found with name: ${name}`);
+
     return false;
   }
 

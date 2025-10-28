@@ -96,7 +96,7 @@ export class StatisticsModal extends BaseModal {
 }
 
 public static showForFriend(friendId: string, friendUsername: string): void {
-    console.log(`📊 StatisticsModal.showForFriend() called for ${friendUsername} (${friendId})`);
+
     const modal = new StatisticsModal(friendId, friendUsername);
     modal.showModal();
     // loadFriendStatistics will be called from getModalContent via setTimeout
@@ -105,7 +105,7 @@ public static showForFriend(friendId: string, friendUsername: string): void {
 private async loadFriendStatistics(): Promise<void> {
 
     if (!this.friendId) {
-        console.error('DEBUG: No friendId provided');
+
         return;
     }
 
@@ -321,7 +321,7 @@ protected getModalContent(): string {
 						throw new Error('Failed to refresh statistics');
 					}
 				} catch (error) {
-					console.error('Failed to refresh statistics:', error);
+
 					btn.innerHTML = '❌ Error';
 					setTimeout(() => {
 						btn.innerHTML = originalText;
@@ -335,7 +335,7 @@ protected getModalContent(): string {
 	}
 
 	public static show(): void {
-		console.log('📊 StatisticsModal.show() called');
+
 		const modal = new StatisticsModal();
 		modal.showModal();
 	}
@@ -407,7 +407,6 @@ protected updateStatisticsInModal(stats: UserStats): void {
 }
 
 }
-
 
 (window as any).StatisticsModal = StatisticsModal;
 

@@ -234,7 +234,7 @@ private async handleProfileUpdate(event: Event): Promise<void> {
     const successDiv = findElement('#profile-success') as HTMLElement;
 
     if (!firstNameInput || !lastNameInput || !usernameInput || !emailInput || !enable2faInput || !saveBtn) {
-        console.error('❌ Required form elements not found');
+
         return;
     }
 
@@ -282,8 +282,6 @@ private async handleProfileUpdate(event: Event): Promise<void> {
         const result = await authService.updateProfile(updateData);
 
         if (result.success && result.user) {
-            console.log('✅ Profile updated successfully');
-            console.log('👤 Updated user from backend:', result.user);
 
             // Check if avatar was changed and send WebSocket notification
             if (currentAvatar !== selectedAvatar) {
@@ -298,13 +296,13 @@ private async handleProfileUpdate(event: Event): Promise<void> {
                 window.location.reload();
             }, 1500);
         } else {
-            console.error('❌ Profile update failed:', result.message);
+
             this.showProfileError(result.message || 'Failed to update profile');
             saveBtn.disabled = false;
             saveBtn.textContent = t('Save Changes');
         }
     } catch (error) {
-        console.error('❌ Profile update error:', error);
+
         this.showProfileError('An unexpected error occurred while updating your profile');
         saveBtn.disabled = false;
         saveBtn.textContent = t('Save Changes');
@@ -316,17 +314,16 @@ private async handleProfileUpdate(event: Event): Promise<void> {
 			const socketService = (window as any).socketService;
 			if (socketService && socketService.sendAvatarChanged) {
 				socketService.sendAvatarChanged(newAvatar);
-				console.log('📡 Avatar changed notification sent via WebSocket:', newAvatar);
+
 			} else {
-				console.warn('⚠️ SocketService not available for avatar change notification');
+
 			}
 		} catch (error) {
-			console.error('❌ Error sending avatar changed notification:', error);
+
 		}
 	}
 
 	private forceUIUpdate(updatedUser: any): void {
-	console.log('🔄 forceUIUpdate called with user:', updatedUser);
 
 	const beforeState = authService.getState();
 
@@ -334,9 +331,7 @@ private async handleProfileUpdate(event: Event): Promise<void> {
 		detail: { isAuthenticated: true, user: updatedUser }
 	}));
 
-
 	setTimeout(() => {
-		console.log('🔄 Updating navbar...');
 
 		const afterState = authService.getState();
 
@@ -351,10 +346,7 @@ private async handleProfileUpdate(event: Event): Promise<void> {
 		}
 
 		const currentAuthState = authService.getState();
-		console.log('📊 Current auth state after update:', {
-		user: currentAuthState.user,
-		avatar: currentAuthState.user?.profilePath
-		});
+
 	}, 100);
 	}
 
@@ -384,7 +376,7 @@ private async handleProfileUpdate(event: Event): Promise<void> {
 	}
 
 	public static show(): void {
-		console.log('👤 ProfileModal.show() called');
+
 		const modal = new ProfileModal();
 		modal.showModal();
 	}
@@ -409,9 +401,8 @@ private async handleProfileUpdate(event: Event): Promise<void> {
 		return super.close();
 	}
 
-
 	async render(): Promise<void> {
-		console.log('👤 ProfileModal render() called - use show() to display modal');
+
 	}
 	}
 

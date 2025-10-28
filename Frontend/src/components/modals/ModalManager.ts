@@ -19,7 +19,6 @@ export class ModalManager {
     this.infoModal = new InfoModal();
     this.gameModal = new GameModal();
 
-    console.log('🔑 ModalManager initialized with all modal components');
   }
 
   showLoginModal(): void {
@@ -67,7 +66,7 @@ export class ModalManager {
     try {
       user = userData ? JSON.parse(userData) : null;
     } catch (error) {
-      console.error('Error parsing user data:', error);
+
     }
 
     if (!user) {
@@ -252,7 +251,7 @@ export class ModalManager {
     this.signupModal.destroy();
     this.infoModal.destroy();
     this.gameModal.destroy();
-    console.log('🧹 ModalManager destroyed');
+
   }
 }
 

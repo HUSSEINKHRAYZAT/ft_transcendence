@@ -9,19 +9,17 @@ export class Navbar {
 
   async render(): Promise<void> {
     if (!this.container) {
-      console.error('❌ Navbar container not found');
+
       return;
     }
-
-    console.log('🧭 Rendering Navbar component...');
 
     try {
       this.container.innerHTML = this.getNavbarHTML();
       this.setupEventListeners();
       this.isRendered = true;
-      console.log('✅ Navbar component rendered successfully');
+
     } catch (error) {
-      console.error('❌ Error rendering Navbar:', error);
+
     }
   }
 
@@ -67,21 +65,21 @@ export class Navbar {
   }
 
   private showInfoModal(type: string): void {
-    console.log('🔍 Navbar: Trying to show info modal:', type);
+
     if ((window as any).modalService && (window as any).modalService.showInfoModal) {
       (window as any).modalService.showInfoModal(type);
     } else {
-      console.error('❌ Modal service not available');
+
       alert(`${type} information - Modal service not loaded`);
     }
   }
 
   private showLoginModal(): void {
-    console.log('🔍 Navbar: Trying to show login modal');
+
     if ((window as any).modalService && (window as any).modalService.showLoginModal) {
       (window as any).modalService.showLoginModal();
     } else {
-      console.error('❌ Modal service not available');
+
       alert('Login - Modal service not loaded');
     }
   }
@@ -104,6 +102,6 @@ export class Navbar {
       this.container.innerHTML = '';
     }
     this.isRendered = false;
-    console.log('🧹 Navbar component destroyed');
+
   }
 }

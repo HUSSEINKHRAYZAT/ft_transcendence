@@ -110,7 +110,6 @@ class SimpleThemeManager {
     const savedTheme = localStorage.getItem('ft_pong_theme') || 'lime';
     this.applyTheme(savedTheme);
 
-    console.log('🎨 Simple Theme Manager initialized');
   }
 
   private reapplyCurrentTheme(): void {
@@ -133,7 +132,7 @@ class SimpleThemeManager {
 
   resetTheme(): void {
     this.applyTheme(this.defaultTheme);
-    console.log(`🎨 Theme reset to default: ${this.defaultTheme}`);
+
   }
 
   private translateDisplayName(key: string): string {
@@ -162,7 +161,7 @@ class SimpleThemeManager {
   applyTheme(themeName: string): boolean {
     const theme = this.themes[themeName];
     if (!theme) {
-      console.warn(`Theme '${themeName}' not found`);
+
       return false;
     }
 
@@ -183,7 +182,7 @@ class SimpleThemeManager {
     }));
 
     const displayName = this.translateDisplayName(theme.displayNameKey);
-    console.log(`🎨 Applied theme: ${displayName}`);
+
     return true;
   }
 

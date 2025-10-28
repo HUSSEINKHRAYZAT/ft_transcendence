@@ -55,11 +55,6 @@ type RemoteMatchConclusionDetails = {
   reason?: string;
 };
 
-
-
-
-
-
 export class Pong3D {
   private engine: Engine;
   private scene: Scene;
@@ -379,7 +374,6 @@ export class Pong3D {
   public dispose() {
     // Set disposed flag immediately to prevent any further operations
     this.isDisposed = true;
-    console.log('🗑️ Game instance marked as disposed');
 
     if (this.themeUnsubscribe) {
       this.themeUnsubscribe();
@@ -413,7 +407,6 @@ export class Pong3D {
   }
 
   private stopAllAudio() {
-    console.log("🔇 Stopping all audio to prevent loops");
 
     // Stop all sound categories
     Object.values(this.sounds).forEach(soundArray => {
@@ -423,7 +416,7 @@ export class Pong3D {
             sound.stop();
           }
         } catch (e) {
-          console.log("⚠️ Could not stop sound:", e);
+
         }
       });
     });
@@ -431,7 +424,7 @@ export class Pong3D {
 
   private async startGameWithCountdown() {
     if (this.config.skipCountdown) {
-      console.log("⏭️ Skipping countdown overlay (config.skipCountdown)");
+
       this.gameState.matchReady = true;
       this.resetBall(Math.random() < 0.5 ? 1 : -1);
       return;
@@ -451,7 +444,7 @@ export class Pong3D {
   private async beginMatch() {
     // Don't continue if game is disposed
     if (this.isDisposed) {
-      console.log('🚫 Game disposed, skipping beginMatch');
+
       return;
     }
 
@@ -459,10 +452,9 @@ export class Pong3D {
 
     // For Socket.IO games (4P), notify other players to start game
     if (socketManager.connected) {
-      console.log("🎮 Host beginMatch() - starting Socket.IO game flow");
 
       // Notify other players to start the game (countdown will be handled in game_started event)
-      console.log("🎮 Host calling socketManager.startGame()");
+
       socketManager.startGame();
 
       // Host will start countdown when receiving game_started confirmation
@@ -471,7 +463,7 @@ export class Pong3D {
 
     // For WebSocket games (2P), show countdown and then start
     if (this.config.skipCountdown) {
-      console.log("⏭️ beginMatch skipping countdown");
+
       this.gameState.matchReady = true;
       this.resetBall(Math.random() < 0.5 ? 1 : -1);
       if (this.isHost) {
@@ -701,7 +693,6 @@ this.rightWall = wall(
     this.ball.material = ballMat;
     this.ball.position = new Vector3(0, 0.3, 0);
 
-
     // Paddles (L,R,B,T indices)
     const dAxis = (this.config.playerCount === 4 ? height : width) / 2 - 0.3;
     const newPaddle = (
@@ -802,7 +793,7 @@ this.rightWall = wall(
     };
     this.viewTheta = map[idx] ?? 0;
     this.camera.alpha = this.baseAlpha + this.viewTheta;
-    console.log(`🔄 ROTATION DEBUG: Player ${idx} -> viewTheta: ${this.viewTheta}, camera.alpha: ${this.camera.alpha}, baseAlpha: ${this.baseAlpha}`);
+
   }
 // ai --------------------------------------------------------------------------------------- aiii
   private applyAIDifficulty(idxs: number[], d: number) {
@@ -1079,13 +1070,13 @@ this.rightWall = wall(
           socketManager.startGame();
           break;
         default:
-          console.log("Unhandled Web socket message type:", msg.t);
+
       }
     } else if (this.ws) {
       try {
         this.ws.send(JSON.stringify(msg));
       } catch (error) {
-        console.error("Failed to send WebSocket message:", error);
+
       }
     }
   }
@@ -1102,16 +1093,9 @@ this.rightWall = wall(
 
   private initSocketIO() {
     if (!socketManager.connected) {
-      console.error("Web socket not connected");
+
       return;
     }
-
-    console.log("Initializing Web socket for game...", {
-      isHost: this.isHost,
-      isGuest: this.isGuest,
-      roomId: socketManager.roomId,
-      playerId: socketManager.id,
-    });
 
     // Set up Web socket event listeners
     socketManager.on("game_state", (state) => {
@@ -1122,13 +1106,13 @@ this.rightWall = wall(
 
     // Listen for game exit messages via Socket.IO
     socketManager.on("game_exit", (data) => {
-      console.log("🚪 Received game exit signal via Socket.IO:", data);
+
       this.handleRemoteState({ gameExit: true, ...data });
     });
 
     socketManager.on("player_input", (data) => {
       if (this.isHost && data.playerId !== socketManager.id) {
-        console.log("Host received guest input:", data);
+
         // Allow pause request from any player
         if ((data as any).input?.type === "pauseToggle" || (data as any).type === "pauseToggle") {
           this.togglePause();
@@ -1148,7 +1132,7 @@ this.rightWall = wall(
     // Chat system removed
 
     socketManager.on("player_joined", (player) => {
-      console.log("Player joined:", player);
+
       if (this.isHost) {
         this.connectedGuests = Math.min(
           this.requiredGuests,
@@ -1164,7 +1148,6 @@ this.rightWall = wall(
     });
 
     socketManager.on("player_left", async (playerId) => {
-      console.log("Player left:", playerId);
 
       // Only end the active game if it's in progress
       if (this.gameState.matchReady) {
@@ -1181,12 +1164,6 @@ this.rightWall = wall(
         const localPlayerName =
           this.getPlayerName(winnerIdx) || `Player ${winnerIdx + 1}`;
         const reasonText = `Opponent disconnected - ${localPlayerName} wins by forfeit!`;
-
-        console.log("🏁 Player disconnected during active match - awarding forfeit", {
-          winnerIdx,
-          finalScoresOverride,
-          reasonText,
-        });
 
         void this.finishAndReport(winnerIdx, {
           reason: reasonText,
@@ -1218,37 +1195,34 @@ this.rightWall = wall(
     });
 
     socketManager.on("room_state", (state) => {
-      console.log("Room state received:", state);
+
       if (this.isHost) {
         // Update connected guests count based on actual room state
         this.connectedGuests = state.playerCount - 1; // Subtract 1 for the host
-        console.log("Host: Updated connected guests to", this.connectedGuests);
+
         this.updateWaitingUI();
       }
     });
 
     socketManager.on("game_started", (data) => {
-      console.log("Game started signal received", data);
 
       // Update player assignments if provided
       if (data && data.players) {
         const myPlayer = data.players.find((p: any) => p.id === socketManager.id);
         if (myPlayer) {
           this.remoteIndex = myPlayer.playerIndex;
-          console.log(`🎮 My player index: ${this.remoteIndex} (isHost: ${this.isHost})`);
 
           // Set view rotation so this player's paddle appears on the right side
           this.setViewRotationForIndex(this.remoteIndex);
-          console.log(`🎮 Assigned player index ${this.remoteIndex}; camera set. (alpha=${this.camera.alpha}, theta=${this.viewTheta})`);
 
           // Update display names with correct order for all players
         } else {
-          console.log(`🎮 WARNING: Could not find my player in data.players. Available players:`, data.players);
+
           // Fallback: if host is not found in players array, assume they are player 0
           if (this.isHost) {
             this.remoteIndex = 0;
             this.setViewRotationForIndex(0);
-            console.log(`🎮 Fallback: Set host as player 0 with rotation`);
+
           }
         }
 
@@ -1279,19 +1253,19 @@ this.rightWall = wall(
 
       // Both host and guests show countdown on game_started event for synchronization
       if (!this.gameState.matchReady) {
-        console.log(`🎮 Player ${this.isHost ? 'host' : 'guest'} received game_started - showing countdown (remoteIndex: ${this.remoteIndex})`);
+
         this.hideWaitingOverlay();
         this.cleanupTournamentOverlay(); // Hide tournament bracket when match starts
 
         // Show countdown for all Socket.IO players simultaneously
         if (this.config.skipCountdown) {
-          console.log("⏭️ game_started skipping countdown");
+
           this.gameState.matchReady = true;
           this.resetBall(Math.random() < 0.5 ? 1 : -1);
         } else {
           const countdown = new GameCountdown({
             onComplete: () => {
-              console.log(`🎮 Player ${this.isHost ? 'host' : 'guest'} countdown complete - starting game`);
+
               this.gameState.matchReady = true;
               this.resetBall(Math.random() < 0.5 ? 1 : -1);
             },
@@ -1299,12 +1273,11 @@ this.rightWall = wall(
           countdown.start(); // Synchronized countdown for all players
         }
       } else {
-        console.log(`🎮 Player received game_started but game already ready`);
+
       }
     });
 
     socketManager.on("game_ready", (data) => {
-      console.log("Game ready signal received:", data);
 
       // Update display names based on proper player positions
       if (this.config.displayNames) {
@@ -1315,10 +1288,10 @@ this.rightWall = wall(
       // Determine if this client is host or joiner and set remote index accordingly
       if (socketManager.id === data.hostPlayer.id) {
         this.remoteIndex = 0; // Host is always player 0
-        console.log("This client is the host (player 0)");
+
       } else if (socketManager.id === data.joinerPlayer.id) {
         this.remoteIndex = 1; // Joiner is always player 1 (second score)
-        console.log("This client is the joiner (player 1)");
+
         // For guests, keep waiting overlay until game_started; set view rotation only
         if (this.isGuest) {
           this.setViewRotationForIndex(this.remoteIndex);
@@ -1340,18 +1313,18 @@ this.rightWall = wall(
     if (this.isHost) {
       // Since we're starting the game, we know the guest is connected
       this.connectedGuests = this.requiredGuests;
-      console.log("Host: Setting connected guests to", this.connectedGuests);
+
       this.checkMatchReady();
     } else if (this.isGuest) {
       // Guest should wait for game_started signal
-      console.log("Guest: Waiting for game start signal");
+
     }
   }
 
   private async checkMatchReady() {
     // Don't continue if game is disposed
     if (this.isDisposed) {
-      console.log('🚫 Game disposed, skipping checkMatchReady');
+
       return;
     }
 
@@ -1381,7 +1354,7 @@ this.rightWall = wall(
   private handleRemoteState(stateMsg: any) {
     // Handle game exit message
     if (stateMsg.gameExit) {
-      console.log("🚪 Received game exit signal from:", stateMsg.exitedBy);
+
       this.gameState.matchReady = false;
       this.stopAllAudio();
 
@@ -1391,7 +1364,7 @@ this.rightWall = wall(
 
       // For tournament matches, don't show toast or reload
       if (this.config.tournament) {
-        console.log("🏆 Tournament match - opponent exited. Checking for forfeit...");
+
         // The opponent left, so local player wins by forfeit
         const localPlayerIndex = this.getLocalControlledIndices()[0] || 0;
 
@@ -1420,7 +1393,7 @@ this.rightWall = wall(
 
       // Auto-return to menu after 3 seconds (non-tournament only)
       setTimeout(() => {
-        console.log("🕐 3 seconds elapsed - exiting game session automatically");
+
         this.gameState.matchReady = false;
         this.stopAllAudio();
         window.location.reload();
@@ -1472,11 +1445,10 @@ this.rightWall = wall(
       if (this.config.tournament) {
         // Prevent disposed game from handling tournament end
         if (this.isDisposed) {
-          console.log('🚫 Disposed game skipping tournament end handler');
+
           return;
         }
 
-        console.log("🏆 Tournament match ended");
         this.stopAllAudio();
 
         const summary: TournamentResultSummary = {
@@ -1497,7 +1469,7 @@ this.rightWall = wall(
         try {
           sessionStorage.setItem('ft_pong_tournament_match_ended', JSON.stringify(summary));
         } catch (error) {
-          console.warn('Unable to cache tournament result summary:', error);
+
         }
 
         // Update tournament statistics for remote player (joiner)
@@ -1507,16 +1479,16 @@ this.rightWall = wall(
             if (userId) {
               if (isLocalWinner) {
                 await authService.incrementWinCount(userId);
-                console.log('📊 Tournament match: Incremented win count for joiner');
+
               } else {
                 await authService.incrementLossCount(userId);
-                console.log('📊 Tournament match: Incremented loss count for joiner');
+
               }
               await authService.incrementTournamentCount(userId);
-              console.log('📊 Tournament match: Incremented tournament count for joiner');
+
             }
           } catch (statsError) {
-            console.error('Failed to update tournament statistics for joiner:', statsError);
+
           }
         })();
 
@@ -1536,21 +1508,21 @@ this.rightWall = wall(
             if (userId) {
               if (isLocalWinner) {
                 await authService.incrementWinCount(userId);
-                console.log('📊 Online match: Incremented win count for joiner');
+
               } else {
                 await authService.incrementLossCount(userId);
-                console.log('📊 Online match: Incremented loss count for joiner');
+
               }
             }
           } catch (statsError) {
-            console.error('Failed to update statistics for joiner:', statsError);
+
           }
         })();
 
         // Non-tournament game: auto-exit after 3 seconds
         if (!overlayShown) {
           setTimeout(() => {
-            console.log("🕐 3 seconds elapsed - ending game session automatically");
+
             this.gameState.matchReady = false;
             this.stopAllAudio();
             window.location.reload();
@@ -1566,12 +1538,10 @@ this.rightWall = wall(
 
       if (this.gameState.isPaused) {
         this.showPauseOverlay();
-        console.log(`⏸️ Game paused by ${stateMsg.pausedBy}`);
 
         // Chat system removed
       } else {
         this.hidePauseOverlay();
-        console.log(`▶️ Game resumed by ${stateMsg.pausedBy}`);
 
         // Chat system removed
       }
@@ -1659,7 +1629,7 @@ this.rightWall = wall(
             this.hideWaitingOverlay();
             // Show countdown for joiner too
             if (this.config.skipCountdown) {
-              console.log("⏭️ Guest received start - skipping countdown");
+
               this.gameState.matchReady = true;
               this.resetBall(Math.random() < 0.5 ? 1 : -1);
             } else {
@@ -1702,7 +1672,7 @@ this.rightWall = wall(
 
       // Handle WebSocket close (player disconnect)
       this.ws.onclose = () => {
-        console.log("WebSocket connection closed");
+
         // End the game immediately when connection is lost
         this.gameState.matchReady = false;
         this.endAndToast("Game ended - Connection lost");
@@ -1710,7 +1680,7 @@ this.rightWall = wall(
 
       // Handle WebSocket errors
       this.ws.onerror = (error) => {
-        console.error("WebSocket error:", error);
+
         // End the game immediately on connection error
         this.gameState.matchReady = false;
         this.endAndToast("Game ended - Connection error");
@@ -2270,11 +2240,6 @@ this.rightWall = wall(
     // Note: Main wall references (this.leftWall, this.rightWall) are kept from original wall creation
     // Tiles are used only for damage system
 
-    console.log(
-      `🧱 Created ${tilesPerWall} tiles per wall (${
-        tilesPerWall * 2
-      } total wall tiles)`
-    );
   }
 
   private applyDamageToWall(
@@ -2291,7 +2256,7 @@ this.rightWall = wall(
       wallMesh === this.rightWall || this.rightWallTiles.includes(wallMesh);
 
     if (!isLeftWall && !isRightWall) {
-      console.log("❌ Wall mesh not recognized");
+
       return;
     }
 
@@ -2310,15 +2275,13 @@ this.rightWall = wall(
     const targetTile = wallTiles[clampedIndex];
 
     if (!targetTile) {
-      console.log("❌ Could not find target tile");
+
       return;
     }
 
     // Check if this specific tile is already damaged
     if ((targetTile as any)._isDamaged) {
-      console.log(
-        `⚠️ Tile ${clampedIndex} on ${wallName} wall already damaged`
-      );
+
       return;
     }
 
@@ -2338,10 +2301,6 @@ this.rightWall = wall(
     damagedMaterial.diffuseTexture = damageTexture;
     targetTile.material = damagedMaterial;
 
-    console.log(
-      `🔥 Tile ${clampedIndex} on ${wallName} wall damaged with b2 texture at position:`,
-      { hitZ, tileHeight }
-    );
   }
 
   private togglePause() {
@@ -2361,10 +2320,10 @@ this.rightWall = wall(
         }
         if (this.gameState.isPaused) {
           this.showPauseOverlay();
-          console.log("⏸️ Game paused");
+
         } else {
           this.hidePauseOverlay();
-          console.log("▶️ Game resumed");
+
         }
       } else {
         // Guest: request host to toggle pause
@@ -2382,15 +2341,14 @@ this.rightWall = wall(
     this.gameState.isPaused = !this.gameState.isPaused;
     if (this.gameState.isPaused) {
       this.showPauseOverlay();
-      console.log("⏸️ Game paused");
+
     } else {
       this.hidePauseOverlay();
-      console.log("▶️ Game resumed");
+
     }
   }
 
   public async exitGame() {
-    console.log("🚪 Exit game requested by player");
 
     // Show confirmation dialog for multiplayer games
     if (this.isHost || this.isGuest) {
@@ -2420,25 +2378,23 @@ this.rightWall = wall(
       if (socketManager.connected) {
         // Broadcast via Web socket and leave room properly
         socketManager.sendGameState(exitData);
-        console.log("📡 Broadcast game exit via Web socket");
 
         // Leave the room to clean up server-side session
         socketManager.leaveRoom();
-        console.log("🚪 Left Web socket room");
+
       } else if (this.ws) {
         // Broadcast via WebSocket
         this.sendRemoteMessage({
           t: "gameExit",
           ...exitData
         } as any);
-        console.log("📡 Broadcast game exit via WebSocket");
 
         // Send leave room message for WebSocket sessions
         this.sendRemoteMessage({
           t: "leave",
           reason: "Player exited game"
         } as any);
-        console.log("🚪 Sent leave message via WebSocket");
+
       }
 
       // Report current game state before exiting
@@ -2448,10 +2404,10 @@ this.rightWall = wall(
       try {
         if (this.config.currentUser?.id) {
           await ApiClient.endSession(this.config.currentUser.id);
-          console.log("🔐 API session ended");
+
         }
       } catch (error) {
-        console.warn("⚠️ Could not end API session:", error);
+
       }
     }
 
@@ -2647,7 +2603,7 @@ this.rightWall = wall(
 
     // Handle tournament match end for host
     if (this.config.tournament) {
-      console.log("🏆 Tournament match ended (host) - showing tournament UI");
+
       this.stopAllAudio();
 
       const isLocalWinner = this.getLocalControlledIndices().includes(winnerIdx);
@@ -2669,7 +2625,7 @@ this.rightWall = wall(
       try {
         sessionStorage.setItem('ft_pong_tournament_match_ended', JSON.stringify(summary));
       } catch (error) {
-        console.warn('Unable to cache tournament result summary:', error);
+
       }
 
       this.dispatchTournamentMatchEvent(isLocalWinner ? 'victory' : 'eliminated', summary, 'auto');
@@ -2688,7 +2644,7 @@ this.rightWall = wall(
     const shouldAutoReload = !this.config.tournament && !remoteOverlayShown;
     if (shouldAutoReload) {
       setTimeout(() => {
-        console.log("🕐 3 seconds elapsed - ending game session automatically");
+
         this.gameState.matchReady = false;
         this.stopAllAudio();
         window.location.reload();
@@ -2748,24 +2704,23 @@ this.rightWall = wall(
 
                     if (isWinner) {
                       await authService.incrementWinCount(userId);
-                      console.log('📊 Tournament match: Incremented win count for host');
+
                     } else {
                       await authService.incrementLossCount(userId);
-                      console.log('📊 Tournament match: Incremented loss count for host');
+
                     }
 
                     await authService.incrementTournamentCount(userId);
-                    console.log('📊 Tournament match: Incremented tournament count for host');
+
                   }
                 } catch (statsError) {
-                  console.error('Failed to update tournament statistics for host:', statsError);
+
                 }
 
-                console.log(`Tournament match completed: ${winner.name} wins ${sanitizedFinalScores[0]}-${sanitizedFinalScores[1]}`);
               }
             }
           } catch (error) {
-            console.error('Failed to complete tournament match:', error);
+
           }
         } else {
           // Non-tournament online match: Update statistics for host
@@ -2776,14 +2731,14 @@ this.rightWall = wall(
 
               if (isLocalWinner) {
                 await authService.incrementWinCount(userId);
-                console.log('📊 Online match: Incremented win count for host');
+
               } else {
                 await authService.incrementLossCount(userId);
-                console.log('📊 Online match: Incremented loss count for host');
+
               }
             }
           } catch (statsError) {
-            console.error('Failed to update statistics for host:', statsError);
+
           }
         }
       } catch {}
@@ -2796,17 +2751,15 @@ this.rightWall = wall(
     if (this.config.tournament) {
       // Prevent disposed game from showing duplicate tournament UI
       if (this.isDisposed) {
-        console.log('🚫 Disposed game skipping endAndToast tournament handler');
+
         return;
       }
-
-      console.log(`🏆 Tournament match ended: ${text} - Handled by tournament UI`);
 
       // Ensure ALL players get redirected to tournament brackets after 15 seconds
       // This is a safety fallback in case bracket overlay fails
       setTimeout(() => {
         if (!this.isDisposed) {
-          console.log('🏆 Fallback tournament redirect after 15 seconds');
+
           window.dispatchEvent(new CustomEvent('ft:tournament:showTournamentHub', {
             detail: {
               action: 'fallback_redirect',
@@ -2827,7 +2780,7 @@ this.rightWall = wall(
     details: RemoteMatchConclusionDetails
   ) {
     if (this.isDisposed) {
-      console.log("🚫 Disposed game skipping remote match result overlay");
+
       return;
     }
 
@@ -3025,11 +2978,9 @@ this.rightWall = wall(
   private async showTournamentGameOverScreen(summary: TournamentResultSummary) {
     // Prevent disposed game from showing duplicate screens
     if (this.isDisposed) {
-      console.log('🚫 Disposed game skipping Game Over screen');
+
       return;
     }
-
-    console.log('❌ Showing Game Over screen for loser - will transition to bracket');
 
     this.latestTournamentSummary = summary;
     this.engine.stopRenderLoop();
@@ -3081,7 +3032,6 @@ this.rightWall = wall(
 
     // Show game over message for 2 seconds, then return to main menu
     setTimeout(() => {
-      console.log('❌ Loser returning to main menu after 2 seconds');
 
       // Clean up overlay
       if (overlay.parentElement) {
@@ -3099,11 +3049,9 @@ this.rightWall = wall(
   private async showTournamentWinnerScreen(summary: TournamentResultSummary) {
     // Prevent disposed game from showing duplicate screens
     if (this.isDisposed) {
-      console.log('🚫 Disposed game skipping Victory screen');
+
       return;
     }
-
-    console.log('🏆 Showing tournament bracket directly');
 
     this.latestTournamentSummary = summary;
 
@@ -3148,7 +3096,7 @@ this.rightWall = wall(
       const winner = summary.players?.[summary.winnerIdx] ?? this.config.tournament?.players?.[summary.winnerIdx];
 
       if (!winner?.id) {
-        console.warn('🏆 Cannot determine winner ID for match completion');
+
         return;
       }
 
@@ -3160,9 +3108,8 @@ this.rightWall = wall(
         score2
       );
 
-      console.log('✅ Match completion reported successfully');
     } catch (error) {
-      console.error('❌ Failed to report match completion:', error);
+
     }
   }
 
@@ -3174,7 +3121,6 @@ this.rightWall = wall(
         return;
       }
 
-      console.log('🏆[loop-fix] Checking for next tournament match...');
       const { tournamentService } = await import('../../tournament/TournamentService');
       const tournament = await tournamentService.getTournament(matchSummary.tournamentId);
 
@@ -3201,21 +3147,15 @@ this.rightWall = wall(
       );
 
       if (nextMatch) {
-        console.log('✅[loop-fix] Next-round match found -> showing Ready button', {
-          matchId: nextMatch.id,
-          round: nextMatch.round,
-          prevRound,
-          isActive: nextMatch.isActive
-        });
+
         // Show bracket with "Ready" button - auto-starts when both players ready
         this.showNextMatchScreen(overlay, tournament, nextMatch);
         return;
       }
 
-      console.log('⌛[loop-fix] No next-round match yet -> bracket waiting');
       this.showBracketWaitingScreen(overlay, tournament);
     } catch (error) {
-      console.error('❌[loop-fix] Failed to check next match:', error);
+
       this.showBracketWaitingScreen(overlay);
     }
   }
@@ -3228,9 +3168,9 @@ this.rightWall = wall(
       const { tournamentService } = await import('../../tournament/TournamentService');
       const latestTournament = await tournamentService.getTournament(tournament.tournamentId || tournament.id);
       tournament = latestTournament; // Use the fresh data
-      console.log('🔄 Refetched tournament data for bracket display');
+
     } catch (error) {
-      console.warn('⚠️ Failed to refetch tournament, using provided data:', error);
+
     }
 
     // Clear overlay and show bracket with ready button
@@ -3297,7 +3237,7 @@ this.rightWall = wall(
     `;
 
     overlay.appendChild(container);
-    
+
     // Pass the specific container element to avoid rendering in wrong place
     const bracketContainer = container.querySelector('#tournament-bracket-container') as HTMLElement;
     if (bracketContainer) {
@@ -3343,9 +3283,9 @@ this.rightWall = wall(
       try {
         const { tournamentService } = await import('../../tournament/TournamentService');
         await tournamentService.markPlayerReady(tournament.tournamentId, match.id);
-        console.log('✅ Marked as ready for match:', match.id);
+
       } catch (error) {
-        console.error('❌ Failed to mark ready:', error);
+
       }
     });
 
@@ -3364,9 +3304,6 @@ this.rightWall = wall(
     const handleBothReady = ({ matchId, players }: any) => {
       if (matchId !== match.id) return;
 
-      console.log('🎮 Both players ready! Starting match...', players);
-      console.log(`🏆 ${isPlayer1 ? 'Player 1 (Host)' : 'Player 2 (Guest)'} - isPlayer1=${isPlayer1}`);
-      
       // Remove listener immediately to prevent double-trigger
       tournamentService.off('bothPlayersReady', handleBothReady);
 
@@ -3384,18 +3321,17 @@ this.rightWall = wall(
       setTimeout(() => {
         // Both players call startNextTournamentMatch, but the coordinator
         // will handle host/guest logic internally based on player1/player2 IDs
-        console.log(`🎮 ${isPlayer1 ? 'HOST' : 'GUEST'} calling startNextTournamentMatch`);
+
         this.startNextTournamentMatch(tournament, match);
       }, 500);
     };
 
-    console.log(`🎧 Setting up bothPlayersReady listener for ${isPlayer1 ? 'HOST' : 'GUEST'} - matchId: ${match.id}`);
     tournamentService.on('bothPlayersReady', handleBothReady);
 
     // Clean up listener if overlay is removed
     const overlayObserver = new MutationObserver(() => {
       if (!document.body.contains(overlay)) {
-        console.log(`⚠️ Overlay removed, cleaning up bothPlayersReady listener for ${isPlayer1 ? 'HOST' : 'GUEST'}`);
+
         tournamentService.off('bothPlayersReady', handleBothReady);
         overlayObserver.disconnect();
       }
@@ -3493,7 +3429,6 @@ this.rightWall = wall(
       // Only update if overlay is still visible
       if (!document.body.contains(overlay)) return;
 
-      console.log('🔄 Real-time bracket update received');
       const container = overlay.querySelector('#tournament-bracket-container') as HTMLElement;
       if (container) {
         this.renderTournamentBracket(updatedTournament, container);
@@ -3536,7 +3471,7 @@ this.rightWall = wall(
     };
 
     const handleMatchCompleted = ({ tournament: updatedTournament }: any) => {
-      console.log('✅ Match completed event received');
+
       handleTournamentUpdate(updatedTournament);
     };
 
@@ -3549,7 +3484,7 @@ this.rightWall = wall(
     let pollingInterval: any = null;
 
     if (summary) {
-      console.log('🔄 Starting aggressive polling (every 2 seconds) for tournament updates');
+
       pollingInterval = setInterval(async () => {
         try {
           // Check if overlay still exists
@@ -3566,7 +3501,6 @@ this.rightWall = wall(
           if (container) {
             this.renderTournamentBracket(updatedTournament, container);
           }
-          console.log('🔄 Polling: Bracket updated');
 
           // Check for tournament completion
           if (updatedTournament.status === 'completed') {
@@ -3590,7 +3524,6 @@ this.rightWall = wall(
             if (pollingInterval) clearInterval(pollingInterval);
             tournamentService.off('tournamentUpdated', handleTournamentUpdate);
             tournamentService.off('matchCompleted', handleMatchCompleted);
-            console.log('🎮 Polling detected: Next match is ready!');
 
             if (statusEl) {
               statusEl.innerHTML = `
@@ -3605,7 +3538,7 @@ this.rightWall = wall(
             }, 1500);
           }
         } catch (error) {
-          console.error('❌ Polling error:', error);
+
         }
       }, 2000); // Poll every 2 seconds
     }
@@ -3617,7 +3550,7 @@ this.rightWall = wall(
         tournamentService.off('matchCompleted', handleMatchCompleted);
         if (pollingInterval) clearInterval(pollingInterval);
         overlayObserver.disconnect();
-        console.log('🧹 Cleaned up bracket WebSocket listeners and polling');
+
       }
     });
     overlayObserver.observe(document.body, { childList: true, subtree: true });
@@ -3625,7 +3558,7 @@ this.rightWall = wall(
 
   private showTournamentCompleteScreen(overlay: HTMLElement) {
     // STOP THE GAME COMPLETELY
-    console.log('🏆 Tournament complete - stopping game');
+
     this.engine.stopRenderLoop();
     this.stopAllAudio();
     this.gameState.matchReady = false;
@@ -3718,7 +3651,7 @@ this.rightWall = wall(
   }
 
   private redirectToMainMenu() {
-    console.log('🏠 Redirecting to main menu');
+
     this.cleanupTournamentOverlay();
     this.stopAllAudio();
     this.dispose();
@@ -3742,7 +3675,7 @@ this.rightWall = wall(
       if (!raw) return null;
       return JSON.parse(raw) as TournamentResultSummary;
     } catch (error) {
-      console.warn('Failed to restore cached tournament summary:', error);
+
       return null;
     }
   }
@@ -3754,19 +3687,19 @@ this.rightWall = wall(
       } catch {}
       this.tournamentOverlay = null;
     }
-    
+
     // Also remove any stray tournament overlays that might be left in the DOM
     try {
       const allOverlays = document.querySelectorAll('[style*="fixed"][style*="inset: 0"]');
       allOverlays.forEach((overlay) => {
         // Check if it contains tournament bracket elements
         if (overlay.querySelector('#tournament-bracket-container')) {
-          console.log('🧹 Removing stray tournament overlay');
+
           overlay.remove();
         }
       });
     } catch (error) {
-      console.warn('Failed to cleanup stray overlays:', error);
+
     }
   }
 
@@ -3780,7 +3713,7 @@ this.rightWall = wall(
         detail: { outcome, summary, source },
       }));
     } catch (error) {
-      console.warn('Failed to dispatch tournament match event:', error);
+
     }
   }
 
@@ -3805,7 +3738,7 @@ this.rightWall = wall(
       // Use provided container or find by ID (for backward compatibility)
       const container = containerElement || document.getElementById('tournament-bracket-container');
       if (!container) {
-        console.warn('⚠️ Tournament bracket container not found');
+
         return;
       }
 
@@ -3815,23 +3748,22 @@ this.rightWall = wall(
       // Import the adapter to convert old format to new
       const { convertToNewFormat } = await import('../../tournament/TournamentBracketAdapter');
       const { TournamentBracket } = await import('../../tournament-bracket');
-      
+
       // Get current user ID from auth service
       const { authService } = await import('../../services/AuthService');
       const currentUserId = authService.getUser()?.id?.toString();
-      
+
       // Convert tournament data from old format to new format
       const convertedData = convertToNewFormat(tournament, currentUserId);
-      
+
       // Create bracket instance
       const bracket = new TournamentBracket({ tournament: convertedData });
-      
+
       // Mount the bracket element to the container
       container.appendChild(bracket.getElement());
-      
-      console.log('✅ Tournament bracket rendered successfully');
+
     } catch (error) {
-      console.error('❌ Failed to render bracket:', error);
+
     }
   }
 
@@ -3881,7 +3813,7 @@ this.rightWall = wall(
     `;
 
     this.tournamentOverlay = overlay;
-    
+
     // Pass the specific container element
     const bracketContainer = overlay.querySelector('#tournament-bracket-container') as HTMLElement;
     if (bracketContainer) {
@@ -3895,7 +3827,6 @@ this.rightWall = wall(
       // Only update if overlay is still visible
       if (!document.body.contains(overlay)) return;
 
-      console.log('🔄 Real-time bracket update for eliminated player');
       const container = overlay.querySelector('#tournament-bracket-container') as HTMLElement;
       if (container) {
         this.renderTournamentBracket(updatedTournament, container);
@@ -3925,7 +3856,7 @@ this.rightWall = wall(
     };
 
     const handleEliminatedMatchCompleted = ({ tournament: updatedTournament }: any) => {
-      console.log('✅ Match completed event received (eliminated player view)');
+
       handleEliminatedUpdate(updatedTournament);
     };
 
@@ -3939,7 +3870,7 @@ this.rightWall = wall(
         tournamentService.off('tournamentUpdated', handleEliminatedUpdate);
         tournamentService.off('matchCompleted', handleEliminatedMatchCompleted);
         overlayObserver.disconnect();
-        console.log('🧹 Cleaned up eliminated player bracket WebSocket listeners');
+
       }
     });
     overlayObserver.observe(document.body, { childList: true, subtree: true });
@@ -3955,15 +3886,14 @@ this.rightWall = wall(
       );
 
       if (confirmed) {
-        console.log('🚪 Eliminated player leaving tournament');
 
         // Disconnect from tournament
         try {
           const { newTournamentService } = await import('../../tournament/NewTournamentService');
           newTournamentService.leaveTournament();
-          console.log('✅ Successfully disconnected from tournament');
+
         } catch (error) {
-          console.warn('⚠️ Failed to disconnect from tournament:', error);
+
         }
 
         // Clean up and return to main menu
@@ -3974,7 +3904,7 @@ this.rightWall = wall(
         try {
           sessionStorage.removeItem('ft_pong_tournament_match_ended');
         } catch (error) {
-          console.warn('Failed to clear cached tournament summary:', error);
+
         }
 
         window.location.reload();
@@ -3984,13 +3914,12 @@ this.rightWall = wall(
 
   private async startNextTournamentMatch(tournament: any, match: any) {
     try {
-      console.log('🎮 Starting next tournament match:', match);
 
       // Clear tournament overlay first
       this.cleanupTournamentOverlay();
 
       // Clean up current game
-      console.log('🧹 Disposing current game...');
+
       this.dispose();
 
       // Small delay to ensure cleanup completes
@@ -3999,26 +3928,20 @@ this.rightWall = wall(
       // Use the coordinator to prepare and start the next match
       const { NewTournamentMatchCoordinator } = await import('../../tournament/NewTournamentMatchCoordinator');
 
-      console.log('� Preparing next match...');
       const gameConfig = await NewTournamentMatchCoordinator.prepareMatchGameConfig({
         tournament: { id: tournament.tournamentId, maxGoals: 5 },
         match,
-        onStatus: (msg, type) => console.log(`[${type}] ${msg}`)
+        onStatus: (msg, type) => {}
       });
-
-      console.log('✅ Match config ready, starting new game...');
 
       // Import and create new game instance
       const { Pong3D } = await import('./Pong3D');
       const newGame = new Pong3D(gameConfig);
 
-      console.log('✅ Next tournament match started!');
-
       // Store reference to prevent garbage collection
       (window as any).__currentPongGame = newGame;
     } catch (error) {
-      console.error('❌ Failed to start next match:', error);
-      console.error('Error details:', error);
+
       alert(`Failed to start next match: ${error}. Please refresh and try again.`);
     }
   }
@@ -4081,7 +4004,7 @@ this.rightWall = wall(
   }
 
   private playWin() {
-    console.log("🏆 Playing WIN sound");
+
     const s = this.sounds.win[0];
     const ready =
       s && ((s as any).isReadyToPlay === true || (s as any).isReady?.());
@@ -4091,10 +4014,10 @@ this.rightWall = wall(
       try {
         if ((s as any).isPlaying || (s as any)._isPlaying) {
           s.stop();
-          console.log("🛑 Stopped existing WIN sound to prevent loop");
+
         }
       } catch (e) {
-        console.log("⚠️ Could not stop existing sound:", e);
+
       }
 
       // Ensure sound doesn't loop
@@ -4103,22 +4026,21 @@ this.rightWall = wall(
 
       // Play the sound once
       s.play();
-      console.log("🎵 WIN sound started playing (no loop)");
 
       // Automatically stop after expected duration to prevent hanging
       setTimeout(() => {
         try {
           if (s.isPlaying) {
             s.stop();
-            console.log("� Auto-stopped WIN sound after timeout");
+
           }
         } catch (e) {
-          console.log("⚠️ Could not auto-stop sound:", e);
+
         }
       }, 5000); // 5 second safety timeout
 
     } else {
-      console.log("🔊 WIN sound not ready, using fallback beeps");
+
       // little triumphant beep fallback
       this.beepFallback(600, 120, 0.06);
       setTimeout(() => this.beepFallback(900, 160, 0.06), 130);
@@ -4126,7 +4048,7 @@ this.rightWall = wall(
   }
 
   private playLose() {
-    console.log("💔 Playing LOSE sound");
+
     const s = this.sounds.lose[0];
     const ready =
       s && ((s as any).isReadyToPlay === true || (s as any).isReady?.());
@@ -4136,10 +4058,10 @@ this.rightWall = wall(
       try {
         if ((s as any).isPlaying || (s as any)._isPlaying) {
           s.stop();
-          console.log("🛑 Stopped existing LOSE sound to prevent loop");
+
         }
       } catch (e) {
-        console.log("⚠️ Could not stop existing sound:", e);
+
       }
 
       // Ensure sound doesn't loop
@@ -4148,22 +4070,21 @@ this.rightWall = wall(
 
       // Play the sound once
       s.play();
-      console.log("🎵 LOSE sound started playing (no loop)");
 
       // Automatically stop after expected duration to prevent hanging
       setTimeout(() => {
         try {
           if (s.isPlaying) {
             s.stop();
-            console.log("� Auto-stopped LOSE sound after timeout");
+
           }
         } catch (e) {
-          console.log("⚠️ Could not auto-stop sound:", e);
+
         }
       }, 5000); // 5 second safety timeout
 
     } else {
-      console.log("🔊 LOSE sound not ready, using fallback beeps");
+
       // descending tones fallback
       this.beepFallback(700, 90, 0.06);
       setTimeout(() => this.beepFallback(420, 150, 0.06), 100);
@@ -4212,7 +4133,7 @@ this.rightWall = wall(
   private handleVisibilityChange() {
     // Pause the game when the tab becomes hidden in multiplayer
     if (document.hidden && (this.isHost || this.isGuest) && this.gameState.matchReady && !this.gameState.isPaused) {
-      console.log("📱 Tab hidden, auto-pausing multiplayer game");
+
       this.togglePause();
     }
   }
@@ -4270,9 +4191,9 @@ this.rightWall = wall(
             winnerUserId,
             scores: sanitizedFinalScores,
           });
-          console.log("🎮 Match results reported due to game interruption");
+
         } catch (error) {
-          console.warn("⚠️ Failed to report interrupted match result:", error);
+
         }
       }
 
@@ -4311,7 +4232,7 @@ this.rightWall = wall(
       }
 
     } catch (error) {
-      console.error("❌ Error reporting game interruption:", error);
+
     }
   }
 
@@ -4319,15 +4240,13 @@ this.rightWall = wall(
     // Prevent multiple audio calls within a short time frame (debounce)
     const now = Date.now();
     if (now - this.lastGameEndAudioTime < 1000) {
-      console.log("🔇 Game end audio debounced - too soon since last call");
+
       return;
     }
     this.lastGameEndAudioTime = now;
 
     const locals = this.getLocalControlledIndices();
     const isLocalWinner = locals.includes(winnerIdx);
-
-    console.log(`🔊 Playing game end audio - isLocalWinner: ${isLocalWinner}, winnerIdx: ${winnerIdx}, locals: ${locals}`);
 
     // If both players are on the same machine (local 2P), play both cues
     if (this.config.connection === "local" && locals.length >= 2) {

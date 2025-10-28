@@ -56,7 +56,7 @@ export class GameService {
         this.state.settings = { ...this.state.settings, ...parsedSettings };
       }
     } catch (error) {
-      console.error('Error loading game settings from storage:', error);
+
     }
   }
 
@@ -64,7 +64,7 @@ export class GameService {
     try {
       localStorage.setItem(STORAGE_KEYS.GAME_SETTINGS, JSON.stringify(this.state.settings));
     } catch (error) {
-      console.error('Error saving game settings to storage:', error);
+
     }
   }
 
@@ -84,7 +84,7 @@ export class GameService {
 
   startGame(gameMode: GameMode = GameMode.SINGLE_PLAYER): void {
     if (this.state.isPlaying) {
-      console.warn('Game is already in progress');
+
       return;
     }
 
@@ -271,7 +271,7 @@ export class GameService {
       const highScore = localStorage.getItem('ft_pong_high_score');
       return highScore ? parseInt(highScore, 10) : 0;
     } catch (error) {
-      console.error('Error loading high score:', error);
+
       return 0;
     }
   }
@@ -284,7 +284,7 @@ export class GameService {
         globalEventManager.emit('game:new-high-score', score);
       }
     } catch (error) {
-      console.error('Error saving high score:', error);
+
     }
   }
 
@@ -301,7 +301,7 @@ export class GameService {
         totalPlayTime: 0,
       };
     } catch (error) {
-      console.error('Error loading game stats:', error);
+
       return {
         gamesPlayed: 0,
         gamesWon: 0,
@@ -321,7 +321,7 @@ export class GameService {
 
       localStorage.setItem('ft_pong_game_stats', JSON.stringify(stats));
     } catch (error) {
-      console.error('Error updating game stats:', error);
+
     }
   }
 

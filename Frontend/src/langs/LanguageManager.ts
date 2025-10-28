@@ -40,7 +40,7 @@ export class LanguageManager {
 
     this.loadStoredLanguage();
     void this.loadTranslations();
-    console.log(`🌍 LanguageManager initialized with language: ${this.currentLanguage}`);
+
   }
 
   private async loadTranslations(): Promise<void> {
@@ -63,7 +63,7 @@ export class LanguageManager {
         try {
           listener(this.currentLanguage);
         } catch (error) {
-          console.error('Error in language listener after translation load:', error);
+
         }
       });
 
@@ -71,9 +71,8 @@ export class LanguageManager {
         detail: { language: this.currentLanguage }
       }));
 
-      console.log('✅ Translation files loaded successfully');
     } catch (error) {
-      console.error('❌ Error loading translation files:', error);
+
       this.translationsLoaded = true;
       this.resolveTranslationsReady();
     }
@@ -95,7 +94,7 @@ export class LanguageManager {
         this.currentLanguage = browserLang;
       }
     } catch (error) {
-      console.warn('Failed to load stored language:', error);
+
     }
   }
 
@@ -123,7 +122,7 @@ export class LanguageManager {
 
   setLanguage(language: SupportedLanguage): void {
     if (!this.isValidLanguage(language)) {
-      console.error(`Invalid language: ${language}`);
+
       return;
     }
 
@@ -142,17 +141,15 @@ export class LanguageManager {
       settings = { ...settings, language };
       localStorage.setItem('ft_pong_game_settings', JSON.stringify(settings));
     } catch (error) {
-      console.warn('Failed to save language preference:', error);
-    }
 
-    console.log(`🌍 Language changed from ${previousLanguage} to ${language}`);
+    }
 
     // Notify listeners
     this.listeners.forEach(listener => {
       try {
         listener(language);
       } catch (error) {
-        console.error('Error in language change listener:', error);
+
       }
     });
 
@@ -184,7 +181,7 @@ export class LanguageManager {
       const fallback = this.translations.en[key];
       if (fallback === undefined) {
         if (this.translationsLoaded) {
-          console.warn(`Translation not found for key: ${key}`);
+
         }
         return key;
       }
@@ -246,7 +243,7 @@ export class LanguageManager {
         }
       }
     } catch (error) {
-      console.error('Error syncing with settings:', error);
+
     }
   }
 }

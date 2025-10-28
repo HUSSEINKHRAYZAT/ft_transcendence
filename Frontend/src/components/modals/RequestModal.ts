@@ -14,7 +14,6 @@ export class RequestModal extends BaseModal {
     return t('Friend Requests');
   }
 
-
   protected getModalContent(): string {
     if (this.requests.length === 0) {
       return `
@@ -125,7 +124,6 @@ export class RequestModal extends BaseModal {
     });
   }
 
-
 private async rejectRequest(username: string): Promise<void> {
   if (!this.currentUser?.userName) {
     this.showToast('error', 'Error', 'User not authenticated');
@@ -148,16 +146,15 @@ private async rejectRequest(username: string): Promise<void> {
       this.showToast('error', 'Error', response.message || 'Failed to reject friend request');
     }
   } catch (error) {
-    console.error('Error rejecting request:', error);
+
     this.showToast('error', 'Error', 'Network error while rejecting request');
   }
 }
 
-
   async showRequests(): Promise<void> {
     this.currentUser = this.getCurrentUser();
     if (!this.currentUser) {
-      console.error('No current user found');
+
       return;
     }
 
@@ -165,7 +162,7 @@ private async rejectRequest(username: string): Promise<void> {
       await this.loadRequests();
       await this.show('friend-requests');
     } catch (error) {
-      console.error('Error showing requests modal:', error);
+
       this.showToast('error', 'Error', 'Failed to load friend requests');
     }
   }
@@ -181,11 +178,11 @@ private async rejectRequest(username: string): Promise<void> {
       if (response.success && response.data) {
         this.requests = response.data;
       } else {
-        console.error('Failed to load requests:', response.message);
+
         this.requests = [];
       }
     } catch (error) {
-      console.error('Error loading requests:', error);
+
       this.requests = [];
     }
   }
@@ -212,7 +209,7 @@ private async rejectRequest(username: string): Promise<void> {
         this.showToast('error', 'Error', response.message || 'Failed to accept friend request');
       }
     } catch (error) {
-      console.error('Error accepting request:', error);
+
       this.showToast('error', 'Error', 'Network error while accepting request');
     }
   }
@@ -237,7 +234,7 @@ private async blockRequest(username: string): Promise<void> {
       this.showToast('error', 'Error', response.message || 'Failed to block user');
     }
   } catch (error) {
-    console.error('Error blocking user:', error);
+
     this.showToast('error', 'Error', 'Network error while blocking user');
   }
 }

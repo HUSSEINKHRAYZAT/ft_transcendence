@@ -65,7 +65,7 @@ export class SocketService {
                 }
             }
         } catch (error) {
-            console.error("[SocketService] Error restoring session:", error);
+
         }
     }
 
@@ -113,7 +113,7 @@ export class SocketService {
             };
 
             this.socket.onclose = (event) => {
-                console.warn(`[SocketService] Disconnected. Code: ${event.code}, Reason: ${event.reason}`);
+
                 this.isConnecting = false;
                 this.stopHeartbeat();
                 this.stopConnectionChecker();
@@ -129,11 +129,11 @@ export class SocketService {
             };
 
             this.socket.onerror = (error) => {
-                console.error("[SocketService] Error:", error);
+
                 this.isConnecting = false;
             };
         } catch (error) {
-            console.error("[SocketService] Error creating WebSocket:", error);
+
             this.isConnecting = false;
         }
     }
@@ -146,7 +146,7 @@ export class SocketService {
                 try {
                     this.socket.send(JSON.stringify({ type: 'ping' }));
                 } catch (error) {
-                    console.error("[SocketService] Error sending heartbeat:", error);
+
                 }
             }
         }, 30000);
@@ -165,7 +165,7 @@ export class SocketService {
         this.connectionCheckInterval = window.setInterval(() => {
             if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
                 if (this.userId && this.username && !this.isConnecting) {
-                    console.warn("[SocketService] Connection lost, attempting reconnect");
+
                     this.connect(this.userId, this.username);
                 }
             }
@@ -204,7 +204,7 @@ export class SocketService {
                     keepalive: true
                 }).catch(() => {});
             } catch (error) {
-                console.error("[SocketService] Error sending offline status on unload:", error);
+
             }
 
             // Manually broadcast offline status to update UI immediately
@@ -219,7 +219,7 @@ export class SocketService {
         if (userId) {
             const username = this.username;
             this.disconnect(userId).catch(err => {
-                console.error("[SocketService] Error during logout disconnect:", err);
+
             });
 
             // Manually broadcast offline status
@@ -289,18 +289,18 @@ export class SocketService {
                     break;
 
                 case 'welcome':
-                    // console.log('[SocketService] Welcome message:', message);
+
                     break;
 
                 case 'pong':
-                    // console.log('[SocketService] Received heartbeat pong');
+
                     break;
 
                 default:
-                    // console.warn("[SocketService] Unknown message type:", message.type);
+
             }
         } catch (error) {
-            console.error("[SocketService] Error parsing message:", error, event.data);
+
         }
     }
 
@@ -308,7 +308,7 @@ export class SocketService {
         const username = data.username;
 
         if (!username) {
-            console.error('[SocketService] No username in friend-online message:', data);
+
             return;
         }
 
@@ -325,7 +325,7 @@ export class SocketService {
         const username = data.username;
 
         if (!username) {
-            console.error('[SocketService] No username in friend-offline message:', data);
+
             return;
         }
 
@@ -352,7 +352,7 @@ export class SocketService {
         const username = data.username;
 
         if (!username) {
-            console.error('[SocketService] No username in user-blocked message:', data);
+
             return;
         }
 
@@ -375,7 +375,7 @@ export class SocketService {
         const avatar = data.avatar;
 
         if (!username) {
-            console.error('[SocketService] No username in avatar-changed message:', data);
+
             return;
         }
 
@@ -396,7 +396,6 @@ export class SocketService {
             const from = data.from;
             const text = data.text;
             const messageId = data.id || `received_${from}_${Date.now()}_${Math.random()}`;
-
 
             if (!from || !text) {
                 return;
@@ -435,9 +434,8 @@ export class SocketService {
             window.dispatchEvent(receivedEvent);
     }
 
-
     private handleError(message: any): void {
-        console.error("[SocketService] Server error:", message.error);
+
         this.showToast('error', 'Message Error', message.error || 'An error occurred');
     }
 
@@ -465,7 +463,7 @@ export class SocketService {
         const messageText = String(text).trim();
 
         if (!targetUsername || !messageText) {
-            console.error("🔴 [SocketService] Invalid message data:", { to: targetUsername, text: messageText });
+
             this.showToast('error', 'Message Error', 'Invalid message data');
             return;
         }
@@ -486,7 +484,6 @@ export class SocketService {
             text: messageText
         };
 
-
         try {
             // Send via WebSocket
             this.socket.send(JSON.stringify(messageData));
@@ -506,14 +503,14 @@ export class SocketService {
             window.dispatchEvent(sentEvent);
 
         } catch (error) {
-            console.error("🔴 [SocketService] Error sending message:", error);
+
             this.showToast('error', 'Message Error', 'Failed to send message');
         }
     }
 
     public sendAvatarChanged(avatar: string): void {
         if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
-            console.warn("[SocketService] Cannot send avatar-changed: Socket not connected");
+
             return;
         }
 
@@ -524,15 +521,14 @@ export class SocketService {
 
         try {
             this.socket.send(JSON.stringify(messageData));
-            console.log("[SocketService] Avatar changed message sent:", messageData);
+
         } catch (error) {
-            console.error("[SocketService] Error sending avatar-changed message:", error);
+
         }
     }
 
     private processMessageQueue(): void {
         if (this.messageQueue.length === 0) return;
-
 
         // Process all queued messages
         while (this.messageQueue.length > 0) {
@@ -543,7 +539,7 @@ export class SocketService {
 
     private handleReconnect(): void {
         if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-            console.error("[SocketService] Max reconnection attempts reached");
+
             this.showToast('error', 'Connection Lost', 'Unable to reconnect to server');
             return;
         }
@@ -564,7 +560,7 @@ export class SocketService {
             const fullMessage = title ? `${title}: ${message}` : message;
             notifyBox.addNotification(fullMessage, type);
         } else {
-            console.warn('NotificationBox not available for toast:', title, message);
+
         }
     }
 
@@ -583,7 +579,7 @@ export class SocketService {
                 this.socket = null;
             }
         } catch (error) {
-            console.error("[SocketService] Error during disconnect:", error);
+
             throw error;
         }
     }
@@ -606,7 +602,7 @@ export class SocketService {
 
     public sendFriendAccepted(targetUsername: string): void {
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
-        console.warn("[SocketService] Cannot send friend-accepted: Socket not connected");
+
         return;
     }
 
@@ -617,16 +613,16 @@ export class SocketService {
 
     try {
         this.socket.send(JSON.stringify(messageData));
-        console.log("[SocketService] Friend accepted message sent:", messageData);
+
     } catch (error) {
-        console.error("[SocketService] Error sending friend-accepted message:", error);
+
     }
 }
 
 // Send user blocked notification
 public sendUserBlocked(targetUsername: string): void {
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
-        console.warn("[SocketService] Cannot send user-blocked: Socket not connected");
+
         return;
     }
 
@@ -637,9 +633,9 @@ public sendUserBlocked(targetUsername: string): void {
 
     try {
         this.socket.send(JSON.stringify(messageData));
-        console.log("[SocketService] User blocked message sent:", messageData);
+
     } catch (error) {
-        console.error("[SocketService] Error sending user-blocked message:", error);
+
     }
 }
 }

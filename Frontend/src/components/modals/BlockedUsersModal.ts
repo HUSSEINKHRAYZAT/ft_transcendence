@@ -89,7 +89,7 @@ export class BlockedUsersModal extends BaseModal {
   async showBlockedUsers(): Promise<void> {
     this.currentUser = this.getCurrentUser();
     if (!this.currentUser) {
-      console.error('No current user found');
+
       return;
     }
 
@@ -97,7 +97,7 @@ export class BlockedUsersModal extends BaseModal {
       await this.loadBlockedUsers();
       await this.show('blocked-users');
     } catch (error) {
-      console.error('Error showing blocked users modal:', error);
+
       this.showToast('error', 'Error', 'Failed to load blocked users');
     }
   }
@@ -113,11 +113,11 @@ export class BlockedUsersModal extends BaseModal {
       if (response.success && response.data) {
         this.blockedUsers = response.data;
       } else {
-        console.error('Failed to load blocked users:', response.message);
+
         this.blockedUsers = [];
       }
     } catch (error) {
-      console.error('Error loading blocked users:', error);
+
       this.blockedUsers = [];
     }
   }
@@ -144,7 +144,7 @@ export class BlockedUsersModal extends BaseModal {
         this.showToast('error', 'Error', response.message || 'Failed to unblock user');
       }
     } catch (error) {
-      console.error('Error unblocking user:', error);
+
       this.showToast('error', 'Error', 'Network error while unblocking user');
     }
   }

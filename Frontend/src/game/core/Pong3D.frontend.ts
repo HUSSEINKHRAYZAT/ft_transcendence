@@ -137,7 +137,6 @@ export function hideWaitingOverlay(self: any) {
 }
 
 export function updateGameTheme(self: any, newTheme: GameThemeColors) {
-  console.log("🎮 Updating game colors for new theme");
 
   self.currentGameTheme = newTheme;
 
@@ -182,12 +181,11 @@ export function updateGameTheme(self: any, newTheme: GameThemeColors) {
     }
   });
 
-  console.log("✅ Game colors updated successfully");
 }
 
 export function initializeChat(_self: any) {
   // Chat is disabled for all game modes
-  console.log("💬 Chat disabled for all game modes");
+
   return;
 }
 

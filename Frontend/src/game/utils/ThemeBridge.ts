@@ -54,14 +54,10 @@ export class ThemeBridge {
       try {
         callback(this.currentGameTheme);
       } catch (error) {
-        console.error('Error in theme change callback:', error);
+
       }
     });
 
-    console.log('🎮 Game theme updated:', {
-      accent: accentTheme?.name || 'default',
-      background: backgroundTheme?.name || 'default'
-    });
   }
 
   private getCurrentAccentTheme(): any {

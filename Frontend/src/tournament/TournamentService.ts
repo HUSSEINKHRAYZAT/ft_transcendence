@@ -96,7 +96,7 @@ export class TournamentService {
         await socketManager.connect();
       }
     } catch (error) {
-      console.error('Failed to connect to realtime service:', error);
+
       throw error;
     }
 
@@ -163,8 +163,7 @@ export class TournamentService {
     socketManager.on('both_players_ready', (payload) => {
       if (!payload) return;
       const { tournamentId, matchId, players } = payload;
-      console.log('🎮 Both players ready event received:', { tournamentId, matchId, players });
-      
+
       this.emit('bothPlayersReady', {
         tournamentId,
         matchId,
@@ -416,7 +415,7 @@ export class TournamentService {
       try {
         cb(payload);
       } catch (error) {
-        console.error(`Error in tournament event handler for ${event}:`, error);
+
       }
     });
   }
@@ -538,8 +537,7 @@ export class TournamentService {
       tournamentId,
       matchId
     });
-    
-    console.log('🏆 Marked player as ready for match:', matchId);
+
   }
 
   public async requestTournaments(): Promise<void> {
@@ -588,7 +586,7 @@ export class TournamentService {
         }
       }
     } catch (error) {
-      console.warn('TournamentService: failed to resolve user from authService:', error);
+
     }
 
     const cachedUser = sessionStorage.getItem('ft_pong_current_user');
@@ -599,7 +597,7 @@ export class TournamentService {
           return parsed;
         }
       } catch (error) {
-        console.warn('TournamentService: failed to parse cached user:', error);
+
       }
     }
 

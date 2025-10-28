@@ -107,7 +107,7 @@ export class FriendInviteModal {
 
   private sendInvitations(friends: string[], roomCode: string, gameMode: string, hostName: string): void {
     if (!this.socketService) {
-      console.error("Socket service not available");
+
       return;
     }
 
@@ -170,7 +170,7 @@ export class FriendInviteModal {
       const data = await response.json();
       return data;
     } catch (error) {
-      console.error('Error fetching friends list:', error);
+
       throw error;
     }
   }

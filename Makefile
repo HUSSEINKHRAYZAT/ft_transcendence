@@ -6,7 +6,7 @@
 .PHONY: all help setup certs build up down restart clean logs status \
         backend-build backend-up backend-down backend-logs backend-restart \
         frontend-dev frontend-install frontend-reinstall frontend-build frontend-preview \
-        dev-build dev-up dev-down prune health check-docker launcher eval
+        frontend-clean-console dev-build dev-up dev-down prune health check-docker launcher eval
 
 MAKEFLAGS += --no-print-directory
 
@@ -91,6 +91,7 @@ help:
 	@echo "  $(YELLOW)make frontend-install$(RESET)    - Install frontend dependencies"
 	@echo "  $(YELLOW)make frontend-reinstall$(RESET) - Reinstall frontend dependencies"
 	@echo "  $(YELLOW)make frontend-build$(RESET)     - Build frontend (in container)"
+	@echo "  $(YELLOW)make frontend-clean-console$(RESET) - Remove all console.log statements"
 	@echo ""
 	@echo "$(GREEN)📊 Monitoring:$(RESET)"
 	@echo "  $(YELLOW)make logs$(RESET)               - View all service logs"
@@ -297,6 +298,25 @@ frontend-reinstall:
 frontend-preview:
 	@echo "$(BLUE)👀 Starting frontend preview server...$(RESET)"
 	@cd $(FRONTEND_DIR) && npm run preview
+
+frontend-clean-console:
+	@echo "$(CYAN)╔════════════════════════════════════════════════════════════════════════╗$(RESET)"
+	@echo "$(CYAN)║           🧹 Removing Console Statements from Frontend 🧹             ║$(RESET)"
+	@echo "$(CYAN)╚════════════════════════════════════════════════════════════════════════╝$(RESET)"
+	@echo ""
+	@echo "$(YELLOW)This will remove all console.log, console.warn, and console.error$(RESET)"
+	@echo "$(YELLOW)statements from your Frontend TypeScript/JavaScript files.$(RESET)"
+	@echo ""
+	@echo "$(MAGENTA)✓ A backup will be created automatically$(RESET)"
+	@echo "$(MAGENTA)✓ Location: Frontend/backups/console-removal-TIMESTAMP/$(RESET)"
+	@echo ""
+	@if command -v python3 >/dev/null 2>&1; then \
+		echo "$(GREEN)🐍 Using Python script (recommended)...$(RESET)"; \
+		cd $(FRONTEND_DIR) && python3 scripts/remove-console-logs.py; \
+	else \
+		echo "$(YELLOW)⚠️  Python3 not found, using bash script...$(RESET)"; \
+		cd $(FRONTEND_DIR) && bash scripts/remove-console-logs.sh; \
+	fi
 
 # ==========================================
 # Logs

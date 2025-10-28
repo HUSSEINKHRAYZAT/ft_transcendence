@@ -255,7 +255,7 @@ export class TournamentBracket {
     this.currentFocusIndex = this.allMatches.indexOf(match);
     
     // Could emit event or handle selection
-    console.log('Card clicked:', matchId);
+
   }
 
   private setupKeyboardNavigation(): void {

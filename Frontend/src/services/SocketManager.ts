@@ -206,7 +206,7 @@ export class SocketManager {
     }
 
     if (this.isConnected) {
-      console.log('Already connected to WebSocket server');
+
       if (playerName && playerName !== this.playerName) {
         this.playerName = playerName;
       }
@@ -217,7 +217,6 @@ export class SocketManager {
     const serverURL = this.getServerURL();
 
     try {
-      console.log(`🔌 Connecting to WebSocket server at ${serverURL}...`);
 
       this.socket = new WebSocket(serverURL);
 
@@ -231,8 +230,6 @@ export class SocketManager {
           this.isConnected = true;
           this.reconnectAttempts = 0;
 
-          console.log(`✅ Connected to WebSocket server`);
-
           // Register player with server
           this.send('register_player', {
             name: this.playerName,
@@ -245,13 +242,13 @@ export class SocketManager {
 
         this.socket!.onerror = (error) => {
           clearTimeout(timeout);
-          console.error('❌ WebSocket connection failed:', error);
+
           this.emit('error', 'Connection failed');
           reject(error);
         };
 
         this.socket!.onclose = (event) => {
-          console.log('🔌 Disconnected from WebSocket server:', event.code, event.reason);
+
           this.isConnected = false;
           this.currentRoom = null;
           this.emit('disconnected');
@@ -259,7 +256,7 @@ export class SocketManager {
           // Auto-reconnect logic
           if (this.reconnectAttempts < this.maxReconnectAttempts) {
             this.reconnectAttempts++;
-            console.log(`🔄 Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
+
             this.reconnectTimer = setTimeout(() => {
               this.connect(this.playerName);
             }, 1000 * this.reconnectAttempts);
@@ -267,7 +264,7 @@ export class SocketManager {
         };
       });
     } catch (error) {
-      console.error('❌ Failed to initialize WebSocket connection:', error);
+
       this.emit('error', 'Failed to initialize connection');
       return false;
     }
@@ -281,7 +278,7 @@ export class SocketManager {
         const message = JSON.parse(event.data);
         this.handleMessage(message);
       } catch (error) {
-        console.error('Error parsing WebSocket message:', error);
+
       }
     };
   }
@@ -292,49 +289,49 @@ export class SocketManager {
     switch (type) {
       case 'registered':
         this.playerId = message.id;
-        console.log(`👤 Registered as ${message.name} (${this.playerId})`);
+
         this.emit('connected', { playerId: this.playerId, playerName: message.name });
         break;
 
       case 'room_created':
         this.currentRoom = message.roomId;
-        console.log(`🏠 Room created: ${message.roomId}`);
+
         this.emit('room_created', message);
         break;
 
       case 'room_joined':
         this.currentRoom = message.roomId;
-        console.log(`🚪 Joined room: ${message.roomId}`);
+
         this.emit('room_joined', message);
         break;
 
       case 'room_updated':
-        console.log(`🔄 Room updated:`, message);
+
         this.emit('room_updated', message);
         break;
 
       case 'room_state':
-        console.log(`📊 Room state:`, message);
+
         this.emit('room_state', message);
         break;
 
       case 'player_joined':
-        console.log(`👤 Player joined: ${message.name}`);
+
         this.emit('player_joined', message);
         break;
 
       case 'player_left':
-        console.log(`👋 Player left: ${message.id}`);
+
         this.emit('player_left', message.id);
         break;
 
       case 'game_started':
-        console.log('🎮 Game started!', message);
+
         this.emit('game_started', message);
         break;
 
       case 'game_ready':
-        console.log('🎮 Game ready:', message);
+
         this.emit('game_ready', message);
         break;
 
@@ -343,7 +340,7 @@ export class SocketManager {
         break;
 
       case 'game_exit':
-        console.log('🚪 Game exit:', message);
+
         this.emit('game_exit', message);
         break;
 
@@ -423,7 +420,7 @@ export class SocketManager {
         break;
 
       case 'both_players_ready':
-        console.log('✅ Both players ready event received:', message);
+
         this.emit('both_players_ready', {
           tournamentId: message.tournamentId,
           matchId: message.matchId,
@@ -461,17 +458,17 @@ export class SocketManager {
         break;
 
       case 'error':
-        console.error('❌ WebSocket error:', message.error);
+
         this.emit('error', message.error);
         break;
 
       case 'server_shutdown':
-        console.warn('⚠️ Server is shutting down');
+
         this.emit('system_message', message.message || 'Server is shutting down');
         break;
 
       default:
-        console.warn('❌ WebSocket error: Unknown message type:', type);
+
     }
   }
 
@@ -491,7 +488,7 @@ export class SocketManager {
    */
   public async createRoom(gameMode: '2p' | '4p' = '2p'): Promise<string | null> {
     if (!this.isConnected || !this.socket) {
-      console.error('Not connected to server');
+
       return null;
     }
 
@@ -532,7 +529,7 @@ export class SocketManager {
     hostName?: string;
   }): void {
     if (!this.isConnected || !this.socket) {
-      console.warn('Cannot announce tournament match room without an active connection');
+
       return;
     }
 
@@ -553,7 +550,7 @@ export class SocketManager {
    */
   public async joinRoom(roomId: string): Promise<boolean> {
     if (!this.isConnected || !this.socket) {
-      console.error('Not connected to server');
+
       return false;
     }
 
@@ -671,7 +668,7 @@ export class SocketManager {
         try {
           (handler as Function)(...args);
         } catch (error) {
-          console.error(`Error in ${event} handler:`, error);
+
         }
       });
     }
@@ -736,7 +733,7 @@ export class SocketManager {
       });
 
       if (!response.ok) {
-        console.warn('[SocketManager] Realtime health check returned non-OK status:', response.status);
+
         return false;
       }
 
@@ -745,7 +742,7 @@ export class SocketManager {
         try {
           JSON.parse(payload);
         } catch {
-          console.warn('[SocketManager] Realtime health check response was not JSON; continuing anyway');
+
         }
       }
 
@@ -759,11 +756,10 @@ export class SocketManager {
         || message.includes('Failed to fetch')
         || message.includes('NetworkError')
         || env.DEV) {
-        console.warn('[SocketManager] Health check blocked or failed in dev; assuming realtime service is available.');
+
         return true;
       }
 
-      console.warn('[SocketManager] Health check failed:', error);
       return false;
     }
   }

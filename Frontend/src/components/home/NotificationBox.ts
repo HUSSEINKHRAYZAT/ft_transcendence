@@ -20,19 +20,17 @@ export class NotificationBox {
 
   async render(): Promise<void> {
     if (!this.container) {
-      console.error('❌ Notification box container not found');
+
       return;
     }
-
-    console.log('📢 Rendering NotificationBox component...');
 
     try {
       this.updateContent();
       this.setupEventListeners();
       this.isRendered = true;
-      console.log('✅ NotificationBox component rendered successfully');
+
     } catch (error) {
-      console.error('❌ Error rendering NotificationBox:', error);
+
     }
   }
 
@@ -102,11 +100,11 @@ export class NotificationBox {
   }
 
   private showLoginModal(): void {
-    console.log('🔍 NotificationBox: Trying to show login modal');
+
     if ((window as any).modalService && (window as any).modalService.showLoginModal) {
       (window as any).modalService.showLoginModal();
     } else {
-      console.error('❌ Modal service not available');
+
       alert(t('Login - Modal service not loaded'));
     }
   }
@@ -123,13 +121,11 @@ export class NotificationBox {
     }
   }
 
-
   updateAuthState(isAuthenticated: boolean): void {
     if (!this.isRendered) return;
     this.updateContent();
     this.setupEventListeners();
   }
-
 
   addNotification(message: string, type: 'info' | 'success' | 'warning' | 'error' = 'info'): void {
     if (!this.container || !this.isRendered) return;
@@ -261,15 +257,14 @@ export class NotificationBox {
       // Call the join room function directly
       await joinSocketIORoom(gameMode as '2p' | '4p', currentUser, () => {
         // Game config resolved, game will start
-        console.log('Joined game from invitation');
+
       });
 
     } catch (error) {
-      console.error('Error joining game from invite:', error);
+
       alert('Failed to join the game. Please try again or join manually.');
     }
   }
-
 
   showSystemNotification(type: 'maintenance' | 'update' | 'feature'): void {
     switch (type) {
@@ -295,6 +290,6 @@ export class NotificationBox {
       this.container.innerHTML = '';
     }
     this.isRendered = false;
-    console.log('🧹 NotificationBox component destroyed');
+
   }
 }

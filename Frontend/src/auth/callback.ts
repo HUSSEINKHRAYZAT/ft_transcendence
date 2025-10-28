@@ -12,7 +12,6 @@ export async function handleOAuthCallback(): Promise<void> {
     window.history.replaceState({}, "", window.location.pathname);
 
     const rawUser = await authService.fetchAuthMe(token);
-    console.log("Raw /auth/me response:", JSON.stringify(rawUser, null, 2));
 
     if (rawUser) {
         const user = mapBackendUserToUser(rawUser);
@@ -28,6 +27,6 @@ export async function handleOAuthCallback(): Promise<void> {
 
         window.location.href = "/home";
     } else {
-        console.error("Error fetching token, try again later!");
+
     }
 }

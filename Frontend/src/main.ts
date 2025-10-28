@@ -28,7 +28,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 });
 
-
 interface Component {
 	render(): Promise<void>;
 	updateAuthState?(isAuthenticated: boolean, user: any): void;
@@ -36,8 +35,6 @@ interface Component {
 
 let componentInstances: Component[] = [];
 let isComponentsLoaded = false;
-
-
 
 bootstrapAndInitialize();
 
@@ -53,19 +50,16 @@ async function bootstrapAndInitialize(): Promise<void> {
     await sessionBootstrap();
 
     const sessionData = await sessionReadyPromise;
-    console.log('📊 Session data:', sessionData);
 
     await initializeApplication();
 
   } catch (error) {
-    console.error('❌ Bootstrap failed:', error);
+
     await initializeApplication();
   }
 }
 
-
 async function initializeApplication(): Promise<void> {
-  console.log('🚀 Starting FT_PONG application initialization...');
 
   try {
     await waitForDOM();
@@ -73,22 +67,21 @@ async function initializeApplication(): Promise<void> {
     checkBackendStatus();
 
     languageManager.onLanguageChange((newLanguage) => {
-      console.log(`🌍 Global language changed to: ${newLanguage}`);
+
       updateGlobalTranslations();
     });
 
     hideLoadingScreen();
-    console.log('🔄 Loading safe components...');
+
     await loadSafeComponents();
   }
   catch (error) {
-    console.error('❌ Failed to initialize application:', error);
+
     showInitializationError(error);
   }
 }
 
 function updateGlobalTranslations(): void {
-  console.log('🔄 Updating global translations...');
 
   addBasicNavbar();
   updateJumbotronButton();
@@ -96,7 +89,6 @@ function updateGlobalTranslations(): void {
 }
 
 async function loadSafeComponents(): Promise<void> {
-    console.log('📦 Loading safe components (no API calls)...');
 
     try {
         const safeComponents = [
@@ -109,42 +101,39 @@ async function loadSafeComponents(): Promise<void> {
             { name: 'LoginModal', constructor: LoginModal }
         ];
 
-        console.log(`📊 Component loading: ${safeComponents.length}/${safeComponents.length} successful`);
-
         await initializeWithSafeComponents(safeComponents);
 
     } catch (error) {
-        console.error('❌ Safe component loading failed:', error);
+
         await initializeBasicContent();
     }
 }
 
 async function loadComponent(path: string, componentName: string): Promise<any> {
     try {
-        console.log(`📦 Loading ${componentName} from ${path}...`);
+
         const module = await import(/* @vite-ignore */ path);
 
         if (module[componentName]) {
-            console.log(`✅ ${componentName} loaded successfully`);
+
             return { name: componentName, constructor: module[componentName], module };
         } else {
             throw new Error(`${componentName} not found in module`);
         }
     } catch (error) {
-        console.error(`❌ Failed to load ${componentName}:`, error);
+
         throw error;
     }
 }
 
 async function initializeWithSafeComponents(components: any[]): Promise<void> {
-    console.log('🧩 Initializing with safe components...');
 
     try {
         const modalServiceComponent = components.find(c => c.name === 'ModalService');
         if (modalServiceComponent) {
             const modalService = new modalServiceComponent.constructor();
             (window as any).modalService = modalService;
-            console.log('🔑 Modal service initialized');
+
         } else {
             createBasicModalService();
         }
@@ -157,31 +146,29 @@ async function initializeWithSafeComponents(components: any[]): Promise<void> {
 	// Both players must click "Start Match" for the game to launch
 	const startingMatch = sessionStorage.getItem('ft_pong_starting_tournament_match');
 	if (startingMatch) {
-		console.log('⚠️ Found old tournament match in sessionStorage - clearing it');
-		console.log('   Players must now use "Start Match" button in bracket');
+
 		sessionStorage.removeItem('ft_pong_starting_tournament_match');
 		// DO NOT auto-launch - let players click "Start Match" button
 	}		const instancesCreated: Component[] = [];
 		for (const component of components) {
 			if (component.name !== 'ModalService') {
 				try {
-					console.log(`🧩 Initializing ${component.name}...`);
 
 					if (component.name === 'StatisticsModal') {
 						(window as any).StatisticsModal = component.constructor;
-						console.log(`✅ ${component.name} made globally available`);
+
 						continue;
 					}
 
 					if (component.name === 'ProfileModal') {
 						(window as any).ProfileModal = component.constructor;
-						console.log(`✅ ${component.name} made globally available`);
+
 						continue;
 					}
 
 					if (component.name === 'LoginModal') {
 						(window as any).LoginModal = component.constructor;
-						console.log(`✅ ${component.name} made globally available`);
+
 						continue;
 					}
 
@@ -191,15 +178,15 @@ async function initializeWithSafeComponents(components: any[]): Promise<void> {
 					if ('render' in instance && typeof instance.render === 'function') {
 						await instance.render();
 					} else if ('showModal' in instance && typeof instance.showModal === 'function') {
-						console.log(`✅ ${component.name} instance created (modal type)`);
+
 					}
 
 					else
 					{
-						console.log(`⚠️ ${component.name} has no render method, skipping render call`);
+
 					}
 				} catch (error) {
-					console.error(`❌ Failed to initialize ${component.name}:`, error);
+
 				}
 			}
 		}
@@ -209,17 +196,14 @@ async function initializeWithSafeComponents(components: any[]): Promise<void> {
 		setupAuthListeners(instancesCreated);
 		updateAuthState(instancesCreated);
 
-		console.log('🎮 FT_PONG Application initialized with safe components!');
-
 	} catch (error) {
-		console.error('❌ Failed to initialize with safe components:', error);
+
 		await initializeBasicContent();
 	}
 }
 
 async function initializeBasicContent(): Promise<void>
 {
-	console.log('🔄 Initializing with basic content fallback...');
 
 	try
 	{
@@ -229,12 +213,10 @@ async function initializeBasicContent(): Promise<void>
 		addBasicJumbotron();
 		addBasicContentBoxes();
 
-		console.log('✅ Basic content initialized successfully!');
-
 	}
 	catch (error)
 	{
-		console.error('❌ Failed to initialize basic content:', error);
+
 		showInitializationError(error);
 	}
 }
@@ -243,9 +225,9 @@ function hideLoadingScreen(): void
 {
 	const loadingScreen = document.getElementById('loading-screen');
 	if (loadingScreen) {
-		console.log('✅ Loading screen found, hiding it...');
+
 		loadingScreen.style.display = 'none';
-		console.log('✅ Loading screen hidden successfully');
+
 	}
 }
 
@@ -254,32 +236,32 @@ function createBasicModalService(): void
   (window as any).modalService =
   {
     showLoginModal: () => {
-      console.log('🔑 Basic login modal');
+
       showBasicAuthModal('login');
     },
     showSignupModal: () => {
-      console.log('📝 Basic signup modal');
+
       showBasicAuthModal('signup');
     },
     showProfileModal: () => {
-      console.log('👤 Basic profile modal');
+
       showBasicProfileModal();
     },
     showInfoModal: (type: string) => {
-      console.log(`ℹ️ Basic ${type} info modal`);
+
       showBasicInfoModal(type);
     },
     showPlayGameModal: () => {
-      console.log('🎮 Basic play game modal');
+
       showBasicPlayGameModal();
     },
     closeModal: () => {
-      console.log('❌ Close basic modal');
+
       closeBasicModal();
     },
     isModalOpen: () => document.getElementById('basic-modal') !== null
   };
-  console.log('🔑 Basic modal service created');
+
 }
 
 function showBasicPlayGameModal(): void
@@ -332,7 +314,6 @@ function showBasicPlayGameModal(): void
 
 (window as any).selectGameMode = async function(mode: string)
 {
-  console.log('🎮 Game mode selected:', mode);
 
   closeBasicModal();
 
@@ -340,26 +321,26 @@ function showBasicPlayGameModal(): void
 
   // Handle tournament modes
   if (mode === 'create-tournament') {
-    console.log('🏆 Creating Tournament...');
+
     showBasicToast('info', 'Opening Tournament Creation...');
 
     try {
       await showTournamentCreationModal();
     } catch (error) {
-      console.error('Failed to show tournament creation:', error);
+
       showBasicToast('error', 'Failed to create tournament');
     }
     return;
   }
 
   if (mode === 'join-tournament') {
-    console.log('� Joining Tournament...');
+
     showBasicToast('info', 'Opening Tournament Join...');
 
     try {
       await showTournamentJoinModal();
     } catch (error) {
-      console.error('Failed to show tournament join:', error);
+
       showBasicToast('error', 'Failed to join tournament');
     }
     return;
@@ -728,12 +709,6 @@ function addBasicNavbar(): void {
     const isAuthenticated = authState.isAuthenticated;
     const user = authState.user;
 
-    console.log('🔄 Updating navbar with auth state:', {
-      isAuthenticated,
-      user: user?.email,
-      profilePath: user?.profilePath
-    });
-
     let avatarHtml = '';
     if (isAuthenticated && user) {
       if (user.profilePath) {
@@ -816,7 +791,6 @@ function addBasicNavbar(): void {
 }
 
 (window as any).handleProfile = function() {
-	console.log('👤 Profile clicked...');
 
 	const dropdownMenu = document.getElementById('profile-dropdown-menu');
 	if (dropdownMenu && !dropdownMenu.classList.contains('hidden')) {
@@ -824,20 +798,19 @@ function addBasicNavbar(): void {
 	}
 
 	if ((window as any).ProfileModal) {
-		console.log('✅ Using ProfileModal.show()');
+
 		(window as any).ProfileModal.show();
 	} else {
 		import('./components/modals/ProfileModal').then(({ ProfileModal }) => {
 			ProfileModal.show();
 		}).catch(() => {
-			console.log('ProfileModal not available, using fallback');
+
 			showBasicProfileModal();
 		});
 	}
 };
 
 (window as any).handleStatistics = function() {
-	console.log('📊 Statistics clicked...');
 
 	if ((window as any).StatisticsModal) {
 		(window as any).StatisticsModal.show();
@@ -845,7 +818,7 @@ function addBasicNavbar(): void {
 		import('./components/modals/StatisticsModal').then(({ StatisticsModal }) => {
 			StatisticsModal.show();
 		}).catch((error) => {
-			console.error('ProfileModal failed to load:', error);
+
 			showBasicProfileModal();
 		});
 	}
@@ -919,13 +892,12 @@ function setupProfileDropdown(): void {
 		});
 	});
 
-	console.log('✅ Profile dropdown functionality setup complete');
 }
 
 (window as any).addBasicNavbar = addBasicNavbar;
 
 (window as any).handleLogin = function() {
-	console.log('🔑 Login clicked...');
+
 	if ((window as any).modalService) {
 		(window as any).modalService.showLoginModal();
 	}
@@ -936,14 +908,13 @@ function setupProfileDropdown(): void {
 };
 
 (window as any).handlePlayGame = async function() {
-  console.log('🎮 Play Game clicked...');
+
 	const user = authService.getUser();
-	console.log('👤 Current User:', user);
-	console.log('📁 ProfilePath:', user?.profilePath);
+
   const authState = authService.getState();
 
   if (!authState.isAuthenticated || !authState.user) {
-    console.log('❌ User not authenticated, showing login modal');
+
     if ((window as any).modalService && (window as any).modalService.showLoginModal) {
       (window as any).modalService.showLoginModal();
     } else {
@@ -952,14 +923,11 @@ function setupProfileDropdown(): void {
     return;
   }
 
-  console.log('✅ User is authenticated, starting 3D Pong game...');
-  console.log('🎫 JWT Token available:', authState.token?.substring(0, 20) + '...');
-
   await start3DPongGame();
 };
 
 (window as any).handleAbout = function() {
-	console.log('ℹ️ About clicked...');
+
 	if ((window as any).modalService) {
 		(window as any).modalService.showInfoModal('about');
 	} else {
@@ -968,7 +936,7 @@ function setupProfileDropdown(): void {
 };
 
 (window as any).handleProject = function() {
-	console.log('ℹ️ Project clicked...');
+
 	if ((window as any).modalService) {
 		(window as any).modalService.showInfoModal('project');
 	} else {
@@ -994,7 +962,7 @@ function setupProfileDropdown(): void {
         }, 500);
 
     } catch (error) {
-        console.error('Logout error:', error);
+
         if (typeof (window as any).showBasicToast === 'function') {
             (window as any).showBasicToast('error', 'Logout failed');
         }
@@ -1006,15 +974,14 @@ function setupProfileDropdown(): void {
 };
 
 (window as any).handleGetStarted = function() {
-  console.log('🚀 Get Started clicked...');
 
   const authState = authService.getState();
 
   if (authState.isAuthenticated && authState.user) {
-    console.log('✅ User authenticated, calling handlePlayGame...');
+
     (window as any).handlePlayGame();
   } else {
-    console.log('❌ User not authenticated, showing login modal');
+
     if ((window as any).modalService) {
       (window as any).modalService.showLoginModal();
     } else {
@@ -1074,7 +1041,6 @@ export function addBasicJumbotron(): void {
 
 		updateJumbotronButton();
 
-		console.log('✅ Pong-themed jumbotron added with dynamic button');
 	}
 }
 
@@ -1239,7 +1205,6 @@ function addBasicContentBoxes(): void {
 		`;
 	}
 
-	console.log('✅ Basic content boxes added');
 }
 
 function addFallbackContent(): void {
@@ -1301,14 +1266,14 @@ function setupAuthListeners(components: Component[]): void {
 	});
 
 	window.addEventListener('game-start-requested', ((e: CustomEvent) => {
-		console.log('🎮 Game start requested:', e.detail);
+
 		handleGameStartRequest(e.detail);
 	}) as EventListener);
 
 	// ==================== NEW TOURNAMENT SYSTEM EVENT LISTENERS ====================
 
 	window.addEventListener('tournament-created', ((e: CustomEvent) => {
-		console.log('🏆 Tournament created:', e.detail);
+
 		const { tournament } = e.detail;
 
 		// Store tournament data globally
@@ -1321,19 +1286,19 @@ function setupAuthListeners(components: Component[]): void {
 	}) as EventListener);
 
 	window.addEventListener('tournament-started', ((e: CustomEvent) => {
-		console.log('🏆 Tournament started:', e.detail);
+
 		// Show bracket or match UI
 		showBasicToast('success', 'Tournament has started!');
 	}) as EventListener);
 
 	window.addEventListener('tournament-left', (() => {
-		console.log('🏆 Left tournament');
+
 		showBasicToast('info', 'Left tournament');
 	}) as EventListener);
 
 	// Auto-start tournament matches
 	window.addEventListener('ft:tournament:startMatch', ((e: CustomEvent) => {
-		console.log('🏆 Auto-starting tournament match:', e.detail);
+
 		const { gameConfig, tournament, match } = e.detail;
 
 		try {
@@ -1345,27 +1310,26 @@ function setupAuthListeners(components: Component[]): void {
 				match.player2?.name : match.player1?.name;
 			showBasicToast('success', `🚀 Auto-starting match vs ${opponentName || 'Opponent'}`);
 		} catch (error) {
-			console.error('❌ Failed to auto-start tournament match:', error);
+
 			showBasicToast('error', 'Failed to start match automatically');
 		}
 	}) as EventListener);
 
 	window.addEventListener('ft:pong:returnToMenu', ((e: CustomEvent) => {
-		console.log('🏠 Returning to menu:', e.detail?.reason);
+
 		// Navigate back to home page (which renders the homepage)
 		window.location.href = '/';
 	}) as EventListener);
 
 	// Tournament bracket overlay events
 	window.addEventListener('ft:tournament:continueFromBracket', ((e: CustomEvent) => {
-		console.log('🏆 Continuing from bracket overlay');
+
 		// This will trigger the existing tournament progression system
 		// The bracket overlay has already been hidden by this point
 	}) as EventListener);
 
-
 	window.addEventListener('ft:tournament:showFullBracket', ((e: CustomEvent) => {
-		console.log('🏆 Showing full tournament bracket');
+
 		// Navigate to full tournament view
 		if (currentTournamentData) {
 			import('./tournament/ui/TournamentLobby').then(({ tournamentLobby }) => {
@@ -1383,13 +1347,12 @@ async function setupNewTournamentListeners() {
 
 	// Listen for match ready events
 	newTournamentService.on('match_ready', (data: any) => {
-		console.log('🎮 Match ready event received:', data);
 
 		const user = authService.getUser();
 		const userId = user?.id || user?.email;
 
 		if (!data.match || !userId) {
-			console.log('⚠️ No match data or user ID');
+
 			return;
 		}
 
@@ -1398,12 +1361,11 @@ async function setupNewTournamentListeners() {
 		const isPlayer2 = data.match.player2?.id === userId || data.match.player2?.externalId === userId;
 
     if (isPlayer1 || isPlayer2) {
-			console.log('🎮 Current user is in this match! Starting game...');
 
 			// IMMEDIATELY hide ALL tournament UI and overlays
-			console.log('🧹 Force removing all tournament overlays...');
+
       document.querySelectorAll('.tournament-lobby, .tournament-lobby-overlay, .tournament-modal, .modal-overlay, .modal').forEach(el => {
-				console.log('🧹 Removing:', el.className);
+
 				el.remove();
 			});
 
@@ -1411,7 +1373,7 @@ async function setupNewTournamentListeners() {
 			const jumbotron = document.getElementById('jumbotron');
 			if (jumbotron) {
 				jumbotron.innerHTML = '';
-				console.log('🧹 Cleared jumbotron');
+
 			}
 
 			showBasicToast('success', 'Your match is starting!');
@@ -1421,33 +1383,33 @@ async function setupNewTournamentListeners() {
 				launchNewTournamentMatch(data.tournament, data.match);
 			}, 500); // Reduced from 2000ms to 500ms
 		} else {
-			console.log('👀 Current user is spectating');
+
 			showBasicToast('info', 'A match has started');
 		}
 	});
 
 	// Listen for round started events
 	newTournamentService.on('round_started', (data: any) => {
-		console.log('🏆 Round started:', data.round);
+
 		showBasicToast('info', `Round ${data.round} has started!`);
 	});
 
 	// Listen for tournament completed
 	newTournamentService.on('tournament_completed', (data: any) => {
-		console.log('🏆 Tournament completed:', data);
+
 		showBasicToast('success', `🎉 Tournament complete! Winner: ${data.winner?.name || 'Unknown'}`);
 	});
 
 	// Listen for tournament updates to refresh bracket overlay
 	newTournamentService.on('tournament_updated', (data: any) => {
-		console.log('🏆 Tournament updated:', data);
+
 		// Update any open bracket overlay
 		updateBracketOverlay(data.tournament);
 	});
 
 	// Listen for tournament errors
 	newTournamentService.on('tournament_error', (data: any) => {
-		console.error('🏆 Tournament error:', data);
+
 		const errorMessage = data.error || data.message || 'Unknown tournament error';
 
 		if (errorMessage.toLowerCase().includes('not found') ||
@@ -1473,10 +1435,9 @@ async function updateBracketOverlay(tournament: any): Promise<void> {
 		const { tournamentBracketOverlay } = await import('./tournament/ui/TournamentBracketOverlay');
 		await tournamentBracketOverlay.updateBracket(tournament.tournamentId || tournament.id);
 	} catch (error) {
-		console.error('❌ Failed to update bracket overlay:', error);
+
 	}
 }
-
 
 function resetSettingsToDefaults(): void {
 
@@ -1493,7 +1454,6 @@ function resetSettingsToDefaults(): void {
 }
 
 function handleGameStartRequest(gameData: any): void {
-	console.log('🎮 Handling game start request:', gameData);
 
 	try {
 		localStorage.setItem('ft_pong_pending_game', JSON.stringify(gameData));
@@ -1505,7 +1465,7 @@ function handleGameStartRequest(gameData: any): void {
 		}, 1500);
 
 	} catch (error) {
-		console.error('Error handling game start request:', error);
+
 		showBasicToast('error', 'Game Start Failed');
 	}
 }
@@ -1530,8 +1490,6 @@ function updateAuthState(components: Component[]): void {
 	const isAuthenticated = authState.isAuthenticated;
 	const user = authState.user;
 
-	console.log('🔄 Updating auth state:', { isAuthenticated, user: user?.email, token: authState.token?.substring(0, 20) + '...' });
-
 	addBasicNavbar();
 
 	updateJumbotronButton();
@@ -1541,7 +1499,7 @@ function updateAuthState(components: Component[]): void {
 			try {
 				component.updateAuthState(isAuthenticated, user);
 			} catch (error) {
-				console.error('Error updating component auth state:', error);
+
 			}
 		}
 	});
@@ -1602,7 +1560,7 @@ async function showTournamentCreationModal() {
     const { tournamentCreationModal } = await import('./tournament/ui/TournamentCreationModal');
     tournamentCreationModal.show();
   } catch (error) {
-    console.error('Failed to show tournament creation modal:', error);
+
     showBasicToast('error', 'Failed to open tournament creation');
   }
 }
@@ -1696,7 +1654,7 @@ async function showTournamentJoinModal() {
     const { tournamentLobby } = await import('./tournament/ui/TournamentLobby');
     tournamentLobby.show(tournament);
   } catch (error) {
-    console.error('Failed to join tournament:', error);
+
     const errorMessage = (error as Error).message || 'Unknown error';
 
     // Determine error type and show appropriate message
@@ -1724,7 +1682,6 @@ async function showTournamentJoinModal() {
 
     // Show error message for longer duration and return to main menu
     setTimeout(() => {
-      console.log('🏠 Returning to main menu after tournament join error');
 
       // Dispatch event to notify main menu
       window.dispatchEvent(new CustomEvent('ft:pong:returnToMenu', {
@@ -1873,7 +1830,6 @@ async function showTournamentLobby(tournament: any) {
 
   const updateHandler = async (updatedTournament: any) => {
     if (updatedTournament.tournamentId === tournament.tournamentId) {
-      console.log('🔄 Tournament updated:', updatedTournament.players.length, '/', updatedTournament.size);
 
       // Check if tournament just became full
       const wasFull = currentTournamentData && currentTournamentData.players.length === currentTournamentData.size;
@@ -1886,7 +1842,7 @@ async function showTournamentLobby(tournament: any) {
 
       // Notify host when tournament becomes full
       if (!wasFull && isFull && updatedTournament.status === 'waiting' && isCreator) {
-        console.log('🏆 Tournament is full!');
+
         showBasicToast('success', '🎉 Tournament is full! Click START TOURNAMENT to begin.');
       }
 
@@ -1899,28 +1855,26 @@ async function showTournamentLobby(tournament: any) {
   };
 
   const matchStartHandler = (data: any) => {
-    console.log('🏆 matchStartHandler called with data:', data);
+
     if (data.tournament.tournamentId === tournament.tournamentId) {
-      console.log('🏆 Match starting for current tournament:', data.match);
+
       // Check if current user is in this match
       const currentUser = authService.getUser();
       const userId = currentUser?.id || currentUser?.email;
-      console.log('🏆 Current user ID:', userId);
-      console.log('🏆 Match players:', data.match.player1?.id, data.match.player2?.id);
 
       if (data.match.player1?.id === userId || data.match.player2?.id === userId) {
-        console.log('🏆 Current user is in this match! Starting game...');
+
         showBasicToast('success', 'Your match is starting!');
         // Launch the game
         setTimeout(() => {
-          console.log('🏆 Calling launchTournamentMatch...');
+
           launchTournamentMatch(data.tournament, data.match);
         }, 1000);
       } else {
-        console.log('🏆 Current user is not in this match');
+
       }
     } else {
-      console.log('🏆 Match start event for different tournament:', data.tournament.tournamentId);
+
     }
   };
 
@@ -1960,30 +1914,29 @@ function updatePlayersGrid(tournament: any) {
 
 // Manual start function for host
 (window as any).startTournamentManually = async function() {
-  console.log('🏆 startTournamentManually() called, currentTournamentData:', currentTournamentData);
+
   if (!currentTournamentData) {
-    console.error('🏆 No current tournament data!');
+
     showBasicToast('error', 'No tournament data available');
     return;
   }
 
   if (currentTournamentData.status !== 'waiting') {
-    console.log('🏆 Tournament already started:', currentTournamentData.status);
+
     showBasicToast('info', 'Tournament already in progress');
     return;
   }
 
   try {
-    console.log('🏆 Manually starting tournament:', currentTournamentData.tournamentId);
+
     showBasicToast('info', 'Starting tournament...');
 
     const { tournamentService } = await import('./tournament/TournamentService');
     const result = await tournamentService.startTournament(currentTournamentData.tournamentId);
-    console.log('🏆 Tournament started successfully:', result);
 
     showBasicToast('success', '🚀 Tournament started!');
   } catch (error) {
-    console.error('Failed to start tournament:', error);
+
     showBasicToast('error', `Failed to start tournament: ${(error as Error).message || 'Unknown error'}`);
   }
 };
@@ -2026,15 +1979,13 @@ async function showTournamentBracket(tournament: any) {
       new TournamentBracket(bracketContainer as HTMLElement, tournament);
     }
   } catch (error) {
-    console.error('Failed to render bracket:', error);
+
   }
 
   // Set up listener for Start Match button clicks
   document.addEventListener('tournamentMatchStartRequest', async (e: any) => {
     const match = e.detail?.match;
     if (!match) return;
-
-    console.log('🏆 Start Match button clicked for match:', match.id);
 
     const currentUser = authService.getUser();
     if (!currentUser) {
@@ -2054,12 +2005,6 @@ async function showTournamentBracket(tournament: any) {
       // Send ready signal to backend
       const { socketManager } = await import('./services/SocketManager');
 
-      console.log('🏆 Sending player_ready to backend:', {
-        tournamentId: tournament.tournamentId,
-        matchId: match.id,
-        playerId: userId
-      });
-
       socketManager.sendCommand('mark_player_ready', {
         tournamentId: tournament.tournamentId,
         matchId: match.id,
@@ -2070,7 +2015,7 @@ async function showTournamentBracket(tournament: any) {
 
       // Listen for both players ready
       const readyHandler = (data: any) => {
-        console.log('🏆 Both players ready event:', data);
+
         if (data.matchId === match.id) {
           socketManager.off('both_players_ready', readyHandler);
           showBasicToast('success', 'Match starting!');
@@ -2083,7 +2028,7 @@ async function showTournamentBracket(tournament: any) {
       socketManager.on('both_players_ready', readyHandler);
 
     } catch (error) {
-      console.error('Failed to signal ready:', error);
+
       showBasicToast('error', 'Failed to start match');
     }
   });
@@ -2091,23 +2036,17 @@ async function showTournamentBracket(tournament: any) {
 
 // Launch tournament match - Direct approach like Host 2P
 async function launchTournamentMatch(tournament: any, match: any) {
-  console.log('🏆 launchTournamentMatch - SIMPLIFIED DIRECT START');
-  console.log('🏆 Tournament:', tournament.tournamentId, 'Match:', match.id);
-  console.log('🏆 Match players:', match.player1, match.player2);
 
   try {
     const currentUser = authService.getUser();
     if (!currentUser) {
-      console.error('🏆 No current user found!');
+
       return;
     }
 
     const userId = currentUser.id || currentUser.email;
     const isHost = match.player1?.id === userId;
     const opponent = isHost ? match.player2 : match.player1;
-
-    console.log('🏆 Role:', isHost ? 'HOST' : 'GUEST');
-    console.log('🏆 Opponent:', opponent?.name);
 
     // Prepare game config with tournament context
     const gameConfig: any = {
@@ -2138,8 +2077,6 @@ async function launchTournamentMatch(tournament: any, match: any) {
       opponentName: opponent?.name || 'Opponent'
     };
 
-    console.log('🏆 Game config prepared:', gameConfig);
-
     // Store config for reload handling
     sessionStorage.setItem('ft_pong_starting_tournament_match', JSON.stringify(gameConfig));
 
@@ -2155,24 +2092,22 @@ async function launchTournamentMatch(tournament: any, match: any) {
 
     // Import and start Pong3D directly
     const { Pong3D } = await import('./game/core/Pong3D');
-    console.log('🏆 Starting Pong3D with tournament config...');
+
     currentGameInstance = new Pong3D(gameConfig);
-    console.log('🏆 Tournament match started successfully!');
 
   } catch (error) {
-    console.error('Failed to start tournament match:', error);
+
     showBasicToast('error', 'Failed to start match');
   }
 }
 
 // Launch match for NEW tournament system (simplified like Host 2P)
 async function launchNewTournamentMatch(tournament: any, match: any) {
-  console.log('🎮 launchNewTournamentMatch - Simple approach like Host 2P');
 
   try {
     const currentUser = authService.getUser();
     if (!currentUser) {
-      console.error('❌ No current user found!');
+
       return;
     }
 
@@ -2180,8 +2115,6 @@ async function launchNewTournamentMatch(tournament: any, match: any) {
     const userId = currentUser.id || currentUser.email;
     const isPlayer1 = match.player1?.id === userId || match.player1?.externalId === userId;
     const opponent = isPlayer1 ? match.player2 : match.player1;
-
-    console.log('🎮 Starting game - Current user vs', opponent?.name);
 
   // Simple config like Host 2P - NO aggressive UI cleanup, NO canvas manipulation
     const { clearPongUI } = await import('./ui');
@@ -2203,7 +2136,7 @@ async function launchNewTournamentMatch(tournament: any, match: any) {
       try {
         showBasicToast(type, message);
       } catch (err) {
-        console.log(`Toast (${type}):`, message, err);
+
       }
     };
 
@@ -2216,7 +2149,7 @@ async function launchNewTournamentMatch(tournament: any, match: any) {
         onStatus: toastStatus
       });
     } catch (err) {
-      console.error('❌ Failed to prepare tournament match config:', err);
+
       toastStatus('Falling back to local match.', 'error');
       gameConfig = {
         playerCount: 2,
@@ -2237,21 +2170,17 @@ async function launchNewTournamentMatch(tournament: any, match: any) {
       } as GameConfig;
     }
 
-    console.log('🎮 Tournament match game config:', gameConfig);
-
     CameraConfig.radius = 19;
 
     const { Pong3D } = await import('./game/core/Pong3D');
-    console.log('🎮 Creating Pong3D instance (tournament)...');
-    currentGameInstance = new Pong3D(gameConfig);
 
-    console.log('✅ Tournament match started!');
+    currentGameInstance = new Pong3D(gameConfig);
 
     // Listen for game end to report results
     // TODO: Implement game end callback to report winner to backend
 
   } catch (error) {
-    console.error('❌ Failed to start tournament match:', error);
+
     showBasicToast('error', 'Failed to start match');
   }
 }
@@ -2259,7 +2188,6 @@ async function launchNewTournamentMatch(tournament: any, match: any) {
 // OLD TOURNAMENT HUB - DEPRECATED (Using new modal system instead)
 /*
 async function launchTournamentHub() {
-	console.log('🏆 Launching Tournament Hub...');
 
 	try {
 		// Clean up any existing game or tournament
@@ -2277,7 +2205,7 @@ async function launchTournamentHub() {
 		const jumbotron = document.getElementById('jumbotron');
 		if (!
 			onStartGame: async (gameConfig) => {
-				console.log('🏆 Starting tournament game with config:', gameConfig);
+
 				try {
 					// Close tournament hub UI
 					if (currentTournamentHub) {
@@ -2289,16 +2217,15 @@ async function launchTournamentHub() {
 					const { Pong3D } = await import('./game/core/Pong3D');
 					currentGameInstance = new Pong3D(gameConfig);
 
-					console.log('✅ Tournament game started successfully');
 				} catch (error) {
-					console.error('❌ Failed to start tournament game:', error);
+
 					showBasicToast('error', 'Failed to start game');
 					// Reopen tournament hub on error
 					await launchTournamentHub();
 				}
 			},
 			onClose: () => {
-				console.log('🏆 Closing tournament hub');
+
 				if (currentTournamentHub) {
 					currentTournamentHub.destroy?.();
 					currentTournamentHub = null;
@@ -2308,9 +2235,8 @@ async function launchTournamentHub() {
 			}
 		});
 
-		console.log('✅ Tournament Hub launched successfully');
 	} catch (error) {
-		console.error('❌ Failed to launch Tournament Hub:', error);
+
 		showBasicToast('error', 'Failed to launch Tournament Hub');
 		// Return to home on error
 		addBasicJumbotron();
@@ -2319,7 +2245,6 @@ async function launchTournamentHub() {
 */
 
 async function start3DPongGame() {
-	console.log('🎮 Starting 3D Pong game...');
 
 	try {
 		if (currentGameInstance) {
@@ -2329,7 +2254,6 @@ async function start3DPongGame() {
 		const { clearPongUI } = await import('../src/ui');
 		const { Menu } = await import('../src/menu/MenuController');
 		const { Pong3D } = await import('../src/game/core/Pong3D');
-
 
 		const jumbotron = document.getElementById('jumbotron');
 		if (!jumbotron) {
@@ -2362,17 +2286,14 @@ async function start3DPongGame() {
 
 		currentGameInstance = new Pong3D(gameConfig);
 
-		console.log('✅ 3D Pong game started successfully');
-
 	} catch (error) {
-		console.error('❌ Failed to start 3D Pong game:', error);
+
 		showBasicToast('error', 'Failed to start game');
 	}
 }
 
 async function cleanupGame() {
 	if (currentGameInstance) {
-		console.log('🧹 Cleaning up game instance...');
 
 		try {
 			if (currentGameInstance && typeof currentGameInstance.dispose === 'function') {
@@ -2387,9 +2308,8 @@ async function cleanupGame() {
 				canvas.remove();
 			}
 
-			console.log('✅ Game cleaned up successfully');
 		} catch (error) {
-			console.error('❌ Error during game cleanup:', error);
+
 		}
 
 		currentGameInstance = null;
@@ -2429,12 +2349,12 @@ async function checkBackendStatus() {
       signal: AbortSignal.timeout(3000)
     });
     if (response.ok) {
-      console.log('🌐 Backend server is available');
+
     } else {
       showOfflineMode();
     }
   } catch (error) {
-    console.log('🔌 Backend server not available - running in offline demo mode');
+
     showOfflineMode();
   }
 }
@@ -2457,18 +2377,15 @@ function showOfflineMode() {
 }
 
 (window as any).testThemes = function() {
-  console.log('🎨 Available accent themes:', simpleThemeManager.getAvailableThemes());
-  console.log('🌙 Available background themes:', backgroundThemeManager.getAvailableThemes());
-  console.log('🎨 Current accent theme:', simpleThemeManager.getCurrentTheme());
-  console.log('🌙 Current background theme:', backgroundThemeManager.getCurrentTheme());
+
 };
 
 (window as any).switchToOrange = function() {
-  console.log('🧪 Testing orange theme...');
+
   simpleThemeManager.applyTheme('orange');
 };
 
 (window as any).switchToMidnight = function() {
-  console.log('🧪 Testing midnight background...');
+
   backgroundThemeManager.applyBackgroundTheme('midnight');
 };

@@ -453,7 +453,7 @@ export class SignupModal extends BaseModal {
                   this.showError("signup-error", loginResult.message || t("errors.loginFailed"));
                 }
               } catch (err) {
-                console.error("Login after verification failed:", err);
+
                 this.showError("signup-error", t("errors.unexpected"));
               }
             },
@@ -505,7 +505,7 @@ export class SignupModal extends BaseModal {
         verifyModal.showModal();
       }
     } catch (error) {
-      console.error("Signup error:", error);
+
       this.showError("signup-error", t("errors.unexpected"));
     } finally {
       submitBtn.disabled = false;

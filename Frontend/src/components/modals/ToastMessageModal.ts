@@ -35,7 +35,6 @@ export class ToastMessageModal extends BaseModal {
         window.addEventListener('direct-message-received', this.boundHandleDirectMessageReceived);
         window.addEventListener('direct-message-sent', this.boundHandleDirectMessageSent);
 
-        console.log(`💬 ToastMessageModal created for user: ${this.targetUser || 'general'}`);
     }
 
     protected getModalTitle(): string {
@@ -160,7 +159,6 @@ export class ToastMessageModal extends BaseModal {
     private handleDirectMessageSent(event: Event): void {
         const customEvent = event as CustomEvent;
         const { to, text, timestamp } = customEvent.detail;
-
 
         // If this is a targeted modal and message is not to target user, ignore
         if (this.targetUser && to !== this.targetUser) {
@@ -307,7 +305,7 @@ export class ToastMessageModal extends BaseModal {
             }
 
         } catch (error) {
-            console.error('Send message error:', error);
+
             this.showError('send-error', t('Failed to send message. Please try again.'));
         } finally {
             if (sendBtn) {
@@ -443,7 +441,6 @@ export class ToastMessageModal extends BaseModal {
         // Clear messages
         this.messages = [];
         this.isModalOpen = false;
-
 
         // Call parent destroy
         super.destroy();

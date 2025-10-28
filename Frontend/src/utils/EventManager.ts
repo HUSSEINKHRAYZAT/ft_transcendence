@@ -15,7 +15,6 @@ export class EventManager {
     return () => this.off(event, callback);
   }
 
-
   once(event: string, callback: EventCallback): () => void {
     const onceCallback = (...args: any[]) => {
       callback(...args);
@@ -42,7 +41,7 @@ export class EventManager {
         try {
           callback(...args);
         } catch (error) {
-          console.error(`Error in event listener for '${event}':`, error);
+
         }
       });
     }
@@ -222,7 +221,7 @@ export class KeyboardManager {
         try {
           callback(key);
         } catch (error) {
-          console.error(`Error in key binding for '${bindingKey}':`, error);
+
         }
       });
     }

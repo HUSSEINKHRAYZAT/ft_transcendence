@@ -110,7 +110,7 @@ export class ApiClient {
       return { canJoin: true };
     } catch (error) {
       // If API fails, allow join (graceful degradation)
-      console.warn('Session check failed:', error);
+
       return { canJoin: true };
     }
   }
@@ -123,7 +123,7 @@ export class ApiClient {
         headers: getAuthHeaders(),
       });
     } catch (error) {
-      console.warn('Failed to end session:', error);
+
     }
   }
 }

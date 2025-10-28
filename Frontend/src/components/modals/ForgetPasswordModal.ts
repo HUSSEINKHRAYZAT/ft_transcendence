@@ -263,7 +263,7 @@ export class ForgetPasswordModal extends BaseModal {
     const errorDiv = findElement('#forgot-password-error') as HTMLElement;
 
     if (!emailInput || !passwordInput || !confirmPasswordInput || !submitBtn) {
-      console.error('❌ Required form elements not found');
+
       return;
     }
 
@@ -296,13 +296,11 @@ export class ForgetPasswordModal extends BaseModal {
     submitBtn.textContent = t('Sending...');
 
     try {
-      console.log('🔐 Starting password reset for email:', email);
 
       // Use AuthService for password reset
       const result = await authService.initiatePasswordReset(email, password);
 
       if (result.success) {
-        console.log('✅ Password reset initiated successfully');
 
         // Close current modal and show verification modal
         this.close();
@@ -320,7 +318,7 @@ export class ForgetPasswordModal extends BaseModal {
       }
 
     } catch (error) {
-      console.error('❌ Error initiating password reset:', error);
+
       this.showError('forgot-password-error', t('Network error. Please try again.'));
     } finally {
       submitBtn.disabled = false;
@@ -330,13 +328,12 @@ export class ForgetPasswordModal extends BaseModal {
 
   private async showPasswordResetVerificationModal(email: string, newPassword: string): Promise<void> {
     try {
-      console.log('📧 Showing password reset verification modal');
 
       // Create a custom verification modal specifically for password reset
       this.createPasswordResetVerificationModal(email, newPassword);
 
     } catch (error) {
-      console.error('❌ Error showing verification modal:', error);
+
       this.showError('forgot-password-error', t('Unable to load verification modal. Please try again.'));
     }
   }
@@ -568,7 +565,7 @@ export class ForgetPasswordModal extends BaseModal {
         this.clearResetVerifyInputs(overlay);
       }
     } catch (error) {
-      console.error('❌ Error completing password reset:', error);
+
       this.showResetVerifyError(overlay, t('Network error. Please try again.'));
       this.clearResetVerifyInputs(overlay);
     }
@@ -591,7 +588,7 @@ export class ForgetPasswordModal extends BaseModal {
         this.startResetResendCooldown(resendBtn, timerDiv);
       }
     } catch (error) {
-      console.error('❌ Failed to resend password reset code:', error);
+
       this.showToast('error', 'Error', 'Failed to resend verification code');
     }
   }

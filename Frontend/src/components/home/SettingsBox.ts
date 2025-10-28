@@ -77,19 +77,17 @@ export class SettingsBox {
 
   async render(): Promise<void> {
     if (!this.container) {
-      console.error('❌ Settings box container not found');
+
       return;
     }
-
-    console.log('⚙️ Rendering SettingsBox component...');
 
     try {
       this.updateContent();
       this.setupEventListeners();
       this.isRendered = true;
-      console.log('✅ SettingsBox component rendered successfully');
+
     } catch (error) {
-      console.error('❌ Error rendering SettingsBox:', error);
+
     }
   }
 
@@ -459,7 +457,7 @@ export class SettingsBox {
   private async applyAuthenticatedSettings(): Promise<void> {
     const user = authService.getUser();
     if (!user) {
-      console.error('No user found for authenticated settings update');
+
       return;
     }
 
@@ -496,7 +494,7 @@ export class SettingsBox {
         this.setupEventListeners();
       }
     } catch (error) {
-      console.error('Error updating authenticated settings:', error);
+
     }
   }
 
@@ -551,7 +549,7 @@ export class SettingsBox {
         return { ...defaultSettings, ...JSON.parse(savedSettings) };
       }
     } catch (error) {
-      console.error('Error loading local settings:', error);
+
     }
 
     return defaultSettings;
@@ -600,7 +598,7 @@ export class SettingsBox {
       });
 
       this.audioPlayer.addEventListener('error', (e) => {
-        console.error('Audio error:', e);
+
         this.addNotification(t('Failed to play music'), 'error');
         this.isPlaying = false;
         this.updateMusicControls();
@@ -617,7 +615,7 @@ export class SettingsBox {
         this.addNotification(`Now playing: ${currentTrack.name}`, 'success');
       })
       .catch(error => {
-        console.error('Error playing music:', error);
+
         this.addNotification(t('Failed to play music'), 'error');
         this.isPlaying = false;
         this.updateMusicControls();
@@ -792,7 +790,7 @@ export class SettingsBox {
     try {
       localStorage.setItem('ft_pong_game_settings', JSON.stringify(settings));
     } catch (error) {
-      console.error('Error saving setting:', error);
+
     }
   }
 
@@ -863,11 +861,11 @@ export class SettingsBox {
   }
 
   private showLoginModal(): void {
-    console.log('🔐 SettingsBox: Trying to show login modal');
+
     if ((window as any).modalService?.showLoginModal) {
       (window as any).modalService.showLoginModal();
     } else {
-      console.error('❌ Modal service not available');
+
       alert('Login - Modal service not loaded');
     }
   }
@@ -897,6 +895,6 @@ export class SettingsBox {
       this.container.innerHTML = '';
     }
     this.isRendered = false;
-    console.log('🧹 SettingsBox component destroyed');
+
   }
 }

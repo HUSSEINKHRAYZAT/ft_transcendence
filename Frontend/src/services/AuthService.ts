@@ -46,7 +46,6 @@ type BackendUser = {
 	twoFactorEnabled?: number | boolean;
 };
 
-
 export function mapBackendUserToUser(raw: any): User {
     // Use the raw object directly since OAuth responses can vary
     const u = raw;
@@ -54,7 +53,6 @@ export function mapBackendUserToUser(raw: any): User {
     if (!u) {
         throw new Error("Invalid user payload from server.");
     }
-
 
     // Extract properties with all possible aliases
     const userId = u.id || u.sub || u.user_id || "";
@@ -71,12 +69,7 @@ export function mapBackendUserToUser(raw: any): User {
 
     // Validate that we have the minimum required fields
     if (!userId && !userEmail && !userName) {
-        console.error('Missing critical user data:', {
-            id: userId,
-            email: userEmail,
-            username: userName,
-            rawData: u
-        });
+
         throw new Error("Insufficient user data from server - missing ID, email, and username.");
     }
 
@@ -94,9 +87,8 @@ export function mapBackendUserToUser(raw: any): User {
         enable2fa: Boolean(u.twoFactorEnabled || u.two_factor_enabled || u.enable2fa),
     };
 
-
     if (!mappedUser.id || !mappedUser.email) {
-        console.error('Mapping failed - missing required fields:', mappedUser);
+
         throw new Error("User mapping failed - missing required ID or email.");
     }
 
@@ -141,7 +133,7 @@ export class AuthService {
 				};
 			}
 		} catch (err) {
-			console.error("Error loading auth state from storage:", err);
+
 			this.clearStoredAuth();
 		}
 	}
@@ -164,7 +156,6 @@ export class AuthService {
 		}
 		return this.state.statistics;
 	}
-
 
 	getToken(): string | null {
 		return this.state.token;
@@ -197,7 +188,7 @@ export class AuthService {
 				message: response.message || ERROR_MESSAGES.INVALID_CREDENTIALS,
 			};
 		} catch (error) {
-			console.error("Login error:", error);
+
 			return { success: false, message: ERROR_MESSAGES.NETWORK_ERROR };
 		} finally {
 			this.setLoading(false);
@@ -216,14 +207,14 @@ export class AuthService {
 			});
 
 			if (!response.ok) {
-				console.error("fetchAuthMe failed:", response.status);
+
 				return null;
 			}
 
 			const data = await response.json();
 			return data;
 		} catch (error) {
-			console.error('Network error calling /auth/me:', error);
+
 			return null;
 		}
 	}
@@ -253,13 +244,12 @@ export class AuthService {
 
 			return response;
 		} catch (error) {
-			console.error("Signup error:", error);
+
 			return { success: false, message: ERROR_MESSAGES.NETWORK_ERROR };
 		} finally {
 			this.setLoading(false);
 		}
 	}
-
 
 async createSettingsAPI(username: string): Promise<boolean> {
     try {
@@ -289,11 +279,11 @@ async createSettingsAPI(username: string): Promise<boolean> {
 
             return true;
         } else {
-            console.warn(`Failed to create settings for user: ${username}, status: ${response.status}`);
+
             return false;
         }
     } catch (error) {
-        console.error(`Error creating settings for user: ${username}`, error);
+
         return false;
     }
 }
@@ -327,11 +317,11 @@ async updateUserSettings(settings: {
 
             return true;
         } else {
-            console.warn(`Failed to update settings for user: ${settings.username}, status: ${response.status}`);
+
             return false;
         }
     } catch (error) {
-        console.error(`Error updating settings for user: ${settings.username}`, error);
+
         return false;
     }
 }
@@ -352,7 +342,7 @@ async updateUserSettings(settings: {
 			}
 			return null;
 		} catch (error) {
-			console.error('Failed to refresh settings:', error);
+
 			return null;
 		}
 	}
@@ -400,7 +390,7 @@ async updateUserSettings(settings: {
 				statusCode: res.status,
 			};
 		} catch (err) {
-			console.error("signupAPI error:", err);
+
 			return { success: false, message: ERROR_MESSAGES.NETWORK_ERROR };
 		}
 	}
@@ -410,7 +400,7 @@ async updateUserSettings(settings: {
 			this.clearAuthState();
 			globalEventManager.emit(AppEvent.AUTH_LOGOUT);
 		} catch (error) {
-			console.error("Logout error:", error);
+
 			this.clearAuthState();
 			globalEventManager.emit(AppEvent.AUTH_LOGOUT);
 		}
@@ -427,7 +417,7 @@ async updateUserSettings(settings: {
 			}
 			return true;
 		} catch (error) {
-			console.error("Token verification error:", error);
+
 			this.clearAuthState();
 			return false;
 		}
@@ -482,7 +472,6 @@ async setAuthState(token: string, user: User): Promise<void> {
 		return JSON.parse(raw) as WebSettings;
 	}
 
-
 private async settingsAPI(username: string): Promise<any | null> {
     if (!this.state.token) return null;
 
@@ -496,18 +485,17 @@ private async settingsAPI(username: string): Promise<any | null> {
         });
 
         if (!res.ok) {
-            console.error('Failed to fetch settings:', res.status);
+
             return null;
         }
 
         const data = await res.json();
         return data;
     } catch (err) {
-        console.error('Error fetching settings:', err);
+
         return null;
     }
 }
-
 
 	private async setAuthState_statistics(userId: string): Promise<UserStats | null> {
 		const raw = localStorage.getItem(STORAGE_KEYS.USER_STATISTICS);
@@ -522,7 +510,7 @@ private async settingsAPI(username: string): Promise<any | null> {
 			try {
 				await this.socketService?.disconnect(userId);
 			} catch (err) {
-				console.error("Error disconnecting socket during clearAuthState:", err);
+
 			}
 		}
 
@@ -567,7 +555,7 @@ private async settingsAPI(username: string): Promise<any | null> {
     raw: any | undefined
 	): WebSettings {
 		if (!raw) {
-			console.warn("No settings payload from server, using defaults.");
+
 			return {
 				theme: "lime",
 				backgroundTheme: "dark",
@@ -650,10 +638,8 @@ private async settingsAPI(username: string): Promise<any | null> {
 				}),
 			});
 
-
 			// Handle 303 - Email Not Verified
 			if (res.status === 303) {
-
 
 				try {
 					const emailResponse = await fetch(`${API_BASE_URL}/users/getEmail`, {
@@ -671,20 +657,19 @@ private async settingsAPI(username: string): Promise<any | null> {
 						const emailData = await emailResponse.json();
 						const userEmail = emailData.email || emailData.userEmail;
 
-
 						return {
 							success: false,
 							message: `email not verified:${userEmail}`
 						};
 					} else {
-						console.error('Failed to get email from backend');
+
 						return {
 							success: false,
 							message: 'Unable to send verification email. Please contact support.'
 						};
 					}
 				} catch (emailError) {
-					console.error('Error fetching user email:', emailError);
+
 					return {
 						success: false,
 						message: 'Unable to send verification email. Please try again.'
@@ -714,7 +699,6 @@ private async settingsAPI(username: string): Promise<any | null> {
 						const emailData = await emailResponse.json();
 						const userEmail = emailData.email || emailData.userEmail;
 
-
 						// Store ALL the login data needed for completing auth after 2FA
 						const tempToken = responseData.tempToken || responseData.token;
 						const userData = responseData.user;
@@ -734,14 +718,14 @@ private async settingsAPI(username: string): Promise<any | null> {
 							tempToken: tempToken
 						};
 					} else {
-						console.error('Failed to get email for 2FA verification');
+
 						return {
 							success: false,
 							message: 'Unable to send 2FA verification code. Please contact support.'
 						};
 					}
 				} catch (emailError) {
-					console.error('Error fetching user email for 2FA:', emailError);
+
 					return {
 						success: false,
 						message: 'Unable to send 2FA verification code. Please try again.'
@@ -768,7 +752,7 @@ private async settingsAPI(username: string): Promise<any | null> {
 			const user = mapBackendUserToUser(data.user);
 			return { success: true, token: data.token, user };
 		} catch (err) {
-			console.error("Backend not available, using offline demo auth:", err);
+
 			return this.offlineDemoLogin(credentials);
 		}
 	}
@@ -792,7 +776,7 @@ private async settingsAPI(username: string): Promise<any | null> {
 			}
 			return null;
 		} catch (error) {
-			console.error('Failed to refresh statistics:', error);
+
 			return null;
 		}
 		}
@@ -804,7 +788,7 @@ private async settingsAPI(username: string): Promise<any | null> {
 			// Use in-memory token to avoid race conditions with localStorage clearing
 			const token = this.state.token;
 			if (!token) {
-				console.warn("setStatus called without an auth token");
+
 				return false;
 			}
 
@@ -820,7 +804,7 @@ private async settingsAPI(username: string): Promise<any | null> {
 
 			if (!response.ok) {
 				const errorData = await response.json().catch(() => ({}));
-				console.error(`Failed to set status: ${response.status} ${response.statusText}`, errorData);
+
 				return false;
 			}
 
@@ -828,7 +812,7 @@ private async settingsAPI(username: string): Promise<any | null> {
 			return true;
 
 		} catch (error) {
-			console.error("setStatus error:", error);
+
 			return false;
 		}
 	}
@@ -846,7 +830,7 @@ private async settingsAPI(username: string): Promise<any | null> {
 			});
 
 			if (!res.ok) {
-				console.error('Failed to fetch statistics:', res.status);
+
 				return null;
 			}
 
@@ -861,7 +845,7 @@ private async settingsAPI(username: string): Promise<any | null> {
 
 			return stats;
 		} catch (err) {
-			console.error('Error fetching statistics:', err);
+
 			return null;
 		}
 	}
@@ -880,7 +864,6 @@ private async settingsAPI(username: string): Promise<any | null> {
 					message: '2FA session expired. Please login again.'
 				};
 			}
-
 
 			// Parse the stored user data
 			const userData = JSON.parse(tempUserData);
@@ -914,7 +897,6 @@ private async settingsAPI(username: string): Promise<any | null> {
 			};
 
 		} catch (error) {
-			console.error('2FA completion error:', error);
 
 			// Clear any corrupted session data
 			sessionStorage.removeItem('temp_2fa_token');
@@ -965,7 +947,7 @@ private async settingsAPI(username: string): Promise<any | null> {
 
 			return data.valid === true;
 		} catch (err) {
-			console.error("verifyTokenAPI error:", err);
+
 			return false;
 		}
 	}
@@ -999,7 +981,7 @@ private async settingsAPI(username: string): Promise<any | null> {
 				message: response.message || 'Failed to update profile',
 			};
 		} catch (error) {
-			console.error('Profile update error:', error);
+
 			return { success: false, message: ERROR_MESSAGES.NETWORK_ERROR };
 		} finally {
 			this.setLoading(false);
@@ -1053,7 +1035,7 @@ private async settingsAPI(username: string): Promise<any | null> {
 						errorMessage = 'You do not have permission to update this profile';
 					}
 				} catch (parseError) {
-					console.error('Error parsing error response:', parseError);
+
 				}
 
 				return { success: false, message: errorMessage };
@@ -1070,7 +1052,6 @@ private async settingsAPI(username: string): Promise<any | null> {
 			};
 
 		} catch (err) {
-			console.error('updateProfileAPI error:', err);
 
 			if (err instanceof TypeError && err.message.includes('fetch')) {
 				return {
@@ -1122,12 +1103,6 @@ private async settingsAPI(username: string): Promise<any | null> {
 		try {
 			const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
 
-			console.log('🔑 ========================================');
-			console.log('🔑 PASSWORD RESET - VERIFICATION CODE GENERATED');
-			console.log('🔑 Email:', email);
-			console.log('🔑 CODE:', verificationCode);
-			console.log('🔑 ========================================');
-
 			localStorage.setItem('password_reset_code', verificationCode);
 			localStorage.setItem('password_reset_email', email);
 			localStorage.setItem('password_reset_password', newPassword);
@@ -1164,7 +1139,7 @@ private async settingsAPI(username: string): Promise<any | null> {
 			};
 
 		} catch (error) {
-			console.error('Error initiating password reset:', error);
+
 			return {
 				success: false,
 				message: ERROR_MESSAGES.NETWORK_ERROR
@@ -1225,7 +1200,7 @@ private async settingsAPI(username: string): Promise<any | null> {
 			};
 
 		} catch (error) {
-			console.error('Error completing password reset:', error);
+
 			return {
 				success: false,
 				message: ERROR_MESSAGES.NETWORK_ERROR
@@ -1266,7 +1241,7 @@ private async settingsAPI(username: string): Promise<any | null> {
 				};
 			}
 		} catch (error) {
-			console.error('Error sending friend request:', error);
+
 			return { success: false, message: ERROR_MESSAGES.NETWORK_ERROR };
 		}
 	}
@@ -1293,7 +1268,7 @@ private async settingsAPI(username: string): Promise<any | null> {
 				};
 			}
 		} catch (error) {
-			console.error('Error loading friend requests:', error);
+
 			return { success: false, message: ERROR_MESSAGES.NETWORK_ERROR };
 		}
 	}
@@ -1337,11 +1312,10 @@ private async settingsAPI(username: string): Promise<any | null> {
 				};
 			}
 		} catch (error) {
-			console.error('Error accepting friend request:', error);
+
 			return { success: false, message: ERROR_MESSAGES.NETWORK_ERROR };
 		}
 	}
-
 
 async blockUserFromRequest(usernameOne: string, usernameTwo: string): Promise<AuthResponse> {
     try {
@@ -1382,7 +1356,7 @@ async blockUserFromRequest(usernameOne: string, usernameTwo: string): Promise<Au
             };
         }
     } catch (error) {
-        console.error('Error blocking user:', error);
+
         return { success: false, message: ERROR_MESSAGES.NETWORK_ERROR };
     }
 }
@@ -1428,7 +1402,7 @@ async removeFriend(usernameOne: string, usernameTwo: string): Promise<AuthRespon
             };
         }
     } catch (error) {
-        console.error('Error removing friend:', error);
+
         return { success: false, message: ERROR_MESSAGES.NETWORK_ERROR };
     }
 }
@@ -1455,7 +1429,7 @@ async removeFriend(usernameOne: string, usernameTwo: string): Promise<AuthRespon
 				};
 			}
 		} catch (error) {
-			console.error('Error loading friends list:', error);
+
 			return { success: false, message: ERROR_MESSAGES.NETWORK_ERROR };
 		}
 	}
@@ -1482,7 +1456,7 @@ async removeFriend(usernameOne: string, usernameTwo: string): Promise<AuthRespon
 				const messageHandler = async (event: MessageEvent) => {
 					// Verify origin matches your frontend URL
 					if (event.origin !== window.location.origin) {
-						console.warn('Ignoring message from unknown origin:', event.origin);
+
 						return;
 					}
 
@@ -1493,7 +1467,7 @@ async removeFriend(usernameOne: string, usernameTwo: string): Promise<AuthRespon
 					authWindow.close();
 
 					if (error) {
-						console.error('Google OAuth error:', error);
+
 						resolve({
 							success: false,
 							message: error
@@ -1536,7 +1510,7 @@ async removeFriend(usernameOne: string, usernameTwo: string): Promise<AuthRespon
 							});
 						}
 					} catch (processError) {
-						console.error('Error processing OAuth callback:', processError);
+
 						resolve({
 							success: false,
 							message: 'Failed to process Google authentication'
@@ -1561,7 +1535,7 @@ async removeFriend(usernameOne: string, usernameTwo: string): Promise<AuthRespon
 			});
 
 		} catch (error) {
-			console.error('Google login error:', error);
+
 			return {
 				success: false,
 				message: ERROR_MESSAGES.NETWORK_ERROR
@@ -1574,7 +1548,6 @@ async removeFriend(usernameOne: string, usernameTwo: string): Promise<AuthRespon
 	private async processOAuthCallback(googleToken: string, googleUser: any): Promise<AuthResponse> {
 		try {
 			const endpoint = `${API_BASE_URL}/users/oauth-upsert`;
-
 
 			const response = await fetch(endpoint, {
 				method: 'POST',
@@ -1618,7 +1591,7 @@ async removeFriend(usernameOne: string, usernameTwo: string): Promise<AuthRespon
 			};
 
 		} catch (error) {
-			console.error('Error processing OAuth callback:', error);
+
 			return {
 				success: false,
 				message: ERROR_MESSAGES.NETWORK_ERROR
@@ -1693,14 +1666,14 @@ async getBlockedUsers(userId: string): Promise<AuthResponse> {
             };
         }
     } catch (error) {
-        console.error('Error loading blocked users:', error);
+
         return { success: false, message: ERROR_MESSAGES.NETWORK_ERROR };
     }
 }
 
 async getFriendStatistics(friendId: string): Promise<UserStats | null> {
     if (!this.state.token) {
-        console.error('No auth token available');
+
         return null;
     }
 
@@ -1714,7 +1687,7 @@ async getFriendStatistics(friendId: string): Promise<UserStats | null> {
         });
 
         if (!response.ok) {
-            console.error('Failed to fetch friend statistics:', response.status);
+
             return null;
         }
 
@@ -1730,14 +1703,14 @@ async getFriendStatistics(friendId: string): Promise<UserStats | null> {
 
         return stats;
     } catch (error) {
-        console.error('Error fetching friend statistics:', error);
+
         return null;
     }
 }
 
 async getUserById(userId: string): Promise<any | null> {
     if (!this.state.token) {
-        console.error('No auth token available');
+
         return null;
     }
 
@@ -1751,17 +1724,15 @@ async getUserById(userId: string): Promise<any | null> {
         });
 
         if (!response.ok) {
-            console.error('Failed to fetch user by ID:', response.status);
+
             return null;
         }
 
         const data = await response.json();
 
-        console.log('🔍 Fetched user data for ID', userId, ':', data);
-
         return data;
     } catch (error) {
-        console.error('Error fetching user by ID:', error);
+
         return null;
     }
 }
@@ -1784,10 +1755,9 @@ getAvatarPath(profilePath: string | null | undefined): string {
     return `/avatars/${profilePath}`;
 }
 
-
 	async incrementWinCount(userId: string): Promise<boolean> {
 		if (!this.state.token) {
-			console.error('No auth token available');
+
 			return false;
 		}
 
@@ -1807,7 +1777,7 @@ getAvatarPath(profilePath: string | null | undefined): string {
 			});
 
 			if (!response.ok) {
-				console.error('Failed to increment win count:', response.status);
+
 				return false;
 			}
 
@@ -1815,14 +1785,14 @@ getAvatarPath(profilePath: string | null | undefined): string {
 			await this.refreshStatistics();
 			return true;
 		} catch (error) {
-			console.error('Error incrementing win count:', error);
+
 			return false;
 		}
 	}
 
 	async incrementLossCount(userId: string): Promise<boolean> {
 		if (!this.state.token) {
-			console.error('No auth token available');
+
 			return false;
 		}
 
@@ -1842,7 +1812,7 @@ getAvatarPath(profilePath: string | null | undefined): string {
 			});
 
 			if (!response.ok) {
-				console.error('Failed to increment loss count:', response.status);
+
 				return false;
 			}
 
@@ -1850,14 +1820,14 @@ getAvatarPath(profilePath: string | null | undefined): string {
 			await this.refreshStatistics();
 			return true;
 		} catch (error) {
-			console.error('Error incrementing loss count:', error);
+
 			return false;
 		}
 	}
 
 	async incrementTournamentWin(userId: string): Promise<boolean> {
 		if (!this.state.token) {
-			console.error('No auth token available');
+
 			return false;
 		}
 
@@ -1877,7 +1847,7 @@ getAvatarPath(profilePath: string | null | undefined): string {
 			});
 
 			if (!response.ok) {
-				console.error('Failed to increment tournament win:', response.status);
+
 				return false;
 			}
 
@@ -1885,14 +1855,14 @@ getAvatarPath(profilePath: string | null | undefined): string {
 			await this.refreshStatistics();
 			return true;
 		} catch (error) {
-			console.error('Error incrementing tournament win:', error);
+
 			return false;
 		}
 	}
 
 	async incrementTournamentCount(userId: string): Promise<boolean> {
 		if (!this.state.token) {
-			console.error('No auth token available');
+
 			return false;
 		}
 
@@ -1912,7 +1882,7 @@ getAvatarPath(profilePath: string | null | undefined): string {
 			});
 
 			if (!response.ok) {
-				console.error('Failed to increment tournament count:', response.status);
+
 				return false;
 			}
 
@@ -1920,7 +1890,7 @@ getAvatarPath(profilePath: string | null | undefined): string {
 			await this.refreshStatistics();
 			return true;
 		} catch (error) {
-			console.error('Error incrementing tournament count:', error);
+
 			return false;
 		}
 	}

@@ -111,22 +111,17 @@ export class NewTournamentService {
   public async initialize(): Promise<void> {
     if (this.initialized) return;
 
-    console.log('🏆 Initializing New Tournament Service...');
-    
     // Get user info for proper registration
     const user = authService.getUser();
     const playerName = user?.userName || user?.firstName || user?.email || 'Player';
     const externalId = user?.id || user?.email;
     
     await socketManager.connect(playerName, externalId);
-    console.log('🏆 SocketManager connected as:', playerName);
-    
+
     this.setupWebSocketHandlers();
-    console.log('🏆 WebSocket handlers set up');
-    
+
     this.initialized = true;
 
-    console.log('🏆 New Tournament Service initialized');
   }
 
   private setupWebSocketHandlers(): void {
@@ -151,13 +146,13 @@ export class NewTournamentService {
   // ==================== EVENT HANDLERS ====================
 
   private handleTournamentCreated(data: any): void {
-    console.log('🏆 Tournament created:', data);
+
     this.currentTournament = data.tournament;
     this.emit('tournament_created', data);
   }
 
   private handleTournamentUpdated(data: any): void {
-    console.log('🏆 Tournament updated:', data);
+
     if (this.currentTournament && data.tournament.id === this.currentTournament.id) {
       this.currentTournament = data.tournament;
     }
@@ -165,12 +160,12 @@ export class NewTournamentService {
   }
 
   private handlePlayerJoined(data: any): void {
-    console.log('🏆 Player joined:', data);
+
     this.emit('player_joined', data);
   }
 
   private handleTournamentStarted(data: any): void {
-    console.log('🏆 Tournament started:', data);
+
     if (this.currentTournament) {
       this.currentTournament.status = 'active';
       this.currentTournament.startedAt = Date.now();
@@ -179,37 +174,37 @@ export class NewTournamentService {
   }
 
   private handleRoundStarted(data: any): void {
-    console.log('🏆 Round started:', data);
+
     this.emit('round_started', data);
   }
 
   private handleMatchReady(data: any): void {
-    console.log('🏆 Match ready:', data);
+
     this.emit('match_ready', data);
   }
 
   private handleMatchCompleted(data: any): void {
-    console.log('🏆 Match completed:', data);
+
     this.emit('match_completed', data);
   }
 
   private handleRoundCompleted(data: any): void {
-    console.log('🏆 Round completed:', data);
+
     this.emit('round_completed', data);
   }
 
   private handleTournamentCompleted(data: any): void {
-    console.log('🏆 Tournament completed:', data);
+
     this.emit('tournament_completed', data);
   }
 
   private handlePlayerEliminated(data: any): void {
-    console.log('🏆 Player eliminated:', data);
+
     this.emit('player_eliminated', data);
   }
 
   private handleTournamentError(data: any): void {
-    console.error('🏆 Tournament error:', data);
+
     this.emit('tournament_error', data);
   }
 
@@ -232,19 +227,13 @@ export class NewTournamentService {
       }, 10000);
 
       const handler = (data: any) => {
-        console.log('🏆 Received tournament_created event:', data);
+
         clearTimeout(timeout);
         this.off('tournament_created', handler);
         resolve(data.tournament);
       };
 
       this.on('tournament_created', handler);
-
-      console.log('🏆 Sending create_new_tournament command:', {
-        size: request.size,
-        maxGoals: 5,
-        autoStartMinutes: request.autoStartMinutes || 5
-      });
 
       socketManager.sendCommand('create_new_tournament', {
         size: request.size,
@@ -359,7 +348,7 @@ export class NewTournamentService {
         try {
           handler(data);
         } catch (error) {
-          console.error(`Error in tournament event handler for ${event}:`, error);
+
         }
       });
     }
