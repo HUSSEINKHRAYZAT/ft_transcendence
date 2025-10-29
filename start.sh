@@ -126,45 +126,6 @@ check_docker() {
     fi
 }
 
-check_docker_compose() {
-    if docker compose version &> /dev/null; then
-        echo "${GREEN}✓${RESET}"
-        return 0
-    elif command -v docker-compose &> /dev/null; then
-        echo "${YELLOW}⚠${RESET}"
-        return 0
-    else
-        echo "${RED}✗${RESET}"
-        return 1
-    fi
-}
-
-check_node() {
-    if command -v node &> /dev/null; then
-        echo "${GREEN}✓${RESET}"
-        return 0
-    else
-        echo "${RED}✗${RESET}"
-        return 1
-    fi
-}
-
-check_services() {
-    local running_count=0
-    local total_count=9
-
-    if docker ps | grep -q "user_management"; then ((running_count++)); fi
-    if docker ps | grep -q "socket_microservice"; then ((running_count++)); fi
-    if docker ps | grep -q "game_microservice"; then ((running_count++)); fi
-    if docker ps | grep -q "mailer"; then ((running_count++)); fi
-    if docker ps | grep -q "session_microservice"; then ((running_count++)); fi
-    if docker ps | grep -q "google_oauth2"; then ((running_count++)); fi
-    if docker ps | grep -q "realtime_microservice"; then ((running_count++)); fi
-    if docker ps | grep -q "api_gateway"; then ((running_count++)); fi
-    if docker ps | grep -q "frontend"; then ((running_count++)); fi
-
-    echo "$running_count/$total_count"
-}
 
 # ==========================================
 # Progress Bar
@@ -209,14 +170,6 @@ spinner() {
 # ==========================================
 show_main_menu() {
     show_logo
-
-    # System Status
-    echo "${LIME}╔════════════════════════════════════════════════════════════════════════╗${RESET}"
-    echo "${LIME}║${RESET}  ${BOLD}${WHITE}SYSTEM STATUS${RESET}                                                        ${LIME}║${RESET}"
-    echo "${LIME}╠════════════════════════════════════════════════════════════════════════╣${RESET}"
-    printf "${LIME}║${RESET}  Docker:          $(check_docker)   │  Node.js:        $(check_node)   │  Services: ${YELLOW}$(check_services)${RESET}  ${LIME}║${RESET}\n"
-    echo "${LIME}╚════════════════════════════════════════════════════════════════════════╝${RESET}"
-    echo ""
 
     # Main Menu
     echo "${LIME_LIGHT}╔════════════════════════════════════════════════════════════════════════╗${RESET}"
