@@ -6,5 +6,6 @@ tmp/
 
 *.env
 *.vscode
+*.env
 cert/
 *.md

@@ -278,6 +278,7 @@ action_eval() {
     read confirm
 
     if [[ "$confirm" =~ ^[Yy]$ ]]; then
+        generate_env
         echo ""
         show_pong_animation
         echo ""
@@ -352,6 +353,8 @@ action_start_all() {
     echo "${LIME}║${RESET}  ${BOLD}${WHITE}STARTING ALL SERVICES (Production Mode)${RESET}                          ${LIME}║${RESET}"
     echo "${LIME}╚════════════════════════════════════════════════════════════════════════╝${RESET}"
     echo ""
+
+    generate_env
 
     make up &
     local pid=$!
@@ -560,6 +563,23 @@ invalid_choice() {
     echo ""
     echo "${RED}❌ Invalid choice. Please try again.${RESET}"
     sleep 1
+}
+
+generate_env() {
+    echo "${CYAN}🔧 Generating .env file for Docker Compose...${RESET}"
+
+    # Get machine IP
+    IP_HOST=$(hostname -I | awk '{print $1}')
+
+    # Path to .env in Backend
+    ENV_FILE="$BACKEND_DIR/.env"
+
+    # Write ALLOWED_REDIRECTS to .env
+    cat > "$ENV_FILE" <<EOF
+ALLOWED_REDIRECTS=https://localhost:5173,https://127.0.0.1:5173,https://$IP_HOST:5173
+EOF
+
+    echo "${GREEN}✅ .env file generated at $ENV_FILE with ALLOWED_REDIRECTS including localhost, 127.0.0.1 and $IP_HOST${RESET}"
 }
 
 # ==========================================

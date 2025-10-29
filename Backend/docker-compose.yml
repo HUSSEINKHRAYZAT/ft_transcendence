@@ -185,7 +185,7 @@ services:
       AUTH_JWT_SECRET: dev-gateway-secret
       AUTH_JWT_TTL: 5h
       STATE_SECRET: dev-state-secret
-      ALLOWED_REDIRECTS: https://localhost:5173,https://127.0.0.1:5173
+      ALLOWED_REDIRECTS: ${ALLOWED_REDIRECTS}
       ENABLE_HTTPS: "true"
       CERT_PATH: /app/certs
       NODE_EXTRA_CA_CERTS: /usr/local/share/ca-certificates/transcendence-ca.crt
