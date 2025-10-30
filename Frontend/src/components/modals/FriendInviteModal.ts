@@ -23,18 +23,8 @@ export class FriendInviteModal {
     // Get friends list
     const friends = await this.getFriendsList();
 
-    // Check if there are no friends at all
-    if (!friends || friends.length === 0) {
-      throw new Error("You have no friends to invite yet. Add some friends first!");
-    }
-
     // Filter only online friends
     const onlineFriends = friends.filter(friend => friend.status === 'online');
-
-    // Check if none of the friends are online
-    if (onlineFriends.length === 0) {
-      throw new Error("None of your friends are currently online");
-    }
 
     // Create modal overlay
     this.modal = markUI(document.createElement("div"));
@@ -57,19 +47,25 @@ export class FriendInviteModal {
         <div class="mb-4 border border-blue-900 rounded-lg p-3 bg-blue-900/20">
           <div class="text-sm text-blue-300 mb-2">Select friends to invite:</div>
           <div class="max-h-60 overflow-y-auto" id="friends-list">
-            ${onlineFriends.map(friend => `
+            ${onlineFriends.length > 0 ? onlineFriends.map(friend => `
               <label class="flex items-center gap-2 py-2 px-1 hover:bg-blue-900/30 rounded cursor-pointer">
                 <input type="checkbox" class="friend-checkbox" value="${friend.username}" data-id="${friend.id}">
                 <span class="inline-block w-2 h-2 bg-green-500 rounded-full"></span>
                 <span class="text-white">${friend.username}</span>
               </label>
-            `).join('')}
+            `).join('') : `
+              <div class="text-center py-8 text-gray-400">
+                <div class="text-4xl mb-2">😴</div>
+                <div class="text-lg font-medium">No friends online</div>
+                <div class="text-sm mt-1">Your friends are currently offline</div>
+              </div>
+            `}
           </div>
         </div>
 
         <div class="border-t border-blue-900/50 pt-4 flex justify-between">
           <button class="close-modal px-4 py-2 rounded-lg bg-gray-700 text-white hover:bg-gray-600 transition">Cancel</button>
-          <button id="send-invites" class="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-500 transition">Send Invites</button>
+          <button id="send-invites" class="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-500 transition ${onlineFriends.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}" ${onlineFriends.length === 0 ? 'disabled' : ''}>Send Invites</button>
         </div>
       </div>
     `;
@@ -86,6 +82,12 @@ export class FriendInviteModal {
     const sendButton = this.modal.querySelector('#send-invites');
     if (sendButton) {
       sendButton.addEventListener('click', () => {
+        // If no online friends, don't allow sending invites
+        if (onlineFriends.length === 0) {
+          this.showError("No friends are currently online to invite");
+          return;
+        }
+
         const selectedFriends = this.getSelectedFriends();
         if (selectedFriends.length === 0) {
           this.showError("Please select at least one friend to invite");
@@ -144,14 +146,14 @@ export class FriendInviteModal {
       // Get user ID from local storage
       const userData = localStorage.getItem('ft_pong_user_data');
       if (!userData) {
-        throw new Error("User data not found");
+        return []; // Return empty array instead of throwing error
       }
 
       const user = JSON.parse(userData);
       const userId = user.id;
 
       if (!userId) {
-        throw new Error("User ID not found");
+        return []; // Return empty array instead of throwing error
       }
 
       // Fetch friends list
@@ -164,14 +166,13 @@ export class FriendInviteModal {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to load friends list");
+        return []; // Return empty array instead of throwing error
       }
 
       const data = await response.json();
-      return data;
+      return Array.isArray(data) ? data : []; // Ensure we always return an array
     } catch (error) {
-
-      throw error;
+      return []; // Return empty array instead of throwing error
     }
   }
 }
