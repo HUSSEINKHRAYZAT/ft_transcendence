@@ -8,7 +8,7 @@ import { themeBridge } from "../game/utils/ThemeBridge";
 import { t, languageManager } from "../langs";
 import { API_BASE_URL } from "../utils/Constants";
 
-export function startLocal2P(currentUser: any, onResolve: (cfg: GameConfig) => void) {
+function startLocal2P(currentUser: any, onResolve: (cfg: GameConfig) => void) {
     const cfg: GameConfig = {
         playerCount: 2,
         connection: "local",
@@ -20,7 +20,7 @@ export function startLocal2P(currentUser: any, onResolve: (cfg: GameConfig) => v
     onResolve(cfg);
 }
 
-export function startVsAI(aiLevel: number, currentUser: any, onResolve: (cfg: GameConfig) => void) {
+function startVsAI(aiLevel: number, currentUser: any, onResolve: (cfg: GameConfig) => void) {
     const cfg: GameConfig = {
         playerCount: 2,
         connection: "ai",
@@ -34,7 +34,7 @@ export function startVsAI(aiLevel: number, currentUser: any, onResolve: (cfg: Ga
 }
 
 // ADD this near the other exports
-export function startVs3AI(aiLevel: number, currentUser: any, onResolve: (cfg: GameConfig) => void) {
+function startVs3AI(aiLevel: number, currentUser: any, onResolve: (cfg: GameConfig) => void) {
     const cfg: GameConfig = {
         playerCount: 4,
         connection: "ai3",          // 3AI mode connection type
@@ -53,7 +53,7 @@ export function startVs3AI(aiLevel: number, currentUser: any, onResolve: (cfg: G
 }
 
 // === Web socket Only (new UI) ===
-export async function createSocketIORoom(gameMode: '2p' | '4p', currentUser: any, onResolve: (cfg: GameConfig) => void) {
+async function createSocketIORoom(gameMode: '2p' | '4p', currentUser: any, onResolve: (cfg: GameConfig) => void) {
     await languageManager.whenReady();
     const tr = (key: string) => languageManager.translateIfAvailable(key) ?? key;
 
@@ -136,7 +136,7 @@ export async function createSocketIORoom(gameMode: '2p' | '4p', currentUser: any
         <div id="room-status" style="margin-bottom:16px; color:#f59e0b; text-align:center; font-weight:600;">⏳ ${tr('Waiting for players to join...')}</div>
         <div style="display:flex; gap:8px; margin-top:20px;">
           <button class="glass-button" data-close style="flex:1;">${tr('Cancel')}</button>
-          <button class="glass-button" id="invite-friends-btn" style="flex:1; opacity:0.5;" disabled>🎯 ${tr('Invite Friends')}</button>
+          <button class="glass-button" id="invite-friends-btn" style="flex:1;">🎯 ${tr('Invite Friends')}</button>
           <button class="glass-button" id="start-game-btn" data-start style="flex:1; opacity:0.5;" disabled>${tr('Start Game')}</button>
         </div>
       `);
@@ -144,17 +144,7 @@ export async function createSocketIORoom(gameMode: '2p' | '4p', currentUser: any
             const startBtn = loadingOv.querySelector("#start-game-btn") as HTMLButtonElement;
             const inviteBtn = loadingOv.querySelector("#invite-friends-btn") as HTMLButtonElement;
 
-            // Check for online friends and enable/disable invite button
-            checkOnlineFriends().then(hasOnlineFriends => {
-                if (hasOnlineFriends) {
-                    inviteBtn.disabled = false;
-                    inviteBtn.style.opacity = '1';
-                } else {
-                    inviteBtn.disabled = true;
-                    inviteBtn.style.opacity = '0.5';
-                    inviteBtn.title = t('No friends are currently online');
-                }
-            });
+            // Invite button is always enabled now - the modal will handle the logic internally
 
             // Track player count to enable/disable start button
             let connectedPlayers = 1; // Host is already connected
@@ -200,6 +190,7 @@ export async function createSocketIORoom(gameMode: '2p' | '4p', currentUser: any
             inviteBtn.onclick = async () => {
                 try {
                     // Disable button while loading
+                    const originalText = inviteBtn.textContent;
                     inviteBtn.disabled = true;
                     inviteBtn.textContent = t('Loading friends...');
 
@@ -218,7 +209,7 @@ export async function createSocketIORoom(gameMode: '2p' | '4p', currentUser: any
                 } finally {
                     // Re-enable button
                     inviteBtn.disabled = false;
-                    inviteBtn.textContent = t('🎯 Invite Friends');
+                    inviteBtn.textContent = `🎯 ${tr('Invite Friends')}`;
                 }
             };
 
@@ -232,7 +223,7 @@ export async function createSocketIORoom(gameMode: '2p' | '4p', currentUser: any
     };
 }
 
-export async function joinSocketIORoom(gameMode: '2p' | '4p', currentUser: any, onResolve: (cfg: GameConfig) => void) {
+async function joinSocketIORoom(gameMode: '2p' | '4p', currentUser: any, onResolve: (cfg: GameConfig) => void) {
     // Check if user can join a new game
     const sessionCheck = await ApiClient.checkUserCanJoin('game');
     if (!sessionCheck.canJoin) {
@@ -353,41 +344,4 @@ function getStyledCard(content: string): string {
     `;
 }
 
-// Helper function to check if there are online friends
-async function checkOnlineFriends(): Promise<boolean> {
-    try {
-        const token = localStorage.getItem('ft_pong_token') || '';
-        const userData = localStorage.getItem('ft_pong_user_data');
-
-        if (!userData || !token) {
-            return false;
-        }
-
-        const user = JSON.parse(userData);
-        const userId = user.id;
-
-        if (!userId) {
-            return false;
-        }
-
-        const response = await fetch(`${API_BASE_URL}/relation/friends/${userId}`, {
-            method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json',
-            },
-        });
-
-        if (!response.ok) {
-            return false;
-        }
-
-        const friends = await response.json();
-        const onlineFriends = friends.filter((friend: any) => friend.status === 'online');
-
-        return onlineFriends.length > 0;
-    } catch (error) {
-        // Silently fail - button stays disabled
-        return false;
-    }
-}
+export { startLocal2P, startVsAI, startVs3AI, createSocketIORoom, joinSocketIORoom };
