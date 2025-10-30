@@ -82,9 +82,7 @@ export class RequestModal extends BaseModal {
   protected setupEventListeners(): void {
     const closeBtn = document.getElementById('close-requests');
     if (closeBtn) {
-      closeBtn.addEventListener('click', () => {
-        this.close();
-      });
+      closeBtn.addEventListener('click', (e) => { e.preventDefault(); window.history.back(); });
     }
 
     document.querySelectorAll('.accept-request').forEach(btn => {

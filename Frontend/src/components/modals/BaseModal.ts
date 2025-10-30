@@ -185,27 +185,24 @@ export abstract class BaseModal {
       className: 'fixed inset-0 z-50 flex items-center justify-center modal-backdrop backdrop-blur-sm bg-black/75 opacity-0 transition-opacity duration-300'
     });
 
-    this.backdropElement.addEventListener('click', (e) => {
-      if (e.target === this.backdropElement) {
-        this.close();
-      }
-    });
-
-    document.addEventListener('keydown', this.handleEscapeKey);
+    // Disabled: backdrop click-to-close and ESC-to-close. Use browser back instead.
+    // this.backdropElement.addEventListener('click', (e) => {
+    //   if (e.target === this.backdropElement) {
+    //     this.close();
+    //   }
+    // });
+    // document.addEventListener('keydown', this.handleEscapeKey);
 
     this.modalContainer.appendChild(this.backdropElement);
   }
 
   protected handleEscapeKey = (e: KeyboardEvent): void => {
-    if (e.key === 'Escape' && this.activeModal) {
-      this.close();
-    }
+    // Disabled: ESC key no longer closes modals. Use browser back.
+    return;
   };
 
   protected setupBaseEventListeners(): void {
-    // No X button to set up listeners for anymore
-    // Click outside to close is handled by backdrop click in createBackdrop()
-
+    // No close button here. Backdrop and ESC are disabled; close via browser back only.
   }
 
   protected animateIn(): void {

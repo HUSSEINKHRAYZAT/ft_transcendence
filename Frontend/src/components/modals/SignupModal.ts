@@ -449,6 +449,14 @@ export class SignupModal extends BaseModal {
                     t("toast.loggedIn"),
                     t("toast.welcomeUser", { name: loginResult.user.firstName })
                   );
+
+                  // Normalize to home and reload after auth flow
+                  try {
+                    window.location.hash = '/';
+                    window.location.reload();
+                  } catch (e) {
+                    // noop
+                  }
                 } else {
                   this.showError("signup-error", loginResult.message || t("errors.loginFailed"));
                 }
@@ -499,6 +507,14 @@ export class SignupModal extends BaseModal {
               t("toast.welcomeUser", { name: firstName })
             );
             this.triggerAuthUpdate(true, userData);
+
+            // Ensure home hash and reload in demo flow as well
+            try {
+              window.location.hash = '/';
+              window.location.reload();
+            } catch (e) {
+              // noop
+            }
           }
         );
 

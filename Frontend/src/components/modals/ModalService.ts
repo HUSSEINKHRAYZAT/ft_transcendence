@@ -45,6 +45,18 @@ export class ModalService {
     modalManager.showMiniModal(config);
   }
 
+  showStatisticsModal(): void {
+    modalManager.showStatisticsModal();
+  }
+
+  showRequestsModal(): void {
+    modalManager.showRequestsModal();
+  }
+
+  showBlockedUsersModal(): void {
+    modalManager.showBlockedUsersModal();
+  }
+
   closeModal(): void {
     modalManager.closeModal();
   }

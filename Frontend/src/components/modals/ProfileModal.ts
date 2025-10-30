@@ -175,6 +175,7 @@ export class ProfileModal extends BaseModal {
 	protected setupEventListeners(): void {
 		const form = findElement('#profile-form') as HTMLFormElement;
 		const cancelBtn = findElement('#cancel-profile-btn');
+		const closeBtnTop = findElement('#close-profile-btn');
 		const avatarOptions = document.querySelectorAll('.avatar-option');
 
 		if (form) {
@@ -182,7 +183,11 @@ export class ProfileModal extends BaseModal {
 		}
 
 		if (cancelBtn) {
-				cancelBtn.addEventListener('click', () => this.close());
+				cancelBtn.addEventListener('click', (e) => { e.preventDefault(); window.history.back(); });
+		}
+
+		if (closeBtnTop) {
+				closeBtnTop.addEventListener('click', (e) => { e.preventDefault(); window.history.back(); });
 		}
 
 		avatarOptions.forEach(option => {

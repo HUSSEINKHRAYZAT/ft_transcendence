@@ -39,7 +39,11 @@ export class InfoModal extends BaseModal {
     const infoCloseBtn = findElement('#info-modal-close');
 
     if (infoCloseBtn) {
-      infoCloseBtn.addEventListener('click', () => this.close());
+      infoCloseBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        // Navigate back in history so hash routing closes the modal
+        window.history.back();
+      });
     }
     if (this.currentInfoType === 'project') {
       this.setupModuleCarousel();

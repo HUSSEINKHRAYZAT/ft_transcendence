@@ -25,7 +25,9 @@ export async function handleOAuthCallback(): Promise<void> {
         // 🔑 notify UI
         globalEventManager.emit(AppEvent.AUTH_LOGIN, user);
 
-        window.location.href = "/home";
+        // Normalize to home hash and reload app state
+        window.location.hash = '/';
+        window.location.reload();
     } else {
 
     }

@@ -274,7 +274,7 @@ protected getModalContent(): string {
 		const refreshStatsBtn = document.querySelector('#refresh-stats-btn');
 
 		if (closeBtn) {
-			closeBtn.addEventListener('click', () => this.close());
+			closeBtn.addEventListener('click', (e) => { e.preventDefault(); window.history.back(); });
 		}
 
 		if (playAgainBtn) {

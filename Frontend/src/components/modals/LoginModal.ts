@@ -162,6 +162,14 @@ export class LoginModal extends BaseModal {
 				this.close();
 				this.showToast('success', t('Welcome back!'), t('Hello {name}!', { name: result.user.firstName }));
 				this.triggerAuthUpdate(true, result.user);
+
+				// Ensure we land at home and fully reload state after auth completes
+				try {
+					window.location.hash = '/';
+					window.location.reload();
+				} catch (e) {
+					// noop
+				}
 			} else {
 				if (result.message && result.message.includes('email not verified:')) {
 					const userEmail = result.message.split('email not verified:')[1];
@@ -216,6 +224,14 @@ export class LoginModal extends BaseModal {
 					const authState = authService.getState();
 					if (authState.user) {
 						this.triggerAuthUpdate(true, authState.user);
+					}
+
+					// Redirect to home and reload after 2FA completion
+					try {
+						window.location.hash = '/';
+						window.location.reload();
+					} catch (e) {
+						// noop
 					}
 				},
 				() => {
@@ -276,6 +292,14 @@ export class LoginModal extends BaseModal {
 				this.close();
 				this.showToast('success', t('Welcome!'), t('Hello {name}!', { name: result.user.firstName }));
 				this.triggerAuthUpdate(true, result.user);
+
+				// After verification + login, normalize URL and reload to home
+				try {
+					window.location.hash = '/';
+					window.location.reload();
+				} catch (e) {
+					// noop
+				}
 			} else {
 
 				this.showError('login-error', result.message || t('Login failed after verification'));

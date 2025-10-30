@@ -797,31 +797,11 @@ function addBasicNavbar(): void {
 		dropdownMenu.classList.add('hidden');
 	}
 
-	if ((window as any).ProfileModal) {
-
-		(window as any).ProfileModal.show();
-	} else {
-		import('./components/modals/ProfileModal').then(({ ProfileModal }) => {
-			ProfileModal.show();
-		}).catch(() => {
-
-			showBasicProfileModal();
-		});
-	}
+	window.location.hash = '/profile';
 };
 
 (window as any).handleStatistics = function() {
-
-	if ((window as any).StatisticsModal) {
-		(window as any).StatisticsModal.show();
-	} else {
-		import('./components/modals/StatisticsModal').then(({ StatisticsModal }) => {
-			StatisticsModal.show();
-		}).catch((error) => {
-
-			showBasicProfileModal();
-		});
-	}
+	window.location.hash = '/statistics';
 };
 
 function setupProfileDropdown(): void {

@@ -68,9 +68,7 @@ export class BlockedUsersModal extends BaseModal {
   protected setupEventListeners(): void {
     const closeBtn = document.getElementById('close-blocked-users');
     if (closeBtn) {
-      closeBtn.addEventListener('click', () => {
-        this.close();
-      });
+      closeBtn.addEventListener('click', (e) => { e.preventDefault(); window.history.back(); });
     }
 
     document.querySelectorAll('.unblock-user').forEach(btn => {

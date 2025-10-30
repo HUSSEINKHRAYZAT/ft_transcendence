@@ -4,6 +4,10 @@ import { SignupModal } from './SignupModal';
 import { InfoModal } from './InfoModal';
 import { GameModal } from './GameModal';
 import { MiniModal } from './MiniModal';
+import { StatisticsModal } from './StatisticsModal';
+import { RequestModal } from './RequestModal';
+import { BlockedUsersModal } from './BlockedUsersModal';
+import { ProfileModal } from './ProfileModal';
 
 type InfoType = 'about' | 'project' | 'home';
 
@@ -12,28 +16,112 @@ export class ModalManager {
   private signupModal: SignupModal;
   private infoModal: InfoModal;
   private gameModal: GameModal;
+  private statisticsModal: StatisticsModal;
+  private requestModal: RequestModal;
+  private blockedUsersModal: BlockedUsersModal;
+  private profileModal: ProfileModal;
 
   constructor() {
     this.signupModal = new SignupModal(() => this.showLoginModal());
     this.loginModal = new LoginModal(() => this.showSignupModal());
     this.infoModal = new InfoModal();
     this.gameModal = new GameModal();
+    this.statisticsModal = new StatisticsModal();
+    this.requestModal = new RequestModal();
+    this.blockedUsersModal = new BlockedUsersModal();
+    this.profileModal = new ProfileModal();
 
+    // Ensure URL starts at #/ so back doesn't exit the site
+    if (!window.location.hash) {
+      window.history.replaceState({}, '', '#/');
+    }
+
+    // Set up hash-based history listener for browser back/forward buttons
+    this.setupHistoryListener();
   }
 
+  /**
+   * Listen for browser back/forward navigation using hashchange
+   */
+  private setupHistoryListener(): void {
+    const handle = () => {
+      const path = window.location.hash.slice(1) || '/';
+      this.handleRouteChange(path);
+    };
+
+    window.addEventListener('hashchange', handle);
+    // Handle initial hash on load
+    handle();
+  }
+
+  /**
+   * Handle route changes from browser navigation
+   */
+  private handleRouteChange(path: string): void {
+    // Close all modals WITHOUT modifying URL
+    this.closeAllModalsWithoutHistory();
+
+    // Open the appropriate modal based on the path
+    switch (path) {
+      case '/login':
+        this.loginModal.showModal();
+        break;
+      case '/signup':
+        this.signupModal.showModal();
+        break;
+      case '/profile':
+        // Open the full ProfileModal UI
+        this.profileModal.showModal();
+        break;
+      case '/statistics':
+        this.statisticsModal.showModal();
+        break;
+      case '/requests':
+        this.requestModal.showRequests();
+        break;
+      case '/blocked':
+        this.blockedUsersModal.showBlockedUsers();
+        break;
+      case '/about':
+        this.infoModal.showModal('about');
+        break;
+      case '/project':
+        this.infoModal.showModal('project');
+        break;
+      case '/home-info':
+        this.infoModal.showModal('home');
+        break;
+      case '/':
+      default:
+        // Home - all modals closed
+        break;
+    }
+  }
+
+  // Routes: switch to hash navigation (do not open modal directly; let router handle it)
   showLoginModal(): void {
-    this.closeAllModals();
-    this.loginModal.showModal();
+    window.location.hash = '/login';
   }
 
   showSignupModal(): void {
-    this.closeAllModals();
-    this.signupModal.showModal();
+    window.location.hash = '/signup';
   }
 
   showInfoModal(type: InfoType): void {
-    this.closeAllModals();
-    this.infoModal.showModal(type);
+    const path = type === 'about' ? '/about' : type === 'project' ? '/project' : '/home-info';
+    window.location.hash = path;
+  }
+
+  showStatisticsModal(): void {
+    window.location.hash = '/statistics';
+  }
+
+  showRequestsModal(): void {
+    window.location.hash = '/requests';
+  }
+
+  showBlockedUsersModal(): void {
+    window.location.hash = '/blocked';
   }
 
   showPlayGameModal(): void {
@@ -57,31 +145,28 @@ export class ModalManager {
     miniModal.showModal(config);
   }
 
+  // Profile modal from non-routing contexts should navigate as well
   showProfileModal(): void {
-    this.closeAllModals();
-
-    const userData = localStorage.getItem('ft_pong_user_data');
-    let user = null;
-
-    try {
-      user = userData ? JSON.parse(userData) : null;
-    } catch (error) {
-
-    }
-
-    if (!user) {
-      this.showToast('error', 'No profile data found');
-      return;
-    }
-
-    this.createBasicProfileModal(user);
+    window.location.hash = '/profile';
   }
 
   closeAllModals(): void {
+    this.closeAllModalsWithoutHistory();
+    // Do not modify URL here; callers should set location.hash if needed
+  }
+
+  /**
+   * Close all modals without updating browser history
+   */
+  private closeAllModalsWithoutHistory(): void {
     if (this.loginModal.isOpen()) this.loginModal.close();
     if (this.signupModal.isOpen()) this.signupModal.close();
     if (this.infoModal.isOpen()) this.infoModal.close();
     if (this.gameModal.isOpen()) this.gameModal.close();
+    if (this.statisticsModal.isOpen()) this.statisticsModal.close();
+    if (this.requestModal.isOpen()) this.requestModal.close();
+    if (this.blockedUsersModal.isOpen()) this.blockedUsersModal.close();
+    if (this.profileModal.isOpen()) this.profileModal.close();
   }
 
   closeModal(): void {
@@ -92,7 +177,11 @@ export class ModalManager {
     return this.loginModal.isOpen() ||
            this.signupModal.isOpen() ||
            this.infoModal.isOpen() ||
-           this.gameModal.isOpen();
+           this.gameModal.isOpen() ||
+           this.statisticsModal.isOpen() ||
+           this.requestModal.isOpen() ||
+           this.blockedUsersModal.isOpen() ||
+           this.profileModal.isOpen();
   }
 
   getActiveModal(): string | null {
@@ -100,6 +189,10 @@ export class ModalManager {
     if (this.signupModal.isOpen()) return 'signup';
     if (this.infoModal.isOpen()) return 'info';
     if (this.gameModal.isOpen()) return 'game';
+    if (this.statisticsModal.isOpen()) return 'statistics';
+    if (this.requestModal.isOpen()) return 'requests';
+    if (this.blockedUsersModal.isOpen()) return 'blocked';
+    if (this.profileModal.isOpen()) return 'profile';
     return null;
   }
 
@@ -155,36 +248,51 @@ export class ModalManager {
     const closeBtn = modal.querySelector('#profile-modal-close');
     const closeBtnBottom = modal.querySelector('#profile-close-btn');
 
-    const closeModal = () => {
+    const closeAndBack = () => {
+      // Animate out then go back
       backdrop.classList.add('opacity-0');
       modal.classList.add('scale-95', 'opacity-0');
       setTimeout(() => {
-        if (backdrop.parentElement) {
-          backdrop.remove();
-        }
+        if (backdrop.parentElement) backdrop.remove();
+        window.history.back();
       }, 300);
     };
 
-    if (closeBtn) closeBtn.addEventListener('click', closeModal);
-    if (closeBtnBottom) closeBtnBottom.addEventListener('click', closeModal);
+    if (closeBtn) closeBtn.addEventListener('click', (e) => { e.preventDefault(); closeAndBack(); });
+    if (closeBtnBottom) closeBtnBottom.addEventListener('click', (e) => { e.preventDefault(); closeAndBack(); });
 
-    backdrop.addEventListener('click', (e) => {
-      if (e.target === backdrop) closeModal();
-    });
-
-    const escapeHandler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        closeModal();
-        document.removeEventListener('keydown', escapeHandler);
-      }
-    };
-    document.addEventListener('keydown', escapeHandler);
+    // Disable backdrop click-to-close and ESC to close
+    // backdrop.addEventListener('click', (e) => { if (e.target === backdrop) closeAndBack(); });
+    // const escapeHandler = (e: KeyboardEvent) => { if (e.key === 'Escape') { closeAndBack(); document.removeEventListener('keydown', escapeHandler); } };
+    // document.addEventListener('keydown', escapeHandler);
 
     setTimeout(() => {
       backdrop.classList.add('opacity-100');
       modal.classList.remove('scale-95', 'opacity-0');
       modal.classList.add('scale-100', 'opacity-100');
     }, 10);
+  }
+
+  /**
+   * Show profile modal without closing other modals or updating history
+   * Used during route changes
+   */
+  private showProfileModalWithoutClosing(): void {
+    const userData = localStorage.getItem('ft_pong_user_data');
+    let user = null;
+
+    try {
+      user = userData ? JSON.parse(userData) : null;
+    } catch (error) {
+
+    }
+
+    if (!user) {
+      this.showToast('error', 'No profile data found');
+      return;
+    }
+
+    this.createBasicProfileModal(user);
   }
 
   private showToast(type: 'success' | 'error' | 'warning' | 'info', message: string): void {
@@ -251,7 +359,10 @@ export class ModalManager {
     this.signupModal.destroy();
     this.infoModal.destroy();
     this.gameModal.destroy();
-
+    this.statisticsModal.destroy();
+    this.requestModal.destroy();
+    this.blockedUsersModal.destroy();
+    this.profileModal.destroy();
   }
 }
 

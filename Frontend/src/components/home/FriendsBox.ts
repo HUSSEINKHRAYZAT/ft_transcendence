@@ -487,7 +487,11 @@ export class FriendsBox {
             return;
         }
 
-        await this.blockedUsersModal.showBlockedUsers();
+        if ((window as any).modalService && (window as any).modalService.showBlockedUsersModal) {
+            (window as any).modalService.showBlockedUsersModal();
+        } else {
+            await this.blockedUsersModal.showBlockedUsers();
+        }
     }
 
     private async handleAddFriendSubmit(event: Event): Promise<void> {
@@ -815,7 +819,11 @@ export class FriendsBox {
             return;
         }
 
-        await this.requestModal.showRequests();
+        if ((window as any).modalService && (window as any).modalService.showRequestsModal) {
+            (window as any).modalService.showRequestsModal();
+        } else {
+            await this.requestModal.showRequests();
+        }
     }
 
     private async handleRemoveFriend(friendUsername: string): Promise<void> {
