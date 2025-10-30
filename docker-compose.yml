@@ -1,7 +1,7 @@
 services:
   user_management:
     build:
-      context: ./user-management
+      context: ./Backend/user-management
       dockerfile: Dockerfile
     container_name: user_management
     hostname: user_management
@@ -34,7 +34,7 @@ services:
 
   socket_microservice:
     build:
-      context: ./socket-microservice
+      context: ./Backend/socket-microservice
       dockerfile: Dockerfile
     container_name: socket_microservice
     hostname: socket_microservice
@@ -70,7 +70,7 @@ services:
 
   game_microservice:
     build:
-      context: ./game-microservice
+      context: ./Backend/game-microservice
       dockerfile: Dockerfile
     container_name: game_microservice
     hostname: game_microservice
@@ -102,7 +102,7 @@ services:
 
   mailer:
     build:
-      context: ./mailer-microservice
+      context: ./Backend/mailer-microservice
       dockerfile: Dockerfile
     container_name: mailer
     hostname: mailer
@@ -135,11 +135,11 @@ services:
     restart: unless-stopped
     labels:
       - "com.transcendence.service=mailer"
-      - "com.transcendence.tier=communication"
+      - "com.transcendence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.tier=communication"
 
   session_microservice:
     build:
-      context: ./session-microservice
+      context: ./Backend/session-microservice
       dockerfile: Dockerfile
     container_name: session_microservice
     hostname: session_microservice
@@ -171,7 +171,7 @@ services:
 
   google_oauth2:
     build:
-      context: ./google-oauth2
+      context: ./Backend/google-oauth2
       dockerfile: Dockerfile
     container_name: google_oauth2
     hostname: google_oauth2
@@ -212,7 +212,7 @@ services:
 
   realtime_microservice:
     build:
-      context: ./realtime-microservice
+      context: ./Backend/realtime-microservice
       dockerfile: Dockerfile
     container_name: realtime_microservice
     hostname: realtime_microservice
@@ -243,7 +243,7 @@ services:
 
   api_gateway:
     build:
-      context: ./api-gateway
+      context: ./Backend/api-gateway
       dockerfile: Dockerfile
     container_name: api_gateway
     hostname: api_gateway
@@ -299,7 +299,7 @@ services:
 
   frontend:
     build:
-      context: ../Frontend
+      context: ./Frontend
       dockerfile: Dockerfile
     container_name: frontend
     hostname: frontend
