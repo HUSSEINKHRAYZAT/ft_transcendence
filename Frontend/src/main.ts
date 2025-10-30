@@ -28,6 +28,41 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 });
 
+// Lightweight hash router for game menu
+(function setupGameMenuRouting(){
+  let mounted = false;
+  async function mountGameMenu(){
+    if (mounted) return;
+    mounted = true;
+    const { Menu } = await import('./menu/MenuController');
+    try {
+      const stale = document.getElementById('game-menu-root');
+      if (stale) stale.remove();
+      // Wait for a selection, then start the game with the returned config
+      const cfg = await Menu.render();
+      unmountGameMenu();
+      await startPongFromConfig(cfg);
+    } catch(_) {
+      mounted = false;
+    }
+  }
+  function unmountGameMenu(){
+    const root = document.getElementById('game-menu-root');
+    if (root) root.remove();
+    mounted = false;
+  }
+  function handle(){
+    const path = (window.location.hash || '#/').slice(1) || '/';
+    if (path === '/game') {
+      mountGameMenu();
+    } else {
+      unmountGameMenu();
+    }
+  }
+  window.addEventListener('hashchange', handle);
+  handle();
+})();
+
 interface Component {
 	render(): Promise<void>;
 	updateAuthState?(isAuthenticated: boolean, user: any): void;
@@ -755,7 +790,7 @@ function addBasicNavbar(): void {
           </button>
           <button onclick="handleLogout()" class="flex items-center w-full px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-red-400 transition-colors duration-300" data-i18n="Logout">
             <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013 3v1"></path>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 01-3 3v1"></path>
             </svg>
             ${t('Logout')}
           </button>
@@ -903,7 +938,8 @@ function setupProfileDropdown(): void {
     return;
   }
 
-  await start3DPongGame();
+  // Navigate to the game menu route
+  window.location.hash = '/game';
 };
 
 (window as any).handleAbout = function() {
@@ -2258,6 +2294,8 @@ async function start3DPongGame() {
 					await cleanupGame();
 					addBasicJumbotron();
 				}
+				// Always return to the main route
+				window.location.hash = '#';
 			});
 		}
 
@@ -2286,6 +2324,11 @@ async function cleanupGame() {
 			const canvas = document.getElementById('gameCanvas');
 			if (canvas) {
 				canvas.remove();
+			}
+
+			const staleMenu = document.getElementById('game-menu-root');
+			if (staleMenu) {
+				staleMenu.remove();
 			}
 
 		} catch (error) {
@@ -2369,3 +2412,47 @@ function showOfflineMode() {
 
   backgroundThemeManager.applyBackgroundTheme('midnight');
 };
+
+async function startPongFromConfig(cfg: GameConfig) {
+  try {
+    if (currentGameInstance) {
+      await cleanupGame();
+    }
+
+    const { clearPongUI } = await import('./ui');
+    const { Pong3D } = await import('./game/core/Pong3D');
+
+    const jumbotron = document.getElementById('jumbotron');
+    if (!jumbotron) {
+      throw new Error('Jumbotron container not found');
+    }
+
+    jumbotron.innerHTML = `
+      <div class="min-h-screen bg-black relative">
+        <canvas id="gameCanvas" class="w-full h-full block"></canvas>
+        <button id="exit-game" class="absolute top-4 left-4 btn-lime z-20">
+          ← Exit Game
+        </button>
+      </div>
+    `;
+
+    const exitBtn = document.getElementById('exit-game');
+    if (exitBtn) {
+      exitBtn.addEventListener('click', async () => {
+        if (currentGameInstance && typeof currentGameInstance.exitGame === 'function') {
+          await currentGameInstance.exitGame();
+        } else {
+          await cleanupGame();
+          addBasicJumbotron();
+        }
+        // Always return to the main route
+        window.location.hash = '#';
+      });
+    }
+
+    clearPongUI();
+    currentGameInstance = new Pong3D(cfg);
+  } catch (error) {
+    showBasicToast('error', 'Failed to start game');
+  }
+}

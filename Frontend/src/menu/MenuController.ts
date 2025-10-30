@@ -20,7 +20,7 @@ export class Menu {
     // afayad // the themeRridge ma kenit shaghale aslan.
     const you = getFrontendUser();
     const tb = themeBridge.getInstance(); // ✅ Create singleton instance
-    const theme = tb.getCurrentTheme();   
+    const theme = tb.getCurrentTheme();
     const primaryHex = tb.color3ToHex(theme.primary);
 
     const { root } = createMenuRoot({ youName: you?.name ?? null });
@@ -44,8 +44,8 @@ export class Menu {
         if (!a) return;
 
         if (a === "back") {
-          root.remove();
-          window.location.href = "/";
+          // Route back to home using hash navigation
+          window.location.hash = "#";
           return;
         }
 
@@ -106,7 +106,7 @@ export class Menu {
           }
           return;
         }
-        
+
         if (a === "tournament-join") {
           root.remove();
           // Call the global function from main.ts

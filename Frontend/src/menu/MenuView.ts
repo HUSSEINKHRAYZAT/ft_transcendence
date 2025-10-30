@@ -18,6 +18,8 @@ export function createMenuRoot(ctx: MenuRenderContext) {
     "fixed inset-0 grid place-items-center text-white font-sans z-[10000]";
   root.style.background = `rgba(${backgroundRgb}, 0.95)`;
   root.style.backdropFilter = "blur(8px)";
+  // Assign a stable id so router can find/unmount it
+  root.id = 'game-menu-root';
 
   root.innerHTML = `
     <div class="rounded-3xl w-full max-w-4xl mx-4 shadow-2xl backdrop-blur-sm relative" style="background: rgba(${backgroundRgb}, 0.85); border: 2px solid rgba(132, 204, 22, 0.4); padding: 32px; box-shadow: 0 20px 60px rgba(0,0,0,0.3), 0 0 0 1px rgba(132, 204, 22, 0.2); z-index: 10;">

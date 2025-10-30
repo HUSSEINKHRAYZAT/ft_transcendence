@@ -15,8 +15,8 @@ services:
       NODE_EXTRA_CA_CERTS: ${NODE_EXTRA_CA_CERTS}
     volumes:
       - user_data:/app/data
-      - ./certs/ca/ca.crt:/usr/local/share/ca-certificates/transcendence-ca.crt:ro
-      - ./certs/services/user-management:/app/certs:ro
+      - ./Backend/certs/ca/ca.crt:/usr/local/share/ca-certificates/transcendence-ca.crt:ro
+      - ./Backend/certs/services/user-management:/app/certs:ro
     ports:
       - "3001:3000"
     networks:
@@ -48,8 +48,8 @@ services:
       CERT_PATH: ${CERT_PATH}
       NODE_EXTRA_CA_CERTS: ${NODE_EXTRA_CA_CERTS}
     volumes:
-      - ./certs/ca/ca.crt:/usr/local/share/ca-certificates/transcendence-ca.crt:ro
-      - ./certs/services/socket-microservice:/app/certs:ro
+      - ./Backend/certs/ca/ca.crt:/usr/local/share/ca-certificates/transcendence-ca.crt:ro
+      - ./Backend/certs/services/socket-microservice:/app/certs:ro
     ports:
       - "3005:3005"
     networks:
@@ -83,8 +83,8 @@ services:
       NODE_EXTRA_CA_CERTS: ${NODE_EXTRA_CA_CERTS}
     volumes:
       - game_data:/app/data
-      - ./certs/ca/ca.crt:/usr/local/share/ca-certificates/transcendence-ca.crt:ro
-      - ./certs/services/game-microservice:/app/certs:ro
+      - ./Backend/certs/ca/ca.crt:/usr/local/share/ca-certificates/transcendence-ca.crt:ro
+      - ./Backend/certs/services/game-microservice:/app/certs:ro
     ports:
       - "3004:3000"
     networks:
@@ -120,8 +120,8 @@ services:
       CERT_PATH: ${CERT_PATH}
       NODE_EXTRA_CA_CERTS: ${NODE_EXTRA_CA_CERTS}
     volumes:
-      - ./certs/ca/ca.crt:/usr/local/share/ca-certificates/transcendence-ca.crt:ro
-      - ./certs/services/mailer-microservice:/app/certs:ro
+      - ./Backend/certs/ca/ca.crt:/usr/local/share/ca-certificates/transcendence-ca.crt:ro
+      - ./Backend/certs/services/mailer-microservice:/app/certs:ro
     ports:
       - "3002:3000"
     networks:
@@ -152,8 +152,8 @@ services:
       NODE_EXTRA_CA_CERTS: ${NODE_EXTRA_CA_CERTS}
     volumes:
       - session_data:/app/data
-      - ./certs/ca/ca.crt:/usr/local/share/ca-certificates/transcendence-ca.crt:ro
-      - ./certs/services/session-microservice:/app/certs:ro
+      - ./Backend/certs/ca/ca.crt:/usr/local/share/ca-certificates/transcendence-ca.crt:ro
+      - ./Backend/certs/services/session-microservice:/app/certs:ro
     ports:
       - "3003:3000"
     networks:
@@ -190,8 +190,8 @@ services:
       CERT_PATH: ${CERT_PATH}
       NODE_EXTRA_CA_CERTS: ${NODE_EXTRA_CA_CERTS}
     volumes:
-      - ./certs/ca/ca.crt:/usr/local/share/ca-certificates/transcendence-ca.crt:ro
-      - ./certs/services/google-oauth2:/app/certs:ro
+      - ./Backend/certs/ca/ca.crt:/usr/local/share/ca-certificates/transcendence-ca.crt:ro
+      - ./Backend/certs/services/google-oauth2:/app/certs:ro
     ports:
       - "3006:3000"
     networks:
@@ -224,8 +224,8 @@ services:
       CERT_PATH: ${CERT_PATH}
       NODE_EXTRA_CA_CERTS: ${NODE_EXTRA_CA_CERTS}
     volumes:
-      - ./certs/ca/ca.crt:/usr/local/share/ca-certificates/transcendence-ca.crt:ro
-      - ./certs/services/realtime-microservice:/app/certs:ro
+      - ./Backend/certs/ca/ca.crt:/usr/local/share/ca-certificates/transcendence-ca.crt:ro
+      - ./Backend/certs/services/realtime-microservice:/app/certs:ro
     ports:
       - "3020:3020"
     networks:
@@ -265,8 +265,8 @@ services:
       CERT_PATH: ${CERT_PATH}
       NODE_EXTRA_CA_CERTS: ${NODE_EXTRA_CA_CERTS}
     volumes:
-      - ./certs/ca/ca.crt:/usr/local/share/ca-certificates/transcendence-ca.crt:ro
-      - ./certs/services/api-gateway:/app/certs:ro
+      - ./Backend/certs/ca/ca.crt:/usr/local/share/ca-certificates/transcendence-ca.crt:ro
+      - ./Backend/certs/services/api-gateway:/app/certs:ro
     ports:
       - "8080:8080"
     networks:
@@ -304,16 +304,14 @@ services:
     container_name: frontend
     hostname: frontend
     volumes:
-      - ./certs/ca/ca.crt:/etc/nginx/ca/ca.crt:ro
-      - ./certs/services/frontend:/etc/nginx/certs:ro
+      - ./Backend/certs/ca/ca.crt:/etc/nginx/ca/ca.crt:ro
+      - ./Backend/certs/services/frontend:/etc/nginx/certs:ro
     ports:
       - "5173:443"
     networks:
       - backend
     depends_on:
       api_gateway:
-        condition: service_healthy
-      socket_microservice:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider --no-check-certificate https://localhost/health || exit 1"]

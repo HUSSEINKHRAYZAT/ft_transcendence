@@ -525,10 +525,10 @@ generate_env() {
     IP_HOST=$(hostname -I | awk '{print $1}')
 
     # Path to .env in Backend
-    ENV_FILE="$BACKEND_DIR/.env"
+    ENV_FILE="./.env"
 
     # Write ALLOWED_REDIRECTS to .env
-    cat > "$ENV_FILE" <<EOF
+    cat >> "$ENV_FILE" << EOF
 ALLOWED_REDIRECTS=https://localhost:5173,https://127.0.0.1:5173,https://$IP_HOST:5173
 EOF
 

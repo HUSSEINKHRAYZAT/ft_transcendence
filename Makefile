@@ -156,7 +156,7 @@ build: backend-build frontend-build
 
 backend-build:
 	@echo "$(BLUE)🔨 Building backend services...$(RESET)"
-	@cd $(BACKEND_DIR) && $(DOCKER_COMPOSE) build
+	$(DOCKER_COMPOSE) build
 	@echo "$(GREEN)✅ Backend services built!$(RESET)"
 
 frontend-build:
@@ -217,7 +217,7 @@ eval:
 # ==========================================
 up:
 	@echo "$(BLUE)🚀 Starting all services (containerized)...$(RESET)"
-	@cd $(BACKEND_DIR) && $(DOCKER_COMPOSE) up -d
+	$(DOCKER_COMPOSE) up -d
 	@echo ""
 	@echo "$(GREEN)╔════════════════════════════════════════════════════════════════════════╗$(RESET)"
 	@echo "$(GREEN)║                  🎉 ALL SERVICES STARTED SUCCESSFULLY! 🎉              ║$(RESET)"
@@ -235,7 +235,7 @@ up:
 
 backend-up:
 	@echo "$(BLUE)🐳 Starting backend services...$(RESET)"
-	@cd $(BACKEND_DIR) && $(DOCKER_COMPOSE) up -d user_management socket_microservice game_microservice mailer session_microservice google_oauth2 realtime_microservice api_gateway
+	$(DOCKER_COMPOSE) up -d user_management socket_microservice game_microservice mailer session_microservice google_oauth2 realtime_microservice api_gateway
 	@echo "$(GREEN)✅ Backend services started!$(RESET)"
 
 # Local development mode (Vite dev server - NOT containerized)
@@ -262,13 +262,13 @@ frontend-dev:
 # ==========================================
 down:
 	@echo "$(YELLOW)🛑 Stopping all services...$(RESET)"
-	@cd $(BACKEND_DIR) && $(DOCKER_COMPOSE) down
+	$(DOCKER_COMPOSE) down
 	@pkill -f "vite.*dev" 2>/dev/null || true
 	@echo "$(GREEN)✅ All services stopped!$(RESET)"
 
 backend-down:
 	@echo "$(YELLOW)🛑 Stopping backend services...$(RESET)"
-	@cd $(BACKEND_DIR) && $(DOCKER_COMPOSE) down
+	$(DOCKER_COMPOSE) down
 	@echo "$(GREEN)✅ Backend services stopped!$(RESET)"
 
 frontend-down:
@@ -327,15 +327,15 @@ frontend-clean-console:
 logs:
 	@echo "$(BLUE)📋 Showing backend logs...$(RESET)"
 	@echo "$(YELLOW)Press Ctrl+C to exit$(RESET)"
-	@cd $(BACKEND_DIR) && $(DOCKER_COMPOSE) logs -f
+	$(DOCKER_COMPOSE) logs -f
 
 backend-logs:
 	@echo "$(BLUE)📋 Showing backend logs...$(RESET)"
-	@cd $(BACKEND_DIR) && $(DOCKER_COMPOSE) logs -f
+	$(DOCKER_COMPOSE) logs -f
 
 frontend-logs:
 	@echo "$(BLUE)📋 Showing frontend (nginx) logs...$(RESET)"
-	@cd $(BACKEND_DIR) && $(DOCKER_COMPOSE) logs -f frontend
+	$(DOCKER_COMPOSE) logs -f frontend
 
 # ==========================================
 # Status and Health
@@ -348,7 +348,7 @@ status:
 	@echo "$(GREEN)🔧 Docker Compose Command:$(RESET) $(DOCKER_COMPOSE)"
 	@echo ""
 	@echo "$(GREEN)📦 Backend Services:$(RESET)"
-	@cd $(BACKEND_DIR) && $(DOCKER_COMPOSE) ps
+	$(DOCKER_COMPOSE) ps
 	@echo ""
 	@echo "$(GREEN)🎨 Frontend Service:$(RESET)"
 	@if pgrep -f "vite.*dev" > /dev/null; then \
@@ -362,7 +362,7 @@ health:
 	@echo "$(BLUE)🏥 Checking service health...$(RESET)"
 	@echo ""
 	@echo "$(CYAN)Backend Services:$(RESET)"
-	@cd $(BACKEND_DIR) && docker ps --filter "label=com.transcendence.service" --format "table {{.Names}}\t{{.Status}}"
+	docker ps --filter "label=com.transcendence.service" --format "table {{.Names}}\t{{.Status}}"
 	@echo ""
 	@echo "$(CYAN)Frontend Service:$(RESET)"
 	@if pgrep -f "vite.*dev" > /dev/null; then \
@@ -377,7 +377,7 @@ health:
 # ==========================================
 clean:
 	@echo "$(RED)🧹 Cleaning up all services and volumes...$(RESET)"
-	@cd $(BACKEND_DIR) && $(DOCKER_COMPOSE) down --volumes --remove-orphans
+	$(DOCKER_COMPOSE) down --volumes --remove-orphans
 	@pkill -f "vite.*dev" || true
 	@cd $(FRONTEND_DIR) && rm -rf node_modules dist 2>/dev/null || true
 	@echo "$(GREEN)✅ Cleanup complete!$(RESET)"

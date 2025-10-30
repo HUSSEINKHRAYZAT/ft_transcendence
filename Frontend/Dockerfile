@@ -43,8 +43,8 @@ RUN mkdir -p /etc/nginx/certs /etc/nginx/ca
 EXPOSE 443
 
 # Health check - use wget with SSL no-check since we're using self-signed certs
-HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=5 \
-  CMD wget --no-verbose --tries=1 --spider --no-check-certificate https://localhost/health || exit 1
+# HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=5 \
+#   CMD wget --no-verbose --tries=1 --spider --no-check-certificate https://localhost/health || exit 1
 
 # Start nginx
 CMD ["nginx", "-g", "daemon off;"]
