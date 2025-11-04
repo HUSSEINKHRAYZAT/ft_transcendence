@@ -6,7 +6,8 @@
 .PHONY: all help setup certs build up down restart clean logs status \
         backend-build backend-up backend-down backend-logs backend-restart \
         frontend-dev frontend-install frontend-reinstall frontend-build frontend-preview \
-        frontend-clean-console dev-build dev-up dev-down prune health check-docker launcher eval
+        frontend-clean-console dev-build dev-up dev-down prune health check-docker launcher eval \
+        wait-for-services show-urls
 
 MAKEFLAGS += --no-print-directory
 
@@ -20,6 +21,7 @@ BLUE    := \033[0;34m
 MAGENTA := \033[0;35m
 CYAN    := \033[0;36m
 RESET   := \033[0m
+DIM     := \033[2m
 
 # ==========================================
 # Docker Compose Detection
@@ -165,6 +167,34 @@ frontend-build:
 	@echo "$(GREEN)✅ Frontend built!$(RESET)"
 
 # ==========================================
+# Service Health Check and Waiting
+# ==========================================
+wait-for-services:
+	@echo "$(YELLOW)⏳ Waiting for services to initialize (this may take 20-30 seconds)...$(RESET)"
+	@echo -n "$(CYAN)🔍 Checking nginx and backend services"
+	@# Wait for services to be fully ready
+	@if command -v timeout >/dev/null 2>&1; then \
+		timeout 45 bash -c 'while ! $$(docker compose ps --services | xargs -I {} docker compose ps {} | grep -q "Up"); do sleep 3; echo -n "$(DIM).$(RESET)"; done' || echo "$(YELLOW)⚠️  Some services taking longer than expected$(RESET)"; \
+	else \
+		echo "$(YELLOW)⚠️  timeout command not available, using extended sleep...$(RESET)"; \
+		sleep 30; \
+	fi
+	@echo ""
+	@echo "$(GREEN)✅ Services are starting up...$(RESET)"
+	@sleep 8  # Additional buffer time for nginx to fully initialize
+
+wait-for-nginx:
+	@echo "$(CYAN)🔍 Waiting for nginx to be fully ready..."
+	@if command -v timeout >/dev/null 2>&1; then \
+		timeout 30 bash -c 'until $$(docker compose logs nginx 2>&1 | grep -q "start worker process" || $$(docker compose ps nginx | grep -q "Up")); do sleep 2; echo -n "."; done' || echo "$(YELLOW)⚠️  Nginx taking longer than expected to start$(RESET)"; \
+	else \
+		sleep 25; \
+	fi
+	@echo ""
+	@echo "$(GREEN)✅ Nginx is ready!$(RESET)"
+	@sleep 3
+
+# ==========================================
 # Evaluation - Complete Setup for 42
 # ==========================================
 eval:
@@ -195,7 +225,10 @@ eval:
 	@echo ""
 	@echo "$(BLUE)━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$(RESET)"
 	@echo "$(GREEN)Step 4/4: Starting all services...$(RESET)"
-	@$(MAKE) up
+	@$(DOCKER_COMPOSE) up -d
+	@echo ""
+	@$(MAKE) wait-for-services
+	@$(MAKE) show-urls
 	@echo ""
 	@echo "$(GREEN)╔════════════════════════════════════════════════════════════════════════╗$(RESET)"
 	@echo "$(GREEN)║         ✅ EVALUATION SETUP COMPLETE - READY FOR TESTING! ✅           ║$(RESET)"
@@ -204,7 +237,8 @@ eval:
 	@echo "$(CYAN)📍 Access the application:$(RESET)"
 	@echo "  $(YELLOW)Frontend:$(RESET) https://localhost:5173"
 	@echo "  $(YELLOW)API:$(RESET)      https://localhost:8080"
-	@echo "  $(YELLOW)Network:$(RESET)  https://$$(hostname -I | awk '{print $$1}'):5173"
+	@IP_HOST=$$(hostname -I | awk '{print $$1}'); \
+	echo "  $(YELLOW)Network:$(RESET)  https://$$IP_HOST:5173"
 	@echo ""
 	@echo "$(MAGENTA)💡 Useful commands:$(RESET)"
 	@echo "  $(CYAN)make status$(RESET)  - Check service health"
@@ -219,6 +253,10 @@ up:
 	@echo "$(BLUE)🚀 Starting all services (containerized)...$(RESET)"
 	$(DOCKER_COMPOSE) up -d
 	@echo ""
+	@$(MAKE) wait-for-services
+	@$(MAKE) show-urls
+
+show-urls:
 	@echo "$(GREEN)╔════════════════════════════════════════════════════════════════════════╗$(RESET)"
 	@echo "$(GREEN)║                  🎉 ALL SERVICES STARTED SUCCESSFULLY! 🎉              ║$(RESET)"
 	@echo "$(GREEN)╚════════════════════════════════════════════════════════════════════════╝$(RESET)"
@@ -226,7 +264,8 @@ up:
 	@echo "$(CYAN)📍 Service URLs:$(RESET)"
 	@echo "  $(YELLOW)Frontend (Nginx):$(RESET) https://localhost:5173"
 	@echo "  $(YELLOW)API Gateway:$(RESET)     https://localhost:8080"
-	@echo "  $(YELLOW)Network:$(RESET)          https://$$(hostname -I | awk '{print $$1}'):5173"
+	@IP_HOST=$$(hostname -I | awk '{print $$1}'); \
+	echo "  $(YELLOW)Network:$(RESET)          https://$$IP_HOST:5173"
 	@echo ""
 	@echo "$(MAGENTA)💡 Tip: Use 'make logs' to view service logs$(RESET)"
 	@echo "$(MAGENTA)💡 Tip: Use 'make status' to check service health$(RESET)"
@@ -236,6 +275,8 @@ up:
 backend-up:
 	@echo "$(BLUE)🐳 Starting backend services...$(RESET)"
 	$(DOCKER_COMPOSE) up -d user_management socket_microservice game_microservice mailer session_microservice google_oauth2 realtime_microservice api_gateway
+	@echo "$(YELLOW)⏳ Waiting for backend services to initialize...$(RESET)"
+	@sleep 15
 	@echo "$(GREEN)✅ Backend services started!$(RESET)"
 
 # Local development mode (Vite dev server - NOT containerized)
@@ -248,7 +289,8 @@ dev: backend-up frontend-dev
 	@echo "$(CYAN)📍 Development URLs:$(RESET)"
 	@echo "  $(YELLOW)Frontend (Vite):$(RESET) https://localhost:5173"
 	@echo "  $(YELLOW)API Gateway:$(RESET)     https://localhost:8080"
-	@echo "  $(YELLOW)Network:$(RESET)         https://$$(hostname -I | awk '{print $$1}'):5173"
+	@IP_HOST=$$(hostname -I | awk '{print $$1}'); \
+	echo "  $(YELLOW)Network:$(RESET)         https://$$IP_HOST:5173"
 	@echo ""
 	@echo "$(YELLOW)⚠️  Note: In dev mode, you may see certificate warnings$(RESET)"
 	@echo ""
@@ -279,9 +321,15 @@ frontend-down:
 # ==========================================
 # Restart Services
 # ==========================================
-restart: down up
+restart: down
+	@echo "$(CYAN)🔄 Restarting all services...$(RESET)"
+	@sleep 5
+	@$(MAKE) up
 
-backend-restart: backend-down backend-up
+backend-restart: backend-down
+	@echo "$(CYAN)🔄 Restarting backend services...$(RESET)"
+	@sleep 3
+	@$(MAKE) backend-up
 
 frontend-restart: frontend-down frontend-dev
 
@@ -437,4 +485,3 @@ check-docker:
 # ==========================================
 launcher:
 	@./start.sh
-

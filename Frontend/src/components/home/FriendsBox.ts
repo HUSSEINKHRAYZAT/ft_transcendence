@@ -417,12 +417,13 @@ export class FriendsBox {
 
     private handleViewFriendStats(friendId: string, friendUsername: string): void {
 
-    if ((window as any).StatisticsModal) {
-        (window as any).StatisticsModal.showForFriend(friendId, friendUsername);
-    } else {
+    // Save friend context for router
+    try {
+        sessionStorage.setItem('ft_pong_friend_stats', JSON.stringify({ id: friendId, username: friendUsername }));
+    } catch {}
 
-        alert('Statistics modal not loaded');
-    }
+    // Navigate to friend statistics route handled by ModalManager
+    window.location.hash = '/statisticsFreind';
     }
 
     private getUnauthenticatedContent(): string {

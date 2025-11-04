@@ -4,8 +4,7 @@ build/
 tmp/
 .DS_Store
 
-# *.env
 *.vscode
-# *.env
+.env
 cert/
 *.md

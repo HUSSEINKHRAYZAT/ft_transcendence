@@ -101,25 +101,28 @@ export function usersService(app: FastifyInstance) {
   function createWithRandomPassword(data: { firstName: string; lastName: string; username: string; email: string; profilePath?: string; status: string }) {
     const crypto = require('crypto');
     const random = crypto.randomBytes(16).toString('hex');
-    
+
     return (async () => {
       const hashedPw = await require('../utils/hash').hashPassword(random);
       const stmt = app.db.prepare(`
-        INSERT INTO users (firstName, lastName, username, email, hashedPassword, isVerified, twoFactorEnabled, profilePath, status) 
+        INSERT INTO users (firstName, lastName, username, email, hashedPassword, isVerified, twoFactorEnabled, profilePath, status)
         VALUES (?, ?, ?, ?, ?, 1, 0, ?, ?)
       `);
       const info = stmt.run(data.firstName, data.lastName, data.username, data.email, hashedPw, data.profilePath ?? null, data.status);
+      const newId = info.lastInsertRowid as number;
+      db.prepare('INSERT INTO statistics (userId) VALUES (?)').run(newId);
+      db.prepare('INSERT INTO settings (username) VALUES (?)').run(data.username);
       return info.lastInsertRowid as number;
     })();
   }
 
   async function upsertOAuthUser(input: { email: string; firstName: string; lastName: string; username: string; profilePath?: string; status: string }) {
     const existing = getUserByEmail(input.email);
-    
+
     if (existing) {
       app.db.prepare(`
-        UPDATE users 
-        SET firstName = ?, lastName = ?, profilePath = ?, isVerified = 1, updatedAt = (strftime('%Y-%m-%dT%H:%M:%fZ','now')) 
+        UPDATE users
+        SET firstName = ?, lastName = ?, profilePath = ?, isVerified = 1, updatedAt = (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
         WHERE id = ?
       `).run(
         input.firstName,
@@ -134,7 +137,7 @@ export function usersService(app: FastifyInstance) {
     if (usernameExists(uname)) {
       uname = `${uname}${Math.floor(Math.random() * 9000 + 1000)}`;
     }
-    
+
     return await createWithRandomPassword({ ...input, username: uname });
   }
 

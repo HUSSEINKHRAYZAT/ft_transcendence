@@ -20,6 +20,7 @@ export class ModalManager {
   private requestModal: RequestModal;
   private blockedUsersModal: BlockedUsersModal;
   private profileModal: ProfileModal;
+  private isHandlingRoute = false;
 
   constructor() {
     this.signupModal = new SignupModal(() => this.showLoginModal());
@@ -56,45 +57,87 @@ export class ModalManager {
 
   /**
    * Handle route changes from browser navigation
+   * Made async to properly await modal close animations before opening new modals
    */
-  private handleRouteChange(path: string): void {
-    // Close all modals WITHOUT modifying URL
-    this.closeAllModalsWithoutHistory();
+  private async handleRouteChange(path: string): Promise<void> {
+    // Prevent concurrent route handling to avoid race conditions
+    if (this.isHandlingRoute) {
+      return;
+    }
 
-    // Open the appropriate modal based on the path
-    switch (path) {
-      case '/login':
-        this.loginModal.showModal();
-        break;
-      case '/signup':
-        this.signupModal.showModal();
-        break;
-      case '/profile':
-        // Open the full ProfileModal UI
-        this.profileModal.showModal();
-        break;
-      case '/statistics':
-        this.statisticsModal.showModal();
-        break;
-      case '/requests':
-        this.requestModal.showRequests();
-        break;
-      case '/blocked':
-        this.blockedUsersModal.showBlockedUsers();
-        break;
-      case '/about':
-        this.infoModal.showModal('about');
-        break;
-      case '/project':
-        this.infoModal.showModal('project');
-        break;
-      case '/home-info':
-        this.infoModal.showModal('home');
-        break;
-      case '/':
-      default:
-        // Home - all modals closed
-        break;
+    this.isHandlingRoute = true;
+
+    try {
+      // Close all modals WITHOUT modifying URL and wait for animations to complete
+      await this.closeAllModalsWithoutHistory();
+
+      // Small delay to ensure DOM cleanup is complete
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+      // Open the appropriate modal based on the path
+      switch (path) {
+        case '/login':
+          this.loginModal.showModal();
+          break;
+        case '/signup':
+          this.signupModal.showModal();
+          break;
+        case '/profile':
+          // Open the full ProfileModal UI
+          this.profileModal.showModal();
+          break;
+        case '/statistics':
+          // Clear friend context to show user's own stats
+          (this.statisticsModal as any).setFriendContext?.(undefined, undefined);
+          // Clean up any lingering friend context in sessionStorage
+          try {
+            sessionStorage.removeItem('ft_pong_friend_stats');
+          } catch {}
+          this.statisticsModal.showModal();
+          break;
+        case '/statisticsFreind': {
+          // Load friend context from sessionStorage
+          try {
+            const raw = sessionStorage.getItem('ft_pong_friend_stats');
+            if (raw) {
+              const data = JSON.parse(raw);
+              // Use the existing instance and set friend context
+              (this.statisticsModal as any).setFriendContext?.(data.id, data.username);
+              this.statisticsModal.showModal();
+            } else {
+              // Fallback: open self stats
+              (this.statisticsModal as any).setFriendContext?.(undefined, undefined);
+              this.statisticsModal.showModal();
+            }
+          } catch {
+            (this.statisticsModal as any).setFriendContext?.(undefined, undefined);
+            this.statisticsModal.showModal();
+          }
+          break;
+        }
+        case '/requests':
+          this.requestModal.showRequests();
+          break;
+        case '/blocked':
+          this.blockedUsersModal.showBlockedUsers();
+          break;
+        case '/about':
+          this.infoModal.showModal('about');
+          break;
+        case '/project':
+          this.infoModal.showModal('project');
+          break;
+        case '/home-info':
+          this.infoModal.showModal('home');
+          break;
+        case '/':
+        default:
+          // Home - all modals closed
+          break;
+      }
+    } finally {
+      // Always reset the flag to allow future route changes
+      this.isHandlingRoute = false;
     }
   }
 
@@ -124,8 +167,8 @@ export class ModalManager {
     window.location.hash = '/blocked';
   }
 
-  showPlayGameModal(): void {
-    this.closeAllModals();
+  async showPlayGameModal(): Promise<void> {
+    await this.closeAllModals();
     this.gameModal.showModal();
   }
 
@@ -150,27 +193,40 @@ export class ModalManager {
     window.location.hash = '/profile';
   }
 
-  closeAllModals(): void {
-    this.closeAllModalsWithoutHistory();
+  async closeAllModals(): Promise<void> {
+    await this.closeAllModalsWithoutHistory();
     // Do not modify URL here; callers should set location.hash if needed
   }
 
   /**
    * Close all modals without updating browser history
+   * Returns a promise that resolves when all modals are fully closed
    */
-  private closeAllModalsWithoutHistory(): void {
-    if (this.loginModal.isOpen()) this.loginModal.close();
-    if (this.signupModal.isOpen()) this.signupModal.close();
-    if (this.infoModal.isOpen()) this.infoModal.close();
-    if (this.gameModal.isOpen()) this.gameModal.close();
-    if (this.statisticsModal.isOpen()) this.statisticsModal.close();
-    if (this.requestModal.isOpen()) this.requestModal.close();
-    if (this.blockedUsersModal.isOpen()) this.blockedUsersModal.close();
-    if (this.profileModal.isOpen()) this.profileModal.close();
+  private async closeAllModalsWithoutHistory(): Promise<void> {
+    const closePromises: Promise<void>[] = [];
+
+    if (this.loginModal.isOpen()) closePromises.push(this.loginModal.close());
+    if (this.signupModal.isOpen()) closePromises.push(this.signupModal.close());
+    if (this.infoModal.isOpen()) closePromises.push(this.infoModal.close());
+    if (this.gameModal.isOpen()) closePromises.push(this.gameModal.close());
+    if (this.statisticsModal.isOpen()) closePromises.push(this.statisticsModal.close());
+    if (this.requestModal.isOpen()) closePromises.push(this.requestModal.close());
+    if (this.blockedUsersModal.isOpen()) closePromises.push(this.blockedUsersModal.close());
+    if (this.profileModal.isOpen()) closePromises.push(this.profileModal.close());
+
+    // Wait for all close animations to complete
+    await Promise.all(closePromises);
+
+    // Hard cleanup: remove any stray modal DOM backdrops if instances missed them
+    try {
+      document.querySelectorAll('.modal-backdrop').forEach((el) => {
+        el.parentElement?.removeChild(el);
+      });
+    } catch {}
   }
 
-  closeModal(): void {
-    this.closeAllModals();
+  async closeModal(): Promise<void> {
+    await this.closeAllModals();
   }
 
   isModalOpen(): boolean {
@@ -353,8 +409,8 @@ export class ModalManager {
     }, 3000);
   }
 
-  destroy(): void {
-    this.closeAllModals();
+  async destroy(): Promise<void> {
+    await this.closeAllModals();
     this.loginModal.destroy();
     this.signupModal.destroy();
     this.infoModal.destroy();

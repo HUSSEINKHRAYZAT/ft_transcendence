@@ -23,11 +23,13 @@ export class ModalService {
   }
 
   showPlayGameModal(): void {
-    modalManager.showPlayGameModal();
+    // Fire and forget - don't block caller
+    modalManager.showPlayGameModal().catch(console.error);
   }
 
   showPlayGameModalTest(): void {
-    modalManager.showPlayGameModal();
+    // Fire and forget - don't block caller
+    modalManager.showPlayGameModal().catch(console.error);
   }
 
   showMiniModal(config: {
@@ -58,7 +60,8 @@ export class ModalService {
   }
 
   closeModal(): void {
-    modalManager.closeModal();
+    // Fire and forget - don't block caller
+    modalManager.closeModal().catch(console.error);
   }
 
   isModalOpen(): boolean {
@@ -70,8 +73,8 @@ export class ModalService {
   }
 
   destroy(): void {
-    modalManager.destroy();
-
+    // Fire and forget - cleanup on best effort basis
+    modalManager.destroy().catch(console.error);
   }
 }
 

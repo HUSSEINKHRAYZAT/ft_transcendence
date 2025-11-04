@@ -14,6 +14,12 @@ export class StatisticsModal extends BaseModal {
 		StatisticsModal.instance = this;
 	}
 
+	// Allow updating friend context on the same instance
+	public setFriendContext(friendId?: string, friendUsername?: string): void {
+		this.friendId = friendId;
+		this.friendUsername = friendUsername;
+	}
+
 	protected getModalTitle(): string {
 		if (this.friendUsername) {
 			return t('Statistics') + ` - ${this.friendUsername}`;
@@ -97,7 +103,13 @@ export class StatisticsModal extends BaseModal {
 
 public static showForFriend(friendId: string, friendUsername: string): void {
 
-    const modal = new StatisticsModal(friendId, friendUsername);
+    // Ensure there is an instance and set context on it
+    let modal = StatisticsModal.instance;
+    if (!modal) {
+        modal = new StatisticsModal(friendId, friendUsername);
+    } else {
+        modal.setFriendContext(friendId, friendUsername);
+    }
     modal.showModal();
     // loadFriendStatistics will be called from getModalContent via setTimeout
 }
@@ -274,7 +286,11 @@ protected getModalContent(): string {
 		const refreshStatsBtn = document.querySelector('#refresh-stats-btn');
 
 		if (closeBtn) {
-			closeBtn.addEventListener('click', (e) => { e.preventDefault(); window.history.back(); });
+			closeBtn.addEventListener('click', async (e) => {
+				e.preventDefault();
+				try { await this.close(); } catch {}
+				window.location.hash = '#';
+			});
 		}
 
 		if (playAgainBtn) {
